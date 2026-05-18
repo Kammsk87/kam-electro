@@ -228,6 +228,16 @@ h3 {
   background: rgba(255, 255, 255, 0.16);
 }
 
+.button.messenger {
+  color: #fff;
+  border-color: rgba(47, 125, 90, 0.72);
+  background: rgba(47, 125, 90, 0.84);
+}
+
+.button.messenger:hover {
+  background: #2f7d5a;
+}
+
 .hero-stats {
   display: grid;
   max-width: 720px;
@@ -436,6 +446,11 @@ h3 {
 .contact-links a {
   border-bottom: 2px solid var(--copper);
   color: var(--ink);
+  font-weight: 800;
+}
+
+.contact-disabled {
+  color: var(--muted);
   font-weight: 800;
 }
 

@@ -24,5 +24,5 @@ form.addEventListener("submit", (event) => {
   ].join("\n");
 
   note.textContent = "Открываю почтовый клиент с заполненной заявкой.";
-  window.location.href = `mailto:info@example.ru?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.location.href = `mailto:info@kamtok.ru?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 });
