@@ -8,8 +8,56 @@
       name="description"
       content="Сборка ВРУ, АВР, ЩУ, распределительных щитов и электромонтаж для строек, производств и коммерческих объектов. Расчет, комплектация, монтаж, пусконаладка."
     >
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://kamtok.ru/">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="ru_RU">
+    <meta property="og:title" content="Сборка электрощитов и электромонтаж в Екатеринбурге">
+    <meta property="og:description" content="ВРУ, АВР, ЩУ и распределительные щиты. Электромонтаж в Екатеринбурге и Свердловской области, сборка щитов с отправкой по России.">
+    <meta property="og:url" content="https://kamtok.ru/">
+    <meta property="og:image" content="https://kamtok.ru/assets/hero-switchgear.png">
+    <meta name="twitter:card" content="summary_large_image">
     <link rel="stylesheet" href="styles.css">
     <script src="script.js" defer></script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Electrician",
+        "name": "КАМ Электро",
+        "url": "https://kamtok.ru/",
+        "image": "https://kamtok.ru/assets/hero-switchgear.png",
+        "telephone": "+79120507100",
+        "email": "info@kamtok.ru",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Екатеринбург",
+          "addressRegion": "Свердловская область",
+          "addressCountry": "RU"
+        },
+        "areaServed": [
+          "Екатеринбург",
+          "Свердловская область",
+          "Россия"
+        ],
+        "description": "Сборка ВРУ, АВР, ЩУ, распределительных щитов и электромонтаж для коммерческих, строительных и производственных объектов.",
+        "makesOffer": [
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Сборка электрощитов"
+            }
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Электромонтаж"
+            }
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <header class="site-header" data-header>
@@ -26,7 +74,7 @@
         <a href="#quality">Качество</a>
         <a href="#contact">Заявка</a>
       </nav>
-      <a class="header-phone" href="tel:+79120507100">8 912 050-71-00</a>
+      <a class="header-phone" href="tel:+79120507100" data-goal="click_phone_header">8 912 050-71-00</a>
     </header>
 
     <main id="top">
@@ -42,9 +90,9 @@
             или отправляем готовый щит транспортной компанией.
           </p>
           <div class="hero-actions" aria-label="Основные действия">
-            <a class="button primary" href="#contact">Рассчитать щит</a>
-            <a class="button messenger" href="https://wa.me/79120507100" target="_blank" rel="noopener">WhatsApp</a>
-            <a class="button ghost" href="tel:+79120507100">Позвонить</a>
+            <a class="button primary" href="#contact" data-goal="click_calculate_hero">Рассчитать щит</a>
+            <a class="button messenger" href="https://wa.me/79120507100" target="_blank" rel="noopener" data-goal="click_whatsapp_hero">WhatsApp</a>
+            <a class="button ghost" href="tel:+79120507100" data-goal="click_phone_hero">Позвонить</a>
           </div>
           <dl class="hero-stats" aria-label="Ключевые преимущества">
             <div>
@@ -250,11 +298,11 @@
             Работаем по Екатеринбургу и Свердловской области, щиты можем отправлять транспортной компанией.
           </p>
           <div class="contact-links" aria-label="Способы связи">
-            <a href="tel:+79120507100">8 912 050-71-00</a>
-            <a href="https://wa.me/79120507100" target="_blank" rel="noopener">WhatsApp</a>
-            <a href="tg://resolve?phone=79120507100">Telegram</a>
+            <a href="tel:+79120507100" data-goal="click_phone_contact">8 912 050-71-00</a>
+            <a href="https://wa.me/79120507100" target="_blank" rel="noopener" data-goal="click_whatsapp_contact">WhatsApp</a>
+            <a href="tg://resolve?phone=79120507100" data-goal="click_telegram_contact">Telegram</a>
             <span class="contact-disabled">MAX: нужна ссылка профиля</span>
-            <a href="mailto:info@kamtok.ru">info@kamtok.ru</a>
+            <a href="mailto:info@kamtok.ru" data-goal="click_email_contact">info@kamtok.ru</a>
           </div>
         </div>
         <form class="lead-form" id="lead-form">

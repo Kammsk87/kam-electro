@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+Host: https://kamtok.ru
+Sitemap: https://kamtok.ru/sitemap.xml
