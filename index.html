@@ -334,7 +334,14 @@
             <a href="mailto:kammsk87@gmail.com" data-goal="click_email_contact">kammsk87@gmail.com</a>
           </div>
         </div>
-        <form class="lead-form" id="lead-form">
+        <form class="lead-form" id="lead-form" name="lead" method="POST" data-netlify="true" netlify-honeypot="bot-field">
+          <input type="hidden" name="form-name" value="lead">
+          <p class="visually-hidden">
+            <label>
+              Не заполняйте это поле
+              <input name="bot-field">
+            </label>
+          </p>
           <label>
             Имя
             <input name="name" autocomplete="name" placeholder="Как к вам обращаться">
@@ -357,7 +364,7 @@
             <textarea name="message" rows="5" placeholder="Например: нужен ВРУ 160 А, есть проект, объект в городе..."></textarea>
           </label>
           <button class="button primary" type="submit">Отправить заявку</button>
-          <p class="form-note" data-form-note>Форма откроет WhatsApp с заполненной заявкой. Также можно написать в Telegram, MAX или на почту.</p>
+          <p class="form-note" data-form-note>После отправки мы увидим заявку и свяжемся с вами в ближайшее время.</p>
         </form>
       </section>
     </main>
