@@ -16,6 +16,74 @@ function updateHeader() {
   }
 }
 
+function showSubmissionSuccess() {
+  reachGoal("lead_form_submit");
+  form.reset();
+  if (note) {
+    note.classList.add("success");
+    note.textContent = "Спасибо, заявка отправлена. В ближайшее время с вами свяжется специалист.";
+  }
+}
+
+function getFormEndpoint() {
+  const localHosts = ["localhost", "127.0.0.1", ""];
+  return localHosts.includes(window.location.hostname) ? "https://kamtok.ru/" : "/";
+}
+
+function submitLeadForm(data) {
+  return new Promise((resolve, reject) => {
+    const frameName = `lead-submit-${Date.now()}`;
+    const iframe = document.createElement("iframe");
+    const shadowForm = document.createElement("form");
+    let submitted = false;
+    let timeoutId;
+
+    iframe.name = frameName;
+    iframe.style.display = "none";
+
+    shadowForm.method = "POST";
+    shadowForm.action = getFormEndpoint();
+    shadowForm.target = frameName;
+    shadowForm.style.display = "none";
+
+    data.forEach((value, key) => {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = key;
+      input.value = value;
+      shadowForm.append(input);
+    });
+
+    function cleanup() {
+      window.clearTimeout(timeoutId);
+      iframe.remove();
+      shadowForm.remove();
+    }
+
+    iframe.addEventListener("load", () => {
+      if (!submitted) {
+        return;
+      }
+      cleanup();
+      resolve();
+    });
+
+    iframe.addEventListener("error", () => {
+      cleanup();
+      reject(new Error("Form submit failed"));
+    });
+
+    timeoutId = window.setTimeout(() => {
+      cleanup();
+      reject(new Error("Form submit timeout"));
+    }, 12000);
+
+    document.body.append(iframe, shadowForm);
+    submitted = true;
+    shadowForm.submit();
+  });
+}
+
 window.addEventListener("scroll", updateHeader, { passive: true });
 updateHeader();
 
@@ -42,22 +110,8 @@ if (form) {
     }
 
     try {
-      const response = await fetch("/", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams(data).toString(),
-      });
-
-      if (!response.ok) {
-        throw new Error("Form submit failed");
-      }
-
-      reachGoal("lead_form_submit");
-      form.reset();
-      if (note) {
-        note.classList.add("success");
-        note.textContent = "Спасибо, заявка отправлена. В ближайшее время с вами свяжется специалист.";
-      }
+      await submitLeadForm(data);
+      showSubmissionSuccess();
     } catch (error) {
       if (note) {
         note.classList.add("error");
