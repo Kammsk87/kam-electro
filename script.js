@@ -10,7 +10,9 @@ function reachGoal(goalName) {
 }
 
 function updateHeader() {
-  header.classList.toggle("is-scrolled", window.scrollY > 20);
+  if (header) {
+    header.classList.toggle("is-scrolled", window.scrollY > 20);
+  }
 }
 
 window.addEventListener("scroll", updateHeader, { passive: true });
@@ -22,21 +24,26 @@ document.querySelectorAll("[data-goal]").forEach((element) => {
   });
 });
 
-form.addEventListener("submit", (event) => {
-  event.preventDefault();
-  reachGoal("lead_form_submit");
+if (form) {
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    reachGoal("lead_form_submit");
 
-  const data = new FormData(form);
-  const subject = "Заявка на электромонтаж / сборку щита";
-  const body = [
-    `Имя: ${data.get("name") || "не указано"}`,
-    `Телефон: ${data.get("phone") || "не указан"}`,
-    `Услуга: ${data.get("service") || "не указана"}`,
-    "",
-    "Задача:",
-    data.get("message") || "не указана",
-  ].join("\n");
+    const data = new FormData(form);
+    const subject = "Заявка на электромонтаж / сборку щита";
+    const body = [
+      `Имя: ${data.get("name") || "не указано"}`,
+      `Телефон: ${data.get("phone") || "не указан"}`,
+      `Услуга: ${data.get("service") || "не указана"}`,
+      "",
+      "Задача:",
+      data.get("message") || "не указана",
+    ].join("\n");
+    const message = `${subject}\n\n${body}`;
 
-  note.textContent = "Открываю почтовый клиент с заполненной заявкой.";
-  window.location.href = `mailto:kammsk87@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-});
+    if (note) {
+      note.textContent = "Открываю WhatsApp с заполненной заявкой.";
+    }
+    window.location.href = `https://wa.me/79120507100?text=${encodeURIComponent(message)}`;
+  });
+}
