@@ -349,6 +349,18 @@ h3 {
   line-height: 1.55;
 }
 
+.text-link {
+  display: inline-flex;
+  margin-top: 18px;
+  color: var(--green);
+  font-weight: 800;
+  border-bottom: 2px solid rgba(47, 125, 90, 0.32);
+}
+
+.text-link:hover {
+  border-color: var(--green);
+}
+
 .timeline {
   display: grid;
   gap: 18px;
@@ -605,6 +617,111 @@ textarea:focus {
   color: #fff;
 }
 
+.landing-main {
+  background: var(--paper);
+}
+
+.landing-hero {
+  display: grid;
+  min-height: 560px;
+  align-items: end;
+  padding: 132px clamp(18px, 5vw, 72px) 72px;
+  color: #fff;
+  background:
+    linear-gradient(90deg, rgba(15, 20, 24, 0.92), rgba(15, 20, 24, 0.72) 48%, rgba(15, 20, 24, 0.32)),
+    url("assets/hero-switchgear.png") center / cover;
+}
+
+.landing-hero-content {
+  max-width: 820px;
+}
+
+.landing-hero h1 {
+  font-size: clamp(34px, 4.4vw, 56px);
+}
+
+.landing-hero p {
+  max-width: 680px;
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 20px;
+  line-height: 1.55;
+}
+
+.landing-section {
+  display: grid;
+  grid-template-columns: minmax(0, 0.86fr) minmax(320px, 1.14fr);
+  gap: clamp(30px, 6vw, 90px);
+  padding: clamp(64px, 9vw, 112px) clamp(18px, 5vw, 72px);
+}
+
+.landing-section.alt {
+  background: #ecefeb;
+}
+
+.landing-copy {
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1.65;
+}
+
+.landing-list,
+.keyword-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.landing-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.landing-list li,
+.keyword-card {
+  border: 1px solid var(--line);
+  padding: 22px;
+  background: #fff;
+}
+
+.landing-list strong,
+.landing-list span,
+.keyword-card strong,
+.keyword-card span {
+  display: block;
+}
+
+.landing-list strong,
+.keyword-card strong {
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+.landing-list span,
+.keyword-card span {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.keyword-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.cta-band {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: center;
+  padding: clamp(44px, 7vw, 72px) clamp(18px, 5vw, 72px);
+  color: #fff;
+  background: var(--steel);
+}
+
+.cta-band p {
+  margin: 10px 0 0;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 18px;
+}
+
 @media (max-width: 960px) {
   .nav {
     display: none;
@@ -631,6 +748,11 @@ textarea:focus {
 
   .contact-copy {
     position: static;
+  }
+
+  .landing-section,
+  .cta-band {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -673,7 +795,8 @@ textarea:focus {
   .service-grid,
   .proof,
   .estimate-list,
-  .credibility-grid {
+  .credibility-grid,
+  .keyword-grid {
     grid-template-columns: 1fr;
   }
 
