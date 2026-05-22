@@ -444,6 +444,62 @@ h3 {
   font-size: 22px;
 }
 
+.works {
+  display: grid;
+  grid-template-columns: minmax(0, 0.72fr) minmax(360px, 1.28fr);
+  gap: clamp(30px, 6vw, 80px);
+  background: var(--paper);
+}
+
+.works .section-copy p:not(.eyebrow),
+.landing-work p {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.works-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  min-width: 0;
+}
+
+.work-photo {
+  position: relative;
+  min-height: 260px;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: #111416;
+}
+
+.work-photo.large {
+  grid-column: span 2;
+  grid-row: span 2;
+  min-height: 534px;
+}
+
+.work-photo img {
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+  display: block;
+  object-fit: cover;
+}
+
+.work-photo figcaption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 16px;
+  color: #fff;
+  background: linear-gradient(180deg, rgba(17, 20, 22, 0), rgba(17, 20, 22, 0.86));
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
 .estimate {
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(320px, 1.1fr);
@@ -658,6 +714,20 @@ textarea:focus {
   background: #ecefeb;
 }
 
+.landing-work {
+  display: grid;
+  grid-template-columns: minmax(0, 0.82fr) minmax(340px, 1.18fr);
+  gap: clamp(30px, 6vw, 90px);
+  padding: clamp(64px, 9vw, 112px) clamp(18px, 5vw, 72px);
+  background: var(--paper);
+}
+
+.landing-work-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
 .landing-copy {
   color: var(--muted);
   font-size: 18px;
@@ -733,6 +803,7 @@ textarea:focus {
 
   .trust-strip,
   .service-grid,
+  .works-grid,
   .proof {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -740,8 +811,10 @@ textarea:focus {
   .intro,
   .split,
   .quality-inner,
+  .works,
   .estimate,
   .credibility-inner,
+  .landing-work,
   .contact {
     grid-template-columns: 1fr;
   }
@@ -793,11 +866,20 @@ textarea:focus {
   .hero-stats,
   .trust-strip,
   .service-grid,
+  .works-grid,
   .proof,
   .estimate-list,
   .credibility-grid,
-  .keyword-grid {
+  .keyword-grid,
+  .landing-work-grid {
     grid-template-columns: 1fr;
+  }
+
+  .work-photo,
+  .work-photo.large {
+    grid-column: auto;
+    grid-row: auto;
+    min-height: 320px;
   }
 
   .hero-stats div {
