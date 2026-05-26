@@ -312,6 +312,42 @@ h3 {
   background: var(--paper);
 }
 
+.install-scope {
+  display: grid;
+  grid-template-columns: minmax(0, 0.78fr) minmax(360px, 1.22fr);
+  gap: clamp(30px, 6vw, 90px);
+  background: #ecefeb;
+}
+
+.install-scope .section-copy p:not(.eyebrow) {
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+.scope-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.scope-grid article {
+  border: 1px solid var(--line);
+  padding: 24px;
+  background: var(--paper);
+}
+
+.scope-grid h3 {
+  margin-bottom: 10px;
+  font-size: 22px;
+}
+
+.scope-grid p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
 .service-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -909,6 +945,7 @@ textarea:focus {
   .cases,
   .estimate,
   .credibility-inner,
+  .install-scope,
   .landing-work,
   .faq,
   .contact {
@@ -966,6 +1003,7 @@ textarea:focus {
   .proof,
   .estimate-list,
   .credibility-grid,
+  .scope-grid,
   .faq-list,
   .keyword-grid,
   .landing-work-grid {
