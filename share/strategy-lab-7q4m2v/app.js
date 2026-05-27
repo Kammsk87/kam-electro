@@ -396,7 +396,7 @@ function persist() {
 }
 
 function persistPaperTrades() {
-  localStorage.setItem(paperJournalKey, JSON.stringify({ trades: state.paperTrades.slice(-250) }));
+  localStorage.setItem(paperJournalKey, JSON.stringify({ trades: state.paperTrades }));
 }
 
 function renderRules() {
