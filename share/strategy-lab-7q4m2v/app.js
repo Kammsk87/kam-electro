@@ -267,8 +267,11 @@ const state = {
   lastStrategy: "",
   lastUserIdea: "",
   tradePlan: null,
+  signalQuality: null,
   paperTrades: loadPaperTrades(),
   activePaperTradeId: null,
+  paperPriceCache: {},
+  paperPriceLastFetch: 0,
   detectedMode: "trend",
   rsiPreferences: {},
   live: {
@@ -373,6 +376,8 @@ function normalizePaperTrade(trade) {
     id: String(trade.id || `trade-${Date.now()}-${Math.round(Math.random() * 1000)}`),
     asset: String(trade.asset || "BTC/USDT"),
     timeframe: String(trade.timeframe || "15m"),
+    mode: String(trade.mode || ""),
+    modeSource: String(trade.modeSource || ""),
     side: trade.side === "SHORT" ? "SHORT" : "LONG",
     amount,
     entry,
@@ -384,6 +389,8 @@ function normalizePaperTrade(trade) {
     closedAt: Number(trade.closedAt) || null,
     status: trade.status === "target" || trade.status === "stop" ? trade.status : "open",
     result: String(trade.result || "в работе"),
+    decision: String(trade.decision || ""),
+    score: Number(trade.score) || null,
     exitPrice: Number(trade.exitPrice) || null,
     pnl: Number(trade.pnl) || 0,
     pnlPct: Number(trade.pnlPct) || 0,
@@ -733,6 +740,7 @@ function generateStrategy(userIdea = "") {
   const tradePlan = buildTradePlan(context);
   const signalQuality = evaluateSignalQuality(context, tradePlan);
   state.tradePlan = tradePlan;
+  state.signalQuality = signalQuality;
   strategyContainer.classList.add("compact");
   strategyContainer.innerHTML = buildStrategy(userIdea, tradePlan, signalQuality);
   confidence.textContent = `${context.rules.length + context.sourceRules.length} правил учтено`;
@@ -1383,26 +1391,35 @@ function syncPaperSideOptions(tradePlan) {
     const fallback = tradePlan?.scenarios?.[0]?.side;
     if (fallback) paperSide.value = fallback;
   }
+
+  const bestSide = getBestScenarioSide(tradePlan);
+  if (bestSide && availableSides.has(bestSide)) {
+    paperSide.value = bestSide;
+  }
 }
 
 function enterPaperTrade() {
   const tradePlan = state.tradePlan || buildTradePlan(getContext());
-  const side = paperSide.value;
+  const context = getContext();
+  const side = getBestScenarioSide(tradePlan) || paperSide.value;
   const scenario = tradePlan.scenarios.find((item) => item.side === side) || tradePlan.primary;
   if (!scenario) return;
 
   const amount = Math.max(10, Number(paperAmount.value) || 1000);
   paperAmount.value = String(amount);
-  const currentPrice = getCurrentMarketPrice();
-  const entry = currentPrice || scenario.entry;
+  const currentPrice = getCurrentMarketPrice(context.asset);
+  const entry = scenario.entry;
   const quantity = amount / entry;
   const id = `trade-${Date.now()}-${Math.round(Math.random() * 1000)}`;
+  const quality = state.signalQuality?.scenarios?.find((item) => item.side === scenario.side);
 
   const trade = {
     id,
     index: state.paperTrades.length + 1,
-    asset: asset.value,
-    timeframe: timeframe.value,
+    asset: context.asset,
+    timeframe: context.timeframe,
+    mode: context.mode,
+    modeSource: context.modeSource,
     side: scenario.side,
     amount,
     entry,
@@ -1414,16 +1431,26 @@ function enterPaperTrade() {
     closedAt: null,
     status: "open",
     result: "в работе",
+    decision: quality?.decision || "",
+    score: quality?.score || null,
     exitPrice: null,
     pnl: 0,
     pnlPct: 0,
     history: [{ time: Date.now(), price: entry, pnl: 0, pnlPct: 0 }]
   };
 
+  state.paperPriceCache[trade.asset] = { price: currentPrice || entry, updatedAt: Date.now(), source: "entry" };
   state.paperTrades.push(trade);
   state.activePaperTradeId = id;
   persistPaperTrades();
   updatePaperTrades();
+}
+
+function getBestScenarioSide(tradePlan) {
+  const sides = new Set((tradePlan?.scenarios || []).map((scenario) => scenario.side));
+  const bestSide = state.signalQuality?.best?.side;
+  if (bestSide && sides.has(bestSide)) return bestSide;
+  return null;
 }
 
 function resetPaperTrade(shouldDraw = true) {
@@ -1453,6 +1480,7 @@ function updatePaperTrades() {
     return;
   }
 
+  refreshOpenPaperTradePrices();
   state.paperTrades.forEach((trade) => updateSinglePaperTrade(trade));
   const activeTrade = getActivePaperTrade();
   if (activeTrade) {
@@ -1462,6 +1490,66 @@ function updatePaperTrades() {
   } else {
     resetPaperTrade(false);
     drawPaperChart();
+  }
+  persistPaperTrades();
+  renderTradeJournal();
+}
+
+async function refreshOpenPaperTradePrices(force = false) {
+  const now = Date.now();
+  if (!force && now - state.paperPriceLastFetch < 9000) return;
+  const openAssets = [...new Set(state.paperTrades.filter((trade) => trade.status === "open").map((trade) => trade.asset))];
+  if (!openAssets.length) return;
+
+  state.paperPriceLastFetch = now;
+  const currentSnapshot = getLiveSnapshot();
+  if (currentSnapshot.active && currentSnapshot.lastPrice > 0) {
+    state.paperPriceCache[currentSnapshot.symbol] = {
+      price: currentSnapshot.lastPrice,
+      updatedAt: currentSnapshot.updatedAt,
+      source: "live"
+    };
+  }
+
+  const assetsToFetch = openAssets.filter((symbol) => {
+    const cached = state.paperPriceCache[symbol];
+    return !cached || now - cached.updatedAt > 9000;
+  });
+  if (!assetsToFetch.length) return;
+
+  const results = await Promise.allSettled(assetsToFetch.map(fetchPaperTickerPrice));
+  let changed = false;
+  results.forEach((result, index) => {
+    if (result.status !== "fulfilled" || !result.value?.price) return;
+    state.paperPriceCache[assetsToFetch[index]] = {
+      price: result.value.price,
+      updatedAt: Date.now(),
+      source: "Bybit"
+    };
+    changed = true;
+  });
+
+  if (changed) updatePaperTradesFromCachedPrices();
+}
+
+async function fetchPaperTickerPrice(symbol) {
+  const url = `https://api.bybit.com/v5/market/tickers?category=spot&symbol=${toBinanceSymbol(symbol)}`;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Ticker request failed");
+  const data = await response.json();
+  const ticker = data.result?.list?.[0];
+  const price = Number(ticker?.lastPrice);
+  if (!Number.isFinite(price) || price <= 0) throw new Error("Ticker price unavailable");
+  return { price };
+}
+
+function updatePaperTradesFromCachedPrices() {
+  state.paperTrades.forEach((trade) => updateSinglePaperTrade(trade));
+  const activeTrade = getActivePaperTrade();
+  if (activeTrade) {
+    const currentPrice = getPaperTradePrice(activeTrade);
+    renderPaperReadout(activeTrade, currentPrice, activeTrade.pnl, activeTrade.pnlPct);
+    drawPaperChart(activeTrade);
   }
   persistPaperTrades();
   renderTradeJournal();
@@ -1585,18 +1673,21 @@ function formatJournalTime(timestamp) {
   });
 }
 
-function getCurrentMarketPrice() {
+function getCurrentMarketPrice(symbol = asset.value) {
   const live = getLiveSnapshot();
-  if (live.active && live.lastPrice > 0) return live.lastPrice;
-  const lastCandle = state.live.candles[state.live.candles.length - 1];
+  if (live.active && live.symbol === symbol && live.lastPrice > 0) return live.lastPrice;
+  const cached = state.paperPriceCache[symbol];
+  if (cached?.price > 0) return cached.price;
+  const lastCandle = live.symbol === symbol ? state.live.candles[state.live.candles.length - 1] : null;
   if (lastCandle?.close > 0) return lastCandle.close;
+  if (symbol !== asset.value) return 0;
   return state.tradePlan?.basePrice || 0;
 }
 
 function getPaperTradePrice(trade) {
   if (trade.status !== "open" && trade.exitPrice) return trade.exitPrice;
-  if (trade.asset !== asset.value) return trade.history[trade.history.length - 1]?.price || trade.entry;
-  return getCurrentMarketPrice() || trade.entry;
+  const currentPrice = getCurrentMarketPrice(trade.asset);
+  return currentPrice || trade.history[trade.history.length - 1]?.price || trade.entry;
 }
 
 function drawPaperChart(trade = null) {
@@ -1887,9 +1978,6 @@ chatForm.addEventListener("submit", (event) => {
     if (control === asset) {
       renderRsiControls();
     }
-    if (control === asset || control === timeframe) {
-      resetPaperTrade(false);
-    }
     if ((control === asset || control === timeframe) && state.live.enabled) {
       restartLiveConnection();
     }
@@ -1909,6 +1997,8 @@ updateRiskLabel();
 renderLiveReadout();
 renderTradeJournal();
 generateStrategy();
+refreshOpenPaperTradePrices(true);
+window.setInterval(() => refreshOpenPaperTradePrices(), 10000);
 
 function startLiveConnection() {
   state.live.enabled = true;
