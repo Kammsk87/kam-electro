@@ -435,7 +435,9 @@ function generateStrategy(userIdea = "") {
   maxRisk.textContent = `${context.risk.toFixed(2)}%`;
   filterCount.textContent = context.conservative ? "4" : "3";
   chartLabel.textContent = `${context.asset} · ${context.timeframe}`;
-  chartTitle.textContent = context.live.active ? `Live свечи · ${modeLabel(context.mode)}` : "Сценарий цены";
+  chartTitle.textContent = context.live.active
+    ? `Live свечи · ${modeLabel(context.mode)} · ${selectedSidesLabel(tradePlan)}`
+    : `Сценарий цены · ${selectedSidesLabel(tradePlan)}`;
   renderTradePlanReadout(tradePlan);
   if (context.live.active && state.live.candles.length > 1) {
     drawLiveChart(state.live.candles, tradePlan);
@@ -540,8 +542,8 @@ function drawChart(mode, tradePlan = null) {
       ctx.lineTo(point.x, point.y);
     }
   });
-  ctx.strokeStyle = "#55c7a2";
-  ctx.lineWidth = 3;
+  ctx.strokeStyle = "rgba(154,166,173,0.72)";
+  ctx.lineWidth = 2;
   ctx.stroke();
 
   const last = points[points.length - 1];
@@ -570,6 +572,7 @@ function drawChart(mode, tradePlan = null) {
       chartHeight: height - pad.top - pad.bottom,
       priceToY: (price) => priceToY(price, min, range, pad, height - pad.top - pad.bottom)
     });
+    drawScenarioBadge(tradePlan, pad.left, pad.top);
   }
 }
 
@@ -655,6 +658,7 @@ function drawLiveChart(candles, tradePlan = null) {
       chartHeight,
       priceToY: (price) => priceToY(price, min, range, pad, chartHeight)
     });
+    drawScenarioBadge(tradePlan, pad.left, pad.top);
   }
 }
 
@@ -799,6 +803,30 @@ function renderTradePlanReadout(tradePlan) {
   planEntry.textContent = secondary ? `${formatPrice(primary.entry)} / ${formatPrice(secondary.entry)}` : formatPrice(primary.entry);
   planStop.textContent = secondary ? `${formatPrice(primary.stop)} / ${formatPrice(secondary.stop)}` : formatPrice(primary.stop);
   planTarget.textContent = secondary ? `${formatPrice(primary.target2)} / ${formatPrice(secondary.target2)}` : formatPrice(primary.target2);
+}
+
+function selectedSidesLabel(tradePlan) {
+  const sides = tradePlan?.scenarios?.map((scenario) => scenario.side) || [];
+  if (sides.includes("LONG") && sides.includes("SHORT")) return "LONG + SHORT";
+  if (sides.includes("SHORT")) return "SHORT";
+  return "LONG";
+}
+
+function drawScenarioBadge(tradePlan, x, y) {
+  const label = `Показан: ${selectedSidesLabel(tradePlan)}`;
+  const color = selectedSidesLabel(tradePlan) === "SHORT"
+    ? "#ef6b5b"
+    : selectedSidesLabel(tradePlan) === "LONG"
+      ? "#55c7a2"
+      : "#f3b14d";
+  ctx.fillStyle = "rgba(17,21,24,0.86)";
+  ctx.fillRect(x + 6, y + 8, 174, 28);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 6, y + 8, 174, 28);
+  ctx.fillStyle = color;
+  ctx.font = "800 13px Inter, system-ui, sans-serif";
+  ctx.fillText(label, x + 18, y + 27);
 }
 
 function drawTradePlanOverlay(tradePlan, scale) {
