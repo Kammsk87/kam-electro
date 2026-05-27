@@ -426,6 +426,53 @@ canvas {
   font-size: 14px;
 }
 
+.strategy-intel {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(23, 27, 31, 0.88);
+  box-shadow: var(--shadow);
+}
+
+.intel-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.intel-grid div {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 7px;
+  background: rgba(32, 38, 44, 0.84);
+}
+
+.intel-grid span,
+.intel-grid strong {
+  display: block;
+}
+
+.intel-grid span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.intel-grid strong {
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.intel-details {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
 .paper-panel {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(210px, 260px);
@@ -918,22 +965,35 @@ canvas {
   }
 
   .metrics,
-  .trade-plan-strip {
+  .trade-plan-strip,
+  .intel-grid {
     gap: 6px;
   }
 
   .metrics div,
-  .trade-plan-strip div {
+  .trade-plan-strip div,
+  .intel-grid div {
     padding: 6px;
   }
 
   .metrics strong,
-  .trade-plan-strip strong {
+  .trade-plan-strip strong,
+  .intel-grid strong {
     font-size: 13px;
   }
 
   .trade-plan-strip strong {
     font-size: 12px;
+  }
+
+  .strategy-intel {
+    padding: 7px;
+  }
+
+  .intel-details {
+    margin-top: 6px;
+    font-size: 11px;
+    line-height: 1.32;
   }
 
   .paper-panel {
@@ -1037,6 +1097,7 @@ canvas {
   }
 
   .trade-plan-strip,
+  .intel-grid,
   .journal-summary {
     grid-template-columns: repeat(2, 1fr);
   }

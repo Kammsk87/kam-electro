@@ -2,8 +2,11 @@ const storageKey = "crypto-strategy-bot-v1";
 const paperJournalKey = "crypto-strategy-bot-paper-journal-v1";
 const paperSessionKey = "crypto-strategy-bot-session-id";
 const depositKey = "crypto-strategy-bot-deposit-v1";
+const autopilotKey = "crypto-strategy-bot-autopilot-v1";
 
 const currentSessionId = getCurrentSessionId();
+const autopilotMinScore = 74;
+const autopilotScanMs = 30000;
 const emaProfiles = [
   { id: "ema-34", label: "EMA 34", period: 34, color: "#c084fc", role: "быстрая EMA из чисел Фибоначчи: фильтр импульса и отката." },
   { id: "ema-89", label: "EMA 89", period: 89, color: "#38bdf8", role: "медленная EMA из чисел Фибоначчи: фильтр старшего направления." }
@@ -279,6 +282,33 @@ function getCurrentSessionId() {
   return sessionId;
 }
 
+function createEmptyMarketIntel() {
+  return {
+    loading: false,
+    updatedAt: null,
+    backtest: null,
+    derivatives: null,
+    sentiment: null,
+    learning: null,
+    monthlyGoal: null,
+    notes: ["Интеллект-фильтры ждут обновления."]
+  };
+}
+
+function loadAutopilotState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(autopilotKey));
+    return {
+      enabled: Boolean(saved?.enabled),
+      lastEntryAt: Number(saved?.lastEntryAt) || 0,
+      lastScanAt: 0,
+      lastMessage: String(saved?.lastMessage || "наблюдает")
+    };
+  } catch (error) {
+    return { enabled: false, lastEntryAt: 0, lastScanAt: 0, lastMessage: "наблюдает" };
+  }
+}
+
 const state = {
   rules: loadRules(),
   lastStrategy: "",
@@ -289,6 +319,8 @@ const state = {
   activePaperTradeId: null,
   paperPriceCache: {},
   paperPriceLastFetch: 0,
+  marketIntel: createEmptyMarketIntel(),
+  autopilot: loadAutopilotState(),
   emaPreferences: {},
   detectedMode: "trend",
   rsiPreferences: {},
@@ -336,6 +368,14 @@ const planSide = document.querySelector("[data-plan-side]");
 const planEntry = document.querySelector("[data-plan-entry]");
 const planStop = document.querySelector("[data-plan-stop]");
 const planTarget = document.querySelector("[data-plan-target]");
+const backtestScore = document.querySelector("[data-backtest-score]");
+const monthlyGoal = document.querySelector("[data-monthly-goal]");
+const derivativesScore = document.querySelector("[data-derivatives-score]");
+const learningScore = document.querySelector("[data-learning-score]");
+const autopilotStatus = document.querySelector("[data-autopilot-status]");
+const intelDetails = document.querySelector("[data-intel-details]");
+const intelRefresh = document.querySelector("[data-intel-refresh]");
+const autopilotToggle = document.querySelector("[data-autopilot-toggle]");
 const liveStatus = document.querySelector("[data-live-status]");
 const liveToggle = document.querySelector("[data-live-toggle]");
 const livePrice = document.querySelector("[data-live-price]");
@@ -434,6 +474,8 @@ function normalizePaperTrade(trade) {
     deposit: Number(trade.deposit) || loadDeposit(),
     riskBudget: Number(trade.riskBudget) || (Number(trade.deposit) || loadDeposit()) * 0.02,
     riskLimitPct: Number(trade.riskLimitPct) || 2,
+    autopilot: Boolean(trade.autopilot),
+    autopilotReason: String(trade.autopilotReason || ""),
     entry,
     quantity: Number(trade.quantity) || amount / entry,
     stop,
@@ -707,6 +749,7 @@ function getContext() {
     rsi: getSelectedRsiIndicators(),
     ema: getSelectedEmaIndicators(),
     deposit: getDepositValue(),
+    intel: state.marketIntel,
     live: getLiveSnapshot()
   };
 }
@@ -751,6 +794,7 @@ function buildStrategy(userIdea = "", tradePlan = null, signalQuality = null) {
     .map((source) => source.title)
     .join("; ");
   const liveBlock = buildLiveStrategyBlock(context);
+  const intelligenceBlock = buildIntelligenceStrategyBlock(context);
   const tradePlanBlock = buildTradePlanBlock(tradePlan);
   const rsiBlock = buildRsiStrategyBlock(context);
   const emaBlock = buildEmaStrategyBlock(context);
@@ -766,6 +810,7 @@ function buildStrategy(userIdea = "", tradePlan = null, signalQuality = null) {
       <p>Рабочая гипотеза: ${setup}. Направление: ${side}. Таймфрейм исполнения: ${context.timeframe}.</p>
     </section>
     ${liveBlock}
+    ${intelligenceBlock}
     ${tradePlanBlock}
     ${signalQualityBlock}
     ${rsiBlock}
@@ -956,6 +1001,34 @@ function buildLiveStrategyBlock(context) {
   `;
 }
 
+function buildIntelligenceStrategyBlock(context) {
+  const intel = context.intel || createEmptyMarketIntel();
+  const backtestText = intel.backtest
+    ? `бэктест: ${intel.backtest.trades} сделок, winrate ${intel.backtest.winRate.toFixed(0)}%, expectancy ${intel.backtest.expectancyPct.toFixed(2)}%, просадка ${intel.backtest.maxDrawdownPct.toFixed(2)}%`
+    : "бэктест еще не рассчитан";
+  const goalText = intel.monthlyGoal
+    ? `факт за 30 дней ${intel.monthlyGoal.currentPct.toFixed(2)}%, до цели 10% осталось ${Math.max(0, 10 - intel.monthlyGoal.currentPct).toFixed(2)}%`
+    : "цель 10%/мес еще не рассчитана";
+  const derivativesText = intel.derivatives
+    ? `${intel.derivatives.bias}; funding ${formatSigned(intel.derivatives.fundingRatePct, 4)}%, OI ${formatCompact(intel.derivatives.openInterest)}`
+    : "деривативные фильтры ждут данных";
+  const learningText = intel.learning
+    ? `${intel.learning.closedTrades} закрытых сделок в архиве; ${intel.learning.bestPattern || "паттерн еще не выделен"}`
+    : "самообучение ждет закрытых сделок";
+
+  return `
+    <section>
+      <h3>Лаборатория точности</h3>
+      <ul>
+        <li>${escapeHtml(backtestText)}.</li>
+        <li>${escapeHtml(goalText)}.</li>
+        <li>${escapeHtml(derivativesText)}.</li>
+        <li>${escapeHtml(learningText)}.</li>
+      </ul>
+    </section>
+  `;
+}
+
 function selectBookRules(context) {
   const selected = [
     ...knowledgeSources.find((source) => source.title === "Криптотрейдинг: Искусство побеждать").rules,
@@ -994,6 +1067,7 @@ function generateStrategy(userIdea = "") {
   maxRisk.textContent = `${context.risk.toFixed(2)}%`;
   filterCount.textContent = String((context.conservative ? 4 : 3) + context.rsi.filter((indicator) => indicator.use).length + context.ema.filter((indicator) => indicator.use).length);
   renderSignalQualityReadout(signalQuality);
+  renderStrategyIntelligence();
   chartLabel.textContent = `${context.asset} · ${context.timeframe}`;
   chartTitle.textContent = context.live.active
     ? `Live свечи · ${formatModeTitle(context)} · ${selectedSidesLabel(tradePlan)}`
@@ -1014,6 +1088,343 @@ function renderSignalQualityReadout(signalQuality) {
     return;
   }
   signalScore.textContent = `${signalQuality.best.score}/100`;
+}
+
+function renderStrategyIntelligence() {
+  state.marketIntel.learning = analyzeLearningJournal();
+  state.marketIntel.monthlyGoal = calculateMonthlyGoalProgress();
+  const intel = state.marketIntel;
+  const backtest = intel.backtest;
+  const goal = intel.monthlyGoal;
+  const derivatives = intel.derivatives;
+  const learning = intel.learning;
+
+  backtestScore.textContent = backtest
+    ? `${backtest.winRate.toFixed(0)}% · ${backtest.expectancyPct >= 0 ? "+" : ""}${backtest.expectancyPct.toFixed(2)}%`
+    : intel.loading ? "считаю" : "нет данных";
+  monthlyGoal.textContent = goal
+    ? `${goal.currentPct >= 0 ? "+" : ""}${goal.currentPct.toFixed(2)}% / 10%`
+    : "нет данных";
+  derivativesScore.textContent = derivatives
+    ? `${derivatives.sideBias || "NEUTRAL"} · ${formatSigned(derivatives.fundingRatePct, 3)}%`
+    : "нет данных";
+  learningScore.textContent = learning
+    ? `${learning.closedTrades} сделок · ${learning.winRate.toFixed(0)}%`
+    : "нет данных";
+  autopilotStatus.textContent = state.autopilot.enabled ? state.autopilot.lastMessage : "выключен";
+  autopilotToggle.textContent = state.autopilot.enabled ? "Авто-бот: вкл" : "Авто-бот: выкл";
+  autopilotToggle.classList.toggle("is-live", state.autopilot.enabled);
+  intelDetails.textContent = intel.notes.join(" ");
+}
+
+async function refreshStrategyIntelligence(force = false) {
+  const context = getContext();
+  const now = Date.now();
+  if (!force && state.marketIntel.updatedAt && now - state.marketIntel.updatedAt < 60000 && state.marketIntel.asset === context.asset && state.marketIntel.timeframe === context.timeframe) {
+    renderStrategyIntelligence();
+    return;
+  }
+
+  state.marketIntel = { ...state.marketIntel, loading: true, asset: context.asset, timeframe: context.timeframe, notes: ["Обновляю бэктест, деривативные фильтры, сентимент и журнал."] };
+  renderStrategyIntelligence();
+
+  const [candlesResult, derivativesResult, sentimentResult] = await Promise.allSettled([
+    fetchHistoricalCandlesFor(context.asset, context.timeframe, 320),
+    fetchDerivativeIntel(context.asset),
+    fetchSentimentIntel()
+  ]);
+
+  const candles = candlesResult.status === "fulfilled" ? candlesResult.value : [];
+  const backtest = candles.length ? runStrategyBacktest(candles, context) : null;
+  const derivatives = derivativesResult.status === "fulfilled" ? derivativesResult.value : null;
+  const sentiment = sentimentResult.status === "fulfilled" ? sentimentResult.value : null;
+  const learning = analyzeLearningJournal();
+  const monthly = calculateMonthlyGoalProgress();
+  const notes = buildIntelNotes(backtest, derivatives, sentiment, learning, monthly, candles.length);
+
+  state.marketIntel = {
+    loading: false,
+    updatedAt: Date.now(),
+    asset: context.asset,
+    timeframe: context.timeframe,
+    backtest,
+    derivatives,
+    sentiment,
+    learning,
+    monthlyGoal: monthly,
+    notes
+  };
+  generateStrategy(state.lastUserIdea);
+}
+
+async function fetchHistoricalCandlesFor(symbol, interval, limit = 320) {
+  const url = `https://api.bybit.com/v5/market/kline?category=spot&symbol=${toBinanceSymbol(symbol)}&interval=${toBybitInterval(interval)}&limit=${limit}`;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Kline request failed");
+  const data = await response.json();
+  if (data.retCode !== 0 || !Array.isArray(data.result?.list)) throw new Error(data.retMsg || "Kline response failed");
+  return data.result.list.slice().reverse().map((item) => ({
+    openTime: Number(item[0]),
+    open: Number(item[1]),
+    high: Number(item[2]),
+    low: Number(item[3]),
+    close: Number(item[4]),
+    volume: Number(item[5]),
+    closeTime: Number(item[0]) + intervalToMs(interval) - 1
+  }));
+}
+
+async function fetchDerivativeIntel(symbol) {
+  const bybitSymbol = toBinanceSymbol(symbol);
+  const [fundingResult, oiResult, ratioResult] = await Promise.allSettled([
+    fetchJson(`https://api.bybit.com/v5/market/funding/history?category=linear&symbol=${bybitSymbol}&limit=1`),
+    fetchJson(`https://api.bybit.com/v5/market/open-interest?category=linear&symbol=${bybitSymbol}&intervalTime=15min&limit=2`),
+    fetchJson(`https://api.bybit.com/v5/market/account-ratio?category=linear&symbol=${bybitSymbol}&period=15min&limit=1`)
+  ]);
+
+  const funding = fundingResult.status === "fulfilled" ? Number(fundingResult.value.result?.list?.[0]?.fundingRate) * 100 : 0;
+  const oiList = oiResult.status === "fulfilled" ? oiResult.value.result?.list || [] : [];
+  const openInterest = Number(oiList[0]?.openInterest) || 0;
+  const prevOpenInterest = Number(oiList[1]?.openInterest) || openInterest;
+  const oiChangePct = prevOpenInterest > 0 ? ((openInterest - prevOpenInterest) / prevOpenInterest) * 100 : 0;
+  const ratio = ratioResult.status === "fulfilled" ? ratioResult.value.result?.list?.[0] : null;
+  const longShortRatio = Number(ratio?.buyRatio) && Number(ratio?.sellRatio) ? Number(ratio.buyRatio) / Number(ratio.sellRatio) : 1;
+
+  let sideBias = "NEUTRAL";
+  let bias = "деривативы нейтральны";
+  if (Math.abs(funding) > 0.05 && Math.abs(oiChangePct) > 1.5) {
+    sideBias = "CAUTION";
+    bias = "фандинг и OI показывают перегрев";
+  } else if (funding < -0.015 && longShortRatio < 0.9) {
+    sideBias = "LONG";
+    bias = "рынок перегружен short, long допустим только по подтверждению";
+  } else if (funding > 0.015 && longShortRatio > 1.1) {
+    sideBias = "SHORT";
+    bias = "рынок перегружен long, short допустим только по подтверждению";
+  }
+
+  return { fundingRatePct: funding || 0, openInterest, oiChangePct, longShortRatio, sideBias, bias };
+}
+
+async function fetchSentimentIntel() {
+  const data = await fetchJson("https://api.alternative.me/fng/?limit=1");
+  const item = data.data?.[0];
+  return {
+    value: Number(item?.value) || 50,
+    label: String(item?.value_classification || "Neutral"),
+    updatedAt: Number(item?.timestamp) ? Number(item.timestamp) * 1000 : Date.now()
+  };
+}
+
+async function fetchJson(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Request failed");
+  return response.json();
+}
+
+function runStrategyBacktest(candles, context) {
+  const closes = candles.map((candle) => candle.close);
+  const ema34 = calculateEmaSeries(closes, 34);
+  const ema89 = calculateEmaSeries(closes, 89);
+  const rsi14 = calculateRsiSeries(closes, 14);
+  const trades = [];
+
+  for (let i = 90; i < candles.length - 12; i += 1) {
+    const candle = candles[i];
+    const avgRange = average(candles.slice(Math.max(0, i - 20), i).map((item) => (item.high - item.low) / item.close));
+    const riskDistance = Math.max(candle.close * 0.0035, candle.close * Math.max(0.004, Math.min(0.03, avgRange * 1.15)));
+    const rr1 = context.conservative ? 1.6 : 1.25;
+    const rr2 = context.conservative ? 2.2 : 1.7;
+    const candidates = [];
+
+    if (context.includeLongs && candle.close > ema34[i] && ema34[i] > ema89[i] && rsi14[i] >= 42 && rsi14[i] <= 68) {
+      candidates.push({ side: "LONG", entry: candle.close, stop: candle.close - riskDistance, target1: candle.close + riskDistance * rr1, target2: candle.close + riskDistance * rr2 });
+    }
+    if (context.includeShorts && candle.close < ema34[i] && ema34[i] < ema89[i] && rsi14[i] >= 32 && rsi14[i] <= 58) {
+      candidates.push({ side: "SHORT", entry: candle.close, stop: candle.close + riskDistance, target1: candle.close - riskDistance * rr1, target2: candle.close - riskDistance * rr2 });
+    }
+
+    candidates.slice(0, 1).forEach((candidate) => {
+      const result = simulateBacktestTrade(candidate, candles.slice(i + 1, i + 13));
+      if (result) trades.push(result);
+    });
+  }
+
+  const wins = trades.filter((trade) => trade.pnlPct > 0).length;
+  const totalPct = trades.reduce((sum, trade) => sum + trade.pnlPct, 0);
+  const equity = trades.reduce((items, trade) => {
+    const previous = items[items.length - 1] || 0;
+    items.push(previous + trade.pnlPct);
+    return items;
+  }, []);
+  const maxDrawdownPct = calculateMaxDrawdown(equity);
+  const avgPnlPct = trades.length ? totalPct / trades.length : 0;
+  return {
+    trades: trades.length,
+    wins,
+    losses: trades.length - wins,
+    winRate: trades.length ? (wins / trades.length) * 100 : 0,
+    expectancyPct: avgPnlPct,
+    totalPct,
+    maxDrawdownPct,
+    sample: trades.slice(-12)
+  };
+}
+
+function simulateBacktestTrade(plan, futureCandles) {
+  let partial = false;
+  let pnlPct = 0;
+  for (const candle of futureCandles) {
+    const hitStop = plan.side === "LONG" ? candle.low <= plan.stop : candle.high >= plan.stop;
+    const hitT1 = plan.side === "LONG" ? candle.high >= plan.target1 : candle.low <= plan.target1;
+    const hitT2 = plan.side === "LONG" ? candle.high >= plan.target2 : candle.low <= plan.target2;
+    const riskPct = Math.abs(plan.entry - plan.stop) / plan.entry * 100;
+
+    if (hitStop) {
+      pnlPct += partial ? -riskPct * 0.5 : -riskPct;
+      return { side: plan.side, status: "stop", pnlPct };
+    }
+    if (!partial && hitT1) {
+      pnlPct += Math.abs(plan.target1 - plan.entry) / plan.entry * 100 * 0.5;
+      partial = true;
+    }
+    if (hitT2) {
+      pnlPct += Math.abs(plan.target2 - plan.entry) / plan.entry * 100 * (partial ? 0.5 : 1);
+      return { side: plan.side, status: "target", pnlPct };
+    }
+  }
+  return { side: plan.side, status: partial ? "partial" : "timeout", pnlPct };
+}
+
+function calculateMaxDrawdown(equity) {
+  let peak = 0;
+  let maxDrawdown = 0;
+  equity.forEach((value) => {
+    peak = Math.max(peak, value);
+    maxDrawdown = Math.max(maxDrawdown, peak - value);
+  });
+  return maxDrawdown;
+}
+
+function analyzeLearningJournal() {
+  const closed = state.paperTrades.filter((trade) => !isPaperTradeActive(trade));
+  const wins = closed.filter((trade) => trade.pnl > 0).length;
+  const sideStats = ["LONG", "SHORT"].reduce((acc, side) => {
+    const trades = closed.filter((trade) => trade.side === side);
+    acc[side] = {
+      trades: trades.length,
+      avgPnl: trades.length ? average(trades.map((trade) => Number(trade.pnl) || 0)) : 0
+    };
+    return acc;
+  }, {});
+  const bestSide = Object.entries(sideStats).sort((a, b) => b[1].avgPnl - a[1].avgPnl)[0];
+  const bestPattern = bestSide && bestSide[1].trades ? `${bestSide[0]} дает средний PnL ${bestSide[1].avgPnl.toFixed(2)} USDT` : "";
+  return {
+    closedTrades: closed.length,
+    winRate: closed.length ? (wins / closed.length) * 100 : 0,
+    sideStats,
+    bestPattern
+  };
+}
+
+function calculateMonthlyGoalProgress() {
+  const since = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const trades = state.paperTrades.filter((trade) => !isPaperTradeActive(trade) && (trade.closedAt || trade.openedAt) >= since);
+  const pnl = trades.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0);
+  const depositValue = getDepositValue();
+  const currentPct = depositValue > 0 ? (pnl / depositValue) * 100 : 0;
+  return {
+    trades: trades.length,
+    pnl,
+    currentPct,
+    targetPct: 10,
+    remainingPct: Math.max(0, 10 - currentPct)
+  };
+}
+
+function buildIntelNotes(backtest, derivatives, sentiment, learning, monthly, candleCount) {
+  const notes = [];
+  notes.push(candleCount ? `Бэктест рассчитан по ${candleCount} свечам Bybit.` : "Bybit-история временно недоступна, бэктест не обновлен.");
+  if (backtest) notes.push(`Матожидание ${backtest.expectancyPct >= 0 ? "+" : ""}${backtest.expectancyPct.toFixed(2)}% на сделку, просадка ${backtest.maxDrawdownPct.toFixed(2)}%.`);
+  if (derivatives) notes.push(`${derivatives.bias}.`);
+  else notes.push("Деривативные данные недоступны для этой пары или временно не ответили.");
+  if (sentiment) notes.push(`Fear & Greed: ${sentiment.value} (${sentiment.label}).`);
+  if (learning) notes.push(`Журнал: ${learning.closedTrades} закрытых сделок, winrate ${learning.winRate.toFixed(0)}%.`);
+  if (monthly) notes.push(`До цели 10%/мес: ${monthly.remainingPct.toFixed(2)}% от депозита.`);
+  notes.push("CoinGlass-ликвидации можно подключить отдельным ключом API: сейчас бот готов учитывать этот слой, но не хранит ключи в коде.");
+  return notes;
+}
+
+function toggleAutopilot() {
+  state.autopilot.enabled = !state.autopilot.enabled;
+  state.autopilot.lastMessage = state.autopilot.enabled ? "включен, ждет сигнал" : "выключен";
+  persistAutopilot();
+  renderStrategyIntelligence();
+  if (state.autopilot.enabled) {
+    runAutopilotScan(true);
+  }
+}
+
+function persistAutopilot() {
+  localStorage.setItem(autopilotKey, JSON.stringify({
+    enabled: state.autopilot.enabled,
+    lastEntryAt: state.autopilot.lastEntryAt,
+    lastMessage: state.autopilot.lastMessage
+  }));
+}
+
+async function runAutopilotScan(force = false) {
+  if (!state.autopilot.enabled) return;
+  const now = Date.now();
+  if (!force && now - state.autopilot.lastScanAt < autopilotScanMs) return;
+  state.autopilot.lastScanAt = now;
+
+  if (isPaperTradeActiveForAsset(asset.value)) {
+    state.autopilot.lastMessage = "ждет закрытия активной сделки";
+    renderStrategyIntelligence();
+    return;
+  }
+
+  if (now - state.autopilot.lastEntryAt < 5 * 60 * 1000) {
+    state.autopilot.lastMessage = "пауза после входа";
+    renderStrategyIntelligence();
+    return;
+  }
+
+  await refreshStrategyIntelligence(false);
+  const best = state.signalQuality?.best;
+  const backtest = state.marketIntel.backtest;
+  const monthly = state.marketIntel.monthlyGoal;
+  const hasBacktestEdge = !backtest || backtest.trades < 8 || backtest.expectancyPct >= 0;
+  const monthlyRiskOk = !monthly || monthly.currentPct > -6;
+
+  if (best?.score >= autopilotMinScore && hasBacktestEdge && monthlyRiskOk) {
+    const trade = enterPaperTrade({
+      autopilot: true,
+      reason: `score ${best.score}/100, ${backtest ? `expectancy ${backtest.expectancyPct.toFixed(2)}%` : "без бэктеста"}`
+    });
+    state.autopilot.lastEntryAt = Date.now();
+    state.autopilot.lastMessage = trade ? `вошел: ${trade.side} ${trade.asset}` : "сигнал был, вход не создан";
+  } else {
+    if (!best) {
+      state.autopilot.lastMessage = "нет качественного сигнала";
+    } else if (best.score < autopilotMinScore) {
+      state.autopilot.lastMessage = `нет входа: score ${best.score}/100, минимум ${autopilotMinScore}`;
+    } else if (!hasBacktestEdge) {
+      state.autopilot.lastMessage = `нет входа: бэктест ${backtest.expectancyPct.toFixed(2)}%`;
+    } else if (!monthlyRiskOk) {
+      state.autopilot.lastMessage = "нет входа: месячная просадка выше лимита";
+    } else {
+      state.autopilot.lastMessage = "нет входа: фильтр риска не пройден";
+    }
+  }
+
+  persistAutopilot();
+  renderStrategyIntelligence();
+}
+
+function isPaperTradeActiveForAsset(symbol) {
+  return state.paperTrades.some((trade) => trade.asset === symbol && isPaperTradeActive(trade));
 }
 
 function syncAutoMarketMode() {
@@ -1137,6 +1548,8 @@ function evaluateScenarioQuality(context, scenario) {
   if (context.mode === "range" && scenario.side === "LONG") addScore(2, "в боковике long допустим только от поддержки");
   if (context.mode === "range" && scenario.side === "SHORT") addScore(2, "в боковике short допустим только от сопротивления");
 
+  const intelResult = evaluateIntelForScenario(context, scenario);
+  addScore(intelResult.delta, intelResult.reason);
   const rsiResult = evaluateRsiForScenario(context, scenario.side);
   addScore(rsiResult.delta, rsiResult.reason);
   const emaResult = evaluateEmaForScenario(context, scenario.side);
@@ -1162,6 +1575,61 @@ function evaluateScenarioQuality(context, scenario) {
     score += delta;
     reasons.push(`${delta > 0 ? "+" : ""}${delta}: ${reason}`);
   }
+}
+
+function evaluateIntelForScenario(context, scenario) {
+  const intel = context.intel || {};
+  let delta = 0;
+  const reasons = [];
+
+  if (intel.backtest?.trades >= 12) {
+    if (intel.backtest.expectancyPct > 0.2 && intel.backtest.winRate >= 48) {
+      delta += 7;
+      reasons.push("бэктест показывает положительное ожидание");
+    } else if (intel.backtest.expectancyPct < 0) {
+      delta -= 8;
+      reasons.push("бэктест по текущему режиму отрицательный");
+    }
+  }
+
+  if (intel.derivatives?.sideBias) {
+    if (intel.derivatives.sideBias === scenario.side) {
+      delta += 5;
+      reasons.push("деривативные данные не спорят со стороной сделки");
+    } else if (intel.derivatives.sideBias === "CAUTION") {
+      delta -= 5;
+      reasons.push("фандинг/OI указывают на перегрев");
+    } else {
+      delta -= 4;
+      reasons.push("деривативный перекос против выбранной стороны");
+    }
+  }
+
+  if (intel.sentiment?.value) {
+    if (intel.sentiment.value >= 78 && scenario.side === "LONG") {
+      delta -= 5;
+      reasons.push("жадность повышает риск позднего long");
+    } else if (intel.sentiment.value <= 22 && scenario.side === "SHORT") {
+      delta -= 5;
+      reasons.push("экстремальный страх повышает риск позднего short");
+    } else {
+      delta += 2;
+      reasons.push("сентимент не экстремальный");
+    }
+  }
+
+  if (intel.learning?.sideStats?.[scenario.side]?.trades >= 3) {
+    const stat = intel.learning.sideStats[scenario.side];
+    if (stat.avgPnl > 0) {
+      delta += 4;
+      reasons.push("журнал подтверждает сторону сделки");
+    } else {
+      delta -= 4;
+      reasons.push("журнал показывает слабую сторону сделки");
+    }
+  }
+
+  return { delta, reason: reasons.join("; ") || "лабораторные фильтры еще не накопили данных" };
 }
 
 function evaluateEmaForScenario(context, side) {
@@ -1726,7 +2194,7 @@ function syncPaperSideOptions(tradePlan) {
   }
 }
 
-function enterPaperTrade() {
+function enterPaperTrade(options = {}) {
   const tradePlan = state.tradePlan || buildTradePlan(getContext());
   const context = getContext();
   const side = getBestScenarioSide(tradePlan) || paperSide.value;
@@ -1743,7 +2211,7 @@ function enterPaperTrade() {
   const quality = state.signalQuality?.scenarios?.find((item) => item.side === scenario.side);
   const placedPrice = getExecutableMarketPrice(context.asset) || tradePlan.basePrice || entry;
   const triggerDirection = getOrderTriggerDirection(scenario.side, placedPrice, entry);
-  const strategySnapshot = createStrategySnapshot(context, tradePlan, scenario, quality);
+  const strategySnapshot = createStrategySnapshot(context, tradePlan, scenario, quality, options);
 
   const trade = {
     id,
@@ -1758,6 +2226,8 @@ function enterPaperTrade() {
     deposit: context.deposit,
     riskBudget: getRiskBudget(),
     riskLimitPct: Math.min(Number(risk.value) || 1, 2),
+    autopilot: Boolean(options.autopilot),
+    autopilotReason: String(options.reason || ""),
     entry,
     quantity,
     initialQuantity: quantity,
@@ -1790,9 +2260,10 @@ function enterPaperTrade() {
   state.activePaperTradeId = id;
   persistPaperTrades();
   updatePaperTrades();
+  return trade;
 }
 
-function createStrategySnapshot(context, tradePlan, scenario, quality) {
+function createStrategySnapshot(context, tradePlan, scenario, quality, options = {}) {
   const strategyHtml = strategyContainer.innerHTML || buildStrategy(state.lastUserIdea, tradePlan, state.signalQuality);
   const allScenarios = (tradePlan?.scenarios || []).map(snapshotScenario);
   const snapshot = {
@@ -1821,6 +2292,14 @@ function createStrategySnapshot(context, tradePlan, scenario, quality) {
       rsi: context.rsi.map(snapshotIndicator),
       ema: context.ema.map(snapshotIndicator)
     },
+    intelligence: {
+      backtest: context.intel?.backtest || null,
+      derivatives: context.intel?.derivatives || null,
+      sentiment: context.intel?.sentiment || null,
+      learning: context.intel?.learning || null,
+      monthlyGoal: context.intel?.monthlyGoal || null,
+      notes: context.intel?.notes || []
+    },
     selectedScenario: snapshotScenario(scenario),
     allScenarios,
     signalQuality: {
@@ -1828,6 +2307,11 @@ function createStrategySnapshot(context, tradePlan, scenario, quality) {
       best: state.signalQuality?.best || null,
       verdict: state.signalQuality?.verdict || "",
       scenarios: state.signalQuality?.scenarios || []
+    },
+    execution: {
+      autopilot: Boolean(options.autopilot),
+      reason: String(options.reason || ""),
+      minScore: autopilotMinScore
     },
     rules: [...context.rules],
     sourceRules: [...context.sourceRules],
@@ -2382,6 +2866,8 @@ function exportJournalToExcel() {
     "Сумма USDT": trade.amount,
     "Депозит": trade.deposit || "",
     "Риск лимит %": trade.riskLimitPct || "",
+    "Авто-бот": trade.autopilot ? "да" : "нет",
+    "Причина авто-бота": trade.autopilotReason || "",
     "Цена выхода": trade.exitPrice || "",
     "PnL USDT": trade.pnl,
     "PnL %": trade.pnlPct,
@@ -2685,10 +3171,12 @@ liveToggle.addEventListener("click", () => {
     startLiveConnection();
   }
 });
-paperEnter.addEventListener("click", enterPaperTrade);
+paperEnter.addEventListener("click", () => enterPaperTrade());
 paperReset.addEventListener("click", () => resetPaperTrade());
 paperClear.addEventListener("click", clearPaperJournal);
 exportJournal.addEventListener("click", exportJournalToExcel);
+intelRefresh.addEventListener("click", () => refreshStrategyIntelligence(true));
+autopilotToggle.addEventListener("click", toggleAutopilot);
 paperSide.addEventListener("change", () => {
   resetPaperTrade();
 });
@@ -2734,17 +3222,20 @@ chatForm.addEventListener("submit", (event) => {
       restartLiveConnection();
     }
     generateStrategy(state.lastUserIdea);
+    refreshStrategyIntelligence(true);
   });
 });
 
 risk.addEventListener("input", () => {
   updateRiskLabel();
   generateStrategy();
+  refreshStrategyIntelligence(false);
 });
 
 deposit.addEventListener("input", () => {
   persistDeposit();
   generateStrategy(state.lastUserIdea);
+  renderStrategyIntelligence();
 });
 
 renderRules();
@@ -2756,8 +3247,10 @@ updateRiskLabel();
 renderLiveReadout();
 renderTradeJournal();
 generateStrategy();
+refreshStrategyIntelligence(false);
 refreshOpenPaperTradePrices(true);
 window.setInterval(() => refreshOpenPaperTradePrices(), 10000);
+window.setInterval(() => runAutopilotScan(), autopilotScanMs);
 
 function startLiveConnection() {
   state.live.enabled = true;
@@ -3030,6 +3523,11 @@ function formatPrice(value) {
   if (value >= 1000) return value.toLocaleString("ru-RU", { maximumFractionDigits: 2 });
   if (value >= 1) return value.toLocaleString("ru-RU", { maximumFractionDigits: 4 });
   return value.toLocaleString("ru-RU", { maximumFractionDigits: 8 });
+}
+
+function formatSigned(value, digits = 2) {
+  const number = Number(value) || 0;
+  return `${number >= 0 ? "+" : ""}${number.toFixed(digits)}`;
 }
 
 function formatCompact(value) {
