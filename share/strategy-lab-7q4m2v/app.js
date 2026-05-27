@@ -981,12 +981,12 @@ async function connectLiveSocket() {
 
   await loadHistoricalCandles(symbol, interval);
 
-  const streams = [
-    `${symbol.toLowerCase()}@ticker`,
-    `${symbol.toLowerCase()}@bookTicker`,
-    `${symbol.toLowerCase()}@kline_${interval}`
-  ].join("/");
-  const url = `wss://stream.binance.com:9443/stream?streams=${streams}`;
+  const topics = [
+    `tickers.${symbol}`,
+    `orderbook.1.${symbol}`,
+    `kline.${toBybitInterval(interval)}.${symbol}`
+  ];
+  const url = "wss://stream.bybit.com/v5/public/spot";
 
   try {
     const socket = new WebSocket(url);
@@ -995,6 +995,7 @@ async function connectLiveSocket() {
     socket.addEventListener("open", () => {
       state.live.reconnectAttempts = 0;
       setLiveStatus("online");
+      socket.send(JSON.stringify({ op: "subscribe", args: topics }));
     });
 
     socket.addEventListener("message", (event) => {
@@ -1016,18 +1017,19 @@ async function connectLiveSocket() {
 
 async function loadHistoricalCandles(symbol, interval) {
   try {
-    const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=80`;
+    const url = `https://api.bybit.com/v5/market/kline?category=spot&symbol=${symbol}&interval=${toBybitInterval(interval)}&limit=80`;
     const response = await fetch(url);
     if (!response.ok) throw new Error("Kline request failed");
     const data = await response.json();
-    state.live.candles = data.map((item) => ({
+    if (data.retCode !== 0 || !Array.isArray(data.result?.list)) throw new Error(data.retMsg || "Kline response failed");
+    state.live.candles = data.result.list.slice().reverse().map((item) => ({
       openTime: item[0],
       open: Number(item[1]),
       high: Number(item[2]),
       low: Number(item[3]),
       close: Number(item[4]),
       volume: Number(item[5]),
-      closeTime: item[6]
+      closeTime: Number(item[0]) + intervalToMs(interval) - 1
     }));
     generateStrategy(state.lastUserIdea);
   } catch (error) {
@@ -1037,30 +1039,32 @@ async function loadHistoricalCandles(symbol, interval) {
 }
 
 function handleLiveMessage(message) {
-  const stream = message.stream || "";
+  const topic = message.topic || "";
   const data = message.data;
   if (!data) return;
 
-  if (stream.includes("@ticker")) {
+  if (topic.startsWith("tickers.")) {
     state.live.ticker = {
-      lastPrice: Number(data.c),
-      priceChangePct: Number(data.P),
-      volume: Number(data.v),
-      quoteVolume: Number(data.q)
+      lastPrice: Number(data.lastPrice),
+      priceChangePct: Number(data.price24hPcnt) * 100,
+      volume: Number(data.volume24h),
+      quoteVolume: Number(data.turnover24h)
     };
   }
 
-  if (stream.includes("@bookTicker")) {
+  if (topic.startsWith("orderbook.")) {
+    const bid = data.b?.[0];
+    const ask = data.a?.[0];
     state.live.book = {
-      bid: Number(data.b),
-      ask: Number(data.a),
-      bidQty: Number(data.B),
-      askQty: Number(data.A)
+      bid: Number(bid?.[0]),
+      ask: Number(ask?.[0]),
+      bidQty: Number(bid?.[1]),
+      askQty: Number(ask?.[1])
     };
   }
 
-  if (stream.includes("@kline")) {
-    upsertLiveCandle(data.k);
+  if (topic.startsWith("kline.")) {
+    data.forEach(upsertLiveCandle);
   }
 
   state.live.updatedAt = Date.now();
@@ -1070,13 +1074,13 @@ function handleLiveMessage(message) {
 
 function upsertLiveCandle(kline) {
   const candle = {
-    openTime: kline.t,
-    open: Number(kline.o),
-    high: Number(kline.h),
-    low: Number(kline.l),
-    close: Number(kline.c),
-    volume: Number(kline.v),
-    closeTime: kline.T
+    openTime: kline.start,
+    open: Number(kline.open),
+    high: Number(kline.high),
+    low: Number(kline.low),
+    close: Number(kline.close),
+    volume: Number(kline.volume),
+    closeTime: kline.end
   };
   const last = state.live.candles[state.live.candles.length - 1];
   if (last?.openTime === candle.openTime) {
@@ -1143,7 +1147,7 @@ function getLiveSnapshot() {
 
   return {
     active: state.live.enabled && Boolean(state.live.updatedAt || candles.length),
-    exchange: "Binance",
+    exchange: "Bybit",
     symbol: state.live.asset || asset.value,
     lastPrice,
     bid,
@@ -1157,6 +1161,28 @@ function getLiveSnapshot() {
 
 function toBinanceSymbol(value) {
   return value.replace("/", "").toUpperCase();
+}
+
+function toBybitInterval(value) {
+  const intervals = {
+    "5m": "5",
+    "15m": "15",
+    "1h": "60",
+    "4h": "240",
+    "1d": "D"
+  };
+  return intervals[value] || "15";
+}
+
+function intervalToMs(value) {
+  const intervals = {
+    "5m": 5 * 60 * 1000,
+    "15m": 15 * 60 * 1000,
+    "1h": 60 * 60 * 1000,
+    "4h": 4 * 60 * 60 * 1000,
+    "1d": 24 * 60 * 60 * 1000
+  };
+  return intervals[value] || intervals["15m"];
 }
 
 function formatPrice(value) {
