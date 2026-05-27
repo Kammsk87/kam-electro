@@ -715,8 +715,8 @@ function getRsiPreference(id) {
   return state.rsiPreferences[id] || { show: true, use: true };
 }
 
-function getSelectedRsiIndicators() {
-  return getRsiProfilesForAsset(asset.value).map((profile) => {
+function getSelectedRsiIndicators(symbol = asset.value) {
+  return getRsiProfilesForAsset(symbol).map((profile) => {
     const prefs = getRsiPreference(profile.id);
     return { ...profile, show: prefs.show, use: prefs.use };
   });
@@ -746,7 +746,7 @@ function getContext() {
     includeShorts: includeShorts.checked,
     rules: state.rules,
     sourceRules: knowledgeSources.flatMap((source) => source.rules),
-    rsi: getSelectedRsiIndicators(),
+    rsi: getSelectedRsiIndicators(asset.value),
     ema: getSelectedEmaIndicators(),
     deposit: getDepositValue(),
     intel: state.marketIntel,
@@ -1135,14 +1135,18 @@ async function refreshStrategyIntelligence(force = false) {
   ]);
 
   const candles = candlesResult.status === "fulfilled" ? candlesResult.value : [];
-  const backtest = candles.length ? runStrategyBacktest(candles, context) : null;
   const derivatives = derivativesResult.status === "fulfilled" ? derivativesResult.value : null;
   const sentiment = sentimentResult.status === "fulfilled" ? sentimentResult.value : null;
-  const learning = analyzeLearningJournal();
+  state.marketIntel = buildMarketIntelForContext(context, candles, derivatives, sentiment);
+  generateStrategy(state.lastUserIdea);
+}
+
+function buildMarketIntelForContext(context, candles, derivatives = null, sentiment = null) {
+  const backtest = candles.length ? runStrategyBacktest(candles, context) : null;
+  const learning = analyzeLearningJournal(context.asset);
   const monthly = calculateMonthlyGoalProgress();
   const notes = buildIntelNotes(backtest, derivatives, sentiment, learning, monthly, candles.length);
-
-  state.marketIntel = {
+  return {
     loading: false,
     updatedAt: Date.now(),
     asset: context.asset,
@@ -1154,7 +1158,6 @@ async function refreshStrategyIntelligence(force = false) {
     monthlyGoal: monthly,
     notes
   };
-  generateStrategy(state.lastUserIdea);
 }
 
 async function fetchHistoricalCandlesFor(symbol, interval, limit = 320) {
@@ -1306,8 +1309,8 @@ function calculateMaxDrawdown(equity) {
   return maxDrawdown;
 }
 
-function analyzeLearningJournal() {
-  const closed = state.paperTrades.filter((trade) => !isPaperTradeActive(trade));
+function analyzeLearningJournal(symbol = null) {
+  const closed = state.paperTrades.filter((trade) => !isPaperTradeActive(trade) && (!symbol || trade.asset === symbol));
   const wins = closed.filter((trade) => trade.pnl > 0).length;
   const sideStats = ["LONG", "SHORT"].reduce((acc, side) => {
     const trades = closed.filter((trade) => trade.side === side);
@@ -1355,6 +1358,68 @@ function buildIntelNotes(backtest, derivatives, sentiment, learning, monthly, ca
   return notes;
 }
 
+function getAvailableAutopilotAssets() {
+  return [...asset.options]
+    .map((option) => option.value)
+    .filter((value, index, list) => value && list.indexOf(value) === index);
+}
+
+function createScanContext(symbol, candles = [], derivatives = null, sentiment = null) {
+  const base = getContext();
+  const live = createRestLiveSnapshot(symbol, candles);
+  const mode = marketMode.value === "auto" && candles.length >= 18 ? detectMarketMode(candles) : base.mode;
+  return {
+    ...base,
+    asset: symbol,
+    mode,
+    modeSource: marketMode.value === "auto" ? "auto-scan" : base.modeSource,
+    rsi: getSelectedRsiIndicators(symbol),
+    ema: getSelectedEmaIndicators(),
+    live,
+    intel: null,
+    scan: true
+  };
+}
+
+function createRestLiveSnapshot(symbol, candles) {
+  const last = candles[candles.length - 1];
+  const first = candles[Math.max(0, candles.length - 40)] || candles[0] || last;
+  const previous = candles[candles.length - 2] || last;
+  const lastPrice = Number(last?.close) || getPlanBasePrice({ asset: symbol, live: { active: false } });
+  const trendPct = first?.close ? ((lastPrice - first.close) / first.close) * 100 : 0;
+  const spreadPct = lastPrice > 0 && previous?.close ? Math.abs(lastPrice - previous.close) / lastPrice * 100 * 0.08 : 0.02;
+  const volume24h = candles.slice(-96).reduce((sum, candle) => sum + (Number(candle.volume) || 0) * (Number(candle.close) || 0), 0);
+
+  return {
+    active: candles.length > 1,
+    exchange: "Bybit REST scan",
+    symbol,
+    lastPrice,
+    bid: lastPrice * (1 - spreadPct / 200),
+    ask: lastPrice * (1 + spreadPct / 200),
+    spreadPct,
+    volume24h,
+    trendPct,
+    ticker: null,
+    book: null,
+    updatedAt: Date.now()
+  };
+}
+
+function scoreAutopilotCandidate(context, tradePlan, signalQuality, intel) {
+  const best = signalQuality?.best;
+  if (!best) return -Infinity;
+  const backtest = intel?.backtest;
+  const monthly = intel?.monthlyGoal;
+  let score = best.score;
+  if (backtest?.trades >= 8) score += Math.max(-14, Math.min(12, backtest.expectancyPct * 18));
+  if (backtest?.maxDrawdownPct > 6) score -= 8;
+  if (monthly?.currentPct < -6) score -= 10;
+  if (intel?.derivatives?.sideBias === "CAUTION") score -= 6;
+  if (intel?.derivatives?.sideBias === best.side) score += 4;
+  return Math.round(score);
+}
+
 function toggleAutopilot() {
   state.autopilot.enabled = !state.autopilot.enabled;
   state.autopilot.lastMessage = state.autopilot.enabled ? "включен, ждет сигнал" : "выключен";
@@ -1379,44 +1444,41 @@ async function runAutopilotScan(force = false) {
   if (!force && now - state.autopilot.lastScanAt < autopilotScanMs) return;
   state.autopilot.lastScanAt = now;
 
-  if (isPaperTradeActiveForAsset(asset.value)) {
-    state.autopilot.lastMessage = "ждет закрытия активной сделки";
-    renderStrategyIntelligence();
-    return;
-  }
-
   if (now - state.autopilot.lastEntryAt < 5 * 60 * 1000) {
     state.autopilot.lastMessage = "пауза после входа";
     renderStrategyIntelligence();
     return;
   }
 
-  await refreshStrategyIntelligence(false);
-  const best = state.signalQuality?.best;
-  const backtest = state.marketIntel.backtest;
-  const monthly = state.marketIntel.monthlyGoal;
-  const hasBacktestEdge = !backtest || backtest.trades < 8 || backtest.expectancyPct >= 0;
-  const monthlyRiskOk = !monthly || monthly.currentPct > -6;
+  const candidates = await scanAutopilotCandidates();
+  if (!state.autopilot.enabled) {
+    renderStrategyIntelligence();
+    return;
+  }
+  const bestCandidate = candidates[0] || null;
 
-  if (best?.score >= autopilotMinScore && hasBacktestEdge && monthlyRiskOk) {
+  if (bestCandidate && bestCandidate.autopilotScore >= autopilotMinScore) {
+    if (bestCandidate.context.asset === asset.value) {
+      state.marketIntel = bestCandidate.intel;
+      state.tradePlan = bestCandidate.tradePlan;
+      state.signalQuality = bestCandidate.signalQuality;
+      generateStrategy(state.lastUserIdea);
+    }
     const trade = enterPaperTrade({
       autopilot: true,
-      reason: `score ${best.score}/100, ${backtest ? `expectancy ${backtest.expectancyPct.toFixed(2)}%` : "без бэктеста"}`
+      context: bestCandidate.context,
+      tradePlan: bestCandidate.tradePlan,
+      signalQuality: bestCandidate.signalQuality,
+      side: bestCandidate.signalQuality.best.side,
+      strategyHtml: buildAutopilotStrategyHtml(bestCandidate),
+      reason: `${bestCandidate.context.asset}: score ${bestCandidate.signalQuality.best.score}/100, scan ${bestCandidate.autopilotScore}/100`
     });
     state.autopilot.lastEntryAt = Date.now();
     state.autopilot.lastMessage = trade ? `вошел: ${trade.side} ${trade.asset}` : "сигнал был, вход не создан";
   } else {
-    if (!best) {
-      state.autopilot.lastMessage = "нет качественного сигнала";
-    } else if (best.score < autopilotMinScore) {
-      state.autopilot.lastMessage = `нет входа: score ${best.score}/100, минимум ${autopilotMinScore}`;
-    } else if (!hasBacktestEdge) {
-      state.autopilot.lastMessage = `нет входа: бэктест ${backtest.expectancyPct.toFixed(2)}%`;
-    } else if (!monthlyRiskOk) {
-      state.autopilot.lastMessage = "нет входа: месячная просадка выше лимита";
-    } else {
-      state.autopilot.lastMessage = "нет входа: фильтр риска не пройден";
-    }
+    state.autopilot.lastMessage = bestCandidate
+      ? `лучший: ${bestCandidate.context.asset} ${bestCandidate.autopilotScore}/100, минимум ${autopilotMinScore}`
+      : "нет монет без активной сделки";
   }
 
   persistAutopilot();
@@ -1425,6 +1487,72 @@ async function runAutopilotScan(force = false) {
 
 function isPaperTradeActiveForAsset(symbol) {
   return state.paperTrades.some((trade) => trade.asset === symbol && isPaperTradeActive(trade));
+}
+
+async function scanAutopilotCandidates() {
+  const symbols = getAvailableAutopilotAssets().filter((symbol) => !isPaperTradeActiveForAsset(symbol));
+  if (!symbols.length) return [];
+
+  state.autopilot.lastMessage = `сканирую ${symbols.length} монет`;
+  renderStrategyIntelligence();
+  const sentiment = await fetchSentimentIntel().catch(() => null);
+  const preliminary = [];
+
+  for (const symbol of symbols) {
+    if (!state.autopilot.enabled) break;
+    try {
+      const candles = await fetchHistoricalCandlesFor(symbol, timeframe.value, 220);
+      const context = createScanContext(symbol, candles, null, sentiment);
+      const intel = buildMarketIntelForContext(context, candles, null, sentiment);
+      context.intel = intel;
+      const tradePlan = buildTradePlan(context);
+      const signalQuality = evaluateSignalQuality(context, tradePlan);
+      const autopilotScore = scoreAutopilotCandidate(context, tradePlan, signalQuality, intel);
+      preliminary.push({ context, candles, intel, tradePlan, signalQuality, autopilotScore });
+    } catch (error) {
+      preliminary.push({ error, context: { asset: symbol }, autopilotScore: -Infinity });
+    }
+  }
+
+  const top = preliminary
+    .filter((candidate) => Number.isFinite(candidate.autopilotScore))
+    .sort((a, b) => b.autopilotScore - a.autopilotScore)
+    .slice(0, 4);
+
+  const enriched = [];
+  for (const candidate of top) {
+    if (!state.autopilot.enabled) break;
+    const derivatives = await fetchDerivativeIntel(candidate.context.asset).catch(() => null);
+    const context = { ...candidate.context };
+    const intel = buildMarketIntelForContext(context, candidate.candles, derivatives, sentiment);
+    context.intel = intel;
+    const tradePlan = buildTradePlan(context);
+    const signalQuality = evaluateSignalQuality(context, tradePlan);
+    const autopilotScore = scoreAutopilotCandidate(context, tradePlan, signalQuality, intel);
+    enriched.push({ context, candles: candidate.candles, intel, tradePlan, signalQuality, autopilotScore });
+  }
+
+  return enriched.sort((a, b) => b.autopilotScore - a.autopilotScore);
+}
+
+function buildAutopilotStrategyHtml(candidate) {
+  const best = candidate.signalQuality.best;
+  const plan = candidate.tradePlan.scenarios.find((scenario) => scenario.side === best.side) || candidate.tradePlan.primary;
+  return `
+    <h2>${candidate.context.asset}: авто-бот выбрал ${best.side}</h2>
+    <section>
+      <h3>Причина входа</h3>
+      <p>Скан всех монет: итоговый score ${candidate.autopilotScore}/100, сигнал ${best.score}/100. ${escapeHtml(best.decision)}.</p>
+    </section>
+    <section>
+      <h3>План</h3>
+      <p>Entry ${formatPrice(plan.entry)}, stop ${formatPrice(plan.stop)}, T1 ${formatPrice(plan.target1)}, T2 ${formatPrice(plan.target2)}.</p>
+    </section>
+    <section>
+      <h3>Фильтры</h3>
+      <p>${escapeHtml(candidate.intel.notes.join(" "))}</p>
+    </section>
+  `;
 }
 
 function syncAutoMarketMode() {
@@ -2195,9 +2323,10 @@ function syncPaperSideOptions(tradePlan) {
 }
 
 function enterPaperTrade(options = {}) {
-  const tradePlan = state.tradePlan || buildTradePlan(getContext());
-  const context = getContext();
-  const side = getBestScenarioSide(tradePlan) || paperSide.value;
+  const context = options.context || getContext();
+  const tradePlan = options.tradePlan || state.tradePlan || buildTradePlan(context);
+  const signalQuality = options.signalQuality || state.signalQuality;
+  const side = options.side || signalQuality?.best?.side || getBestScenarioSide(tradePlan) || paperSide.value;
   const scenario = tradePlan.scenarios.find((item) => item.side === side) || tradePlan.primary;
   if (!scenario) return;
 
@@ -2208,10 +2337,10 @@ function enterPaperTrade(options = {}) {
   const quantity = amount / entry;
   const target1Quantity = quantity * 0.5;
   const id = `trade-${Date.now()}-${Math.round(Math.random() * 1000)}`;
-  const quality = state.signalQuality?.scenarios?.find((item) => item.side === scenario.side);
+  const quality = signalQuality?.scenarios?.find((item) => item.side === scenario.side);
   const placedPrice = getExecutableMarketPrice(context.asset) || tradePlan.basePrice || entry;
   const triggerDirection = getOrderTriggerDirection(scenario.side, placedPrice, entry);
-  const strategySnapshot = createStrategySnapshot(context, tradePlan, scenario, quality, options);
+  const strategySnapshot = createStrategySnapshot(context, tradePlan, scenario, quality, { ...options, signalQuality });
 
   const trade = {
     id,
@@ -2260,16 +2389,20 @@ function enterPaperTrade(options = {}) {
   state.activePaperTradeId = id;
   persistPaperTrades();
   updatePaperTrades();
+  if (options.context && options.context.asset !== asset.value) {
+    renderTradeJournal();
+  }
   return trade;
 }
 
 function createStrategySnapshot(context, tradePlan, scenario, quality, options = {}) {
-  const strategyHtml = strategyContainer.innerHTML || buildStrategy(state.lastUserIdea, tradePlan, state.signalQuality);
+  const signalQuality = options.signalQuality || state.signalQuality;
+  const strategyHtml = options.strategyHtml || (context.asset === asset.value ? strategyContainer.innerHTML : "") || buildStrategy(state.lastUserIdea, tradePlan, signalQuality);
   const allScenarios = (tradePlan?.scenarios || []).map(snapshotScenario);
   const snapshot = {
     version: "2",
     capturedAt: Date.now(),
-    strategyText: state.lastStrategy || stripTags(strategyHtml),
+    strategyText: options.strategyHtml ? stripTags(strategyHtml) : state.lastStrategy || stripTags(strategyHtml),
     strategyHtml,
     userIdea: state.lastUserIdea || "",
     context: {
@@ -2304,9 +2437,9 @@ function createStrategySnapshot(context, tradePlan, scenario, quality, options =
     allScenarios,
     signalQuality: {
       selected: quality || null,
-      best: state.signalQuality?.best || null,
-      verdict: state.signalQuality?.verdict || "",
-      scenarios: state.signalQuality?.scenarios || []
+      best: signalQuality?.best || null,
+      verdict: signalQuality?.verdict || "",
+      scenarios: signalQuality?.scenarios || []
     },
     execution: {
       autopilot: Boolean(options.autopilot),
