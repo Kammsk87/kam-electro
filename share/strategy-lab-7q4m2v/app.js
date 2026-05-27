@@ -377,6 +377,7 @@ function selectBookRules(context) {
 }
 
 function generateStrategy(userIdea = "") {
+  syncAutoMarketMode();
   const context = getContext();
   const tradePlan = buildTradePlan(context);
   state.tradePlan = tradePlan;
@@ -386,13 +387,77 @@ function generateStrategy(userIdea = "") {
   maxRisk.textContent = `${context.risk.toFixed(2)}%`;
   filterCount.textContent = context.conservative ? "4" : "3";
   chartLabel.textContent = `${context.asset} · ${context.timeframe}`;
-  chartTitle.textContent = context.live.active ? "Live свечи" : "Сценарий цены";
+  chartTitle.textContent = context.live.active ? `Live свечи · ${modeLabel(context.mode)}` : "Сценарий цены";
   renderTradePlanReadout(tradePlan);
   if (context.live.active && state.live.candles.length > 1) {
     drawLiveChart(state.live.candles, tradePlan);
   } else {
     drawChart(context.mode, tradePlan);
   }
+}
+
+function syncAutoMarketMode() {
+  if (!state.live.enabled || state.live.candles.length < 18) return;
+  const detectedMode = detectMarketMode(state.live.candles);
+  if (detectedMode && marketMode.value !== detectedMode) {
+    marketMode.value = detectedMode;
+  }
+}
+
+function detectMarketMode(candles) {
+  const recent = candles.slice(-40);
+  const sample = recent.length >= 40 ? recent : candles.slice(-recent.length);
+  if (sample.length < 18) return marketMode.value;
+
+  const last = sample[sample.length - 1];
+  const previous = sample.slice(0, -1);
+  const first = sample[0];
+  const high = Math.max(...sample.map((candle) => candle.high));
+  const low = Math.min(...sample.map((candle) => candle.low));
+  const previousHigh = Math.max(...previous.map((candle) => candle.high));
+  const previousLow = Math.min(...previous.map((candle) => candle.low));
+  const rangePct = ((high - low) / last.close) * 100;
+  const trendPct = ((last.close - first.close) / first.close) * 100;
+  const avgRangePct = average(sample.map((candle) => ((candle.high - candle.low) / candle.close) * 100));
+  const lastRangePct = ((last.high - last.low) / last.close) * 100;
+  const avgVolume = average(previous.slice(-20).map((candle) => candle.volume));
+  const volumeImpulse = avgVolume > 0 && last.volume > avgVolume * 1.25;
+  const volatilityLimit = timeframe.value === "5m" ? 1.1 : timeframe.value === "15m" ? 1.6 : timeframe.value === "1h" ? 2.4 : 3.6;
+
+  if (avgRangePct > volatilityLimit || lastRangePct > avgRangePct * 2.4) {
+    return "high-volatility";
+  }
+
+  const breaksUp = last.close > previousHigh * 1.0015;
+  const breaksDown = last.close < previousLow * 0.9985;
+  if ((breaksUp || breaksDown) && volumeImpulse) {
+    return "breakout";
+  }
+
+  const last10 = sample.slice(-10);
+  const recentTrendPct = ((last.close - last10[0].close) / last10[0].close) * 100;
+  const impulseUp = trendPct > Math.max(1.2, rangePct * 0.22);
+  const impulseDown = trendPct < -Math.max(1.2, rangePct * 0.22);
+  const recentCounterMove = impulseUp ? recentTrendPct < -avgRangePct * 0.7 : impulseDown ? recentTrendPct > avgRangePct * 0.7 : false;
+  if (recentCounterMove) {
+    return "pullback";
+  }
+
+  if (Math.abs(trendPct) > Math.max(1.4, rangePct * 0.28)) {
+    return "trend";
+  }
+
+  if (rangePct < Math.max(1.8, avgRangePct * 4.8) && Math.abs(trendPct) < rangePct * 0.25) {
+    return "range";
+  }
+
+  return Math.abs(trendPct) >= rangePct * 0.18 ? "trend" : "range";
+}
+
+function average(values) {
+  const clean = values.filter((value) => Number.isFinite(value));
+  if (!clean.length) return 0;
+  return clean.reduce((sum, value) => sum + value, 0) / clean.length;
 }
 
 function drawChart(mode, tradePlan = null) {
