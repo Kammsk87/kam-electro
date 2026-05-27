@@ -368,10 +368,19 @@ function normalizePaperTrade(trade) {
   if (!trade || !Number.isFinite(Number(trade.entry)) || !Number.isFinite(Number(trade.amount))) return null;
   const entry = Number(trade.entry);
   const amount = Number(trade.amount);
+  const side = trade.side === "SHORT" ? "SHORT" : "LONG";
+  const stop = Number(trade.stop) || entry;
+  const target = Number(trade.target) || entry;
+  const target1 = Number(trade.target1) || target;
+  const status = ["pending", "open", "target", "stop"].includes(trade.status) ? trade.status : "open";
+  const normalizedExitPrice = normalizePaperExitPrice({ ...trade, side, status, stop, target });
+  const normalizedPnl = normalizedExitPrice
+    ? calculatePaperPnl({ side, entry, quantity: Number(trade.quantity) || amount / entry }, normalizedExitPrice)
+    : Number(trade.pnl) || 0;
+  const normalizedPnlPct = normalizedExitPrice ? (normalizedPnl / amount) * 100 : Number(trade.pnlPct) || 0;
   const history = Array.isArray(trade.history) && trade.history.length
     ? trade.history
-    : [{ time: Number(trade.openedAt) || Date.now(), price: entry, pnl: Number(trade.pnl) || 0, pnlPct: Number(trade.pnlPct) || 0 }];
-  const status = ["pending", "open", "target", "stop"].includes(trade.status) ? trade.status : "open";
+    : [{ time: Number(trade.openedAt) || Date.now(), price: normalizedExitPrice || entry, pnl: normalizedPnl, pnlPct: normalizedPnlPct }];
   return {
     ...trade,
     id: String(trade.id || `trade-${Date.now()}-${Math.round(Math.random() * 1000)}`),
@@ -379,13 +388,13 @@ function normalizePaperTrade(trade) {
     timeframe: String(trade.timeframe || "15m"),
     mode: String(trade.mode || ""),
     modeSource: String(trade.modeSource || ""),
-    side: trade.side === "SHORT" ? "SHORT" : "LONG",
+    side,
     amount,
     entry,
     quantity: Number(trade.quantity) || amount / entry,
-    stop: Number(trade.stop) || entry,
-    target: Number(trade.target) || entry,
-    target1: Number(trade.target1) || Number(trade.target) || entry,
+    stop,
+    target,
+    target1,
     placedPrice: Number(trade.placedPrice) || entry,
     triggerDirection: trade.triggerDirection === "below" ? "below" : "above",
     openedAt: Number(trade.openedAt) || Date.now(),
@@ -395,11 +404,17 @@ function normalizePaperTrade(trade) {
     result: String(trade.result || "в работе"),
     decision: String(trade.decision || ""),
     score: Number(trade.score) || null,
-    exitPrice: Number(trade.exitPrice) || null,
-    pnl: Number(trade.pnl) || 0,
-    pnlPct: Number(trade.pnlPct) || 0,
+    exitPrice: normalizedExitPrice,
+    pnl: normalizedPnl,
+    pnlPct: normalizedPnlPct,
     history
   };
+}
+
+function normalizePaperExitPrice(trade) {
+  if (trade.status === "target") return Number(trade.target) || null;
+  if (trade.status === "stop") return Number(trade.stop) || null;
+  return Number(trade.exitPrice) || null;
 }
 
 function persist() {
@@ -1596,10 +1611,16 @@ function updateSinglePaperTrade(trade) {
     const hitStop = trade.side === "LONG" ? currentPrice <= trade.stop : currentPrice >= trade.stop;
 
     if (hitTarget || hitStop) {
+      const exitPrice = hitTarget ? trade.target : trade.stop;
+      const exitPnl = calculatePaperPnl(trade, exitPrice);
+      const exitPnlPct = (exitPnl / trade.amount) * 100;
       trade.status = hitTarget ? "target" : "stop";
       trade.closedAt = Date.now();
-      trade.exitPrice = currentPrice;
+      trade.exitPrice = exitPrice;
+      trade.pnl = exitPnl;
+      trade.pnlPct = exitPnlPct;
       trade.result = hitTarget ? `${trade.side} отработал` : `${trade.side} не отработал`;
+      appendPaperPoint(trade, exitPrice, exitPnl, exitPnlPct);
     }
   }
 }
