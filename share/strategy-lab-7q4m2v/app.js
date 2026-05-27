@@ -115,6 +115,26 @@ const knowledgeSources = [
       "Стратегия должна состоять из сетапа, фильтров, входа, стопа, целей, сопровождения и постанализа.",
       "Если нет статистики по стратегии, выдавать ее как гипотезу для бэктеста, а не как готовый торговый сигнал."
     ]
+  },
+  {
+    title: "Разумный инвестор",
+    author: "Бенджамин Грэм",
+    theme: "запас прочности и дисциплина",
+    rules: [
+      "Перед входом требовать запас прочности: сделка должна иметь понятную асимметрию, где потенциальная цель существенно выше принятого риска.",
+      "Не путать рыночное настроение с ценностью актива: резкий рост цены без подтверждения ликвидностью, качеством проекта и risk/reward не является самостоятельным основанием для входа.",
+      "Если нет явного преимущества, лучше пропустить сделку и сохранить капитал."
+    ]
+  },
+  {
+    title: "Человек, который разгадал рынок",
+    author: "Грегори Цукерман",
+    theme: "квантовый подход и проверка гипотез",
+    rules: [
+      "Любой торговый сигнал считать гипотезой, пока он не подтвержден статистикой, повторяемостью и контролем риска.",
+      "Не доверять единичному паттерну: сигнал должен подтверждаться несколькими независимыми признаками, например трендом, объемом, спредом и структурой свечей.",
+      "Остерегаться переобучения: слишком сложная логика без простой причины может хорошо выглядеть на истории и плохо работать в реальном рынке."
+    ]
   }
 ];
 
@@ -262,6 +282,7 @@ function buildStrategy(userIdea = "", tradePlan = null) {
     .join("; ");
   const liveBlock = buildLiveStrategyBlock(context);
   const tradePlanBlock = buildTradePlanBlock(tradePlan);
+  const investorDisciplineBlock = buildInvestorDisciplineBlock(context, tradePlan);
   const idea = userIdea ? `<p><strong>Уточнение из чата:</strong> ${escapeHtml(userIdea)}</p>` : "";
 
   const html = `
@@ -273,6 +294,7 @@ function buildStrategy(userIdea = "", tradePlan = null) {
     </section>
     ${liveBlock}
     ${tradePlanBlock}
+    ${investorDisciplineBlock}
     <section>
       <h3>Условия входа</h3>
       <ul>${entryFilters.map((filter) => `<li>${filter}</li>`).join("")}</ul>
@@ -300,6 +322,28 @@ function buildStrategy(userIdea = "", tradePlan = null) {
 
   state.lastStrategy = stripTags(html);
   return html;
+}
+
+function buildInvestorDisciplineBlock(context, tradePlan) {
+  const primary = tradePlan?.primary;
+  const rrText = primary
+    ? `${primary.side}: риск ${formatPrice(Math.abs(primary.entry - primary.stop))}, цель до ${formatPrice(primary.target2)}`
+    : "риск/цель еще не рассчитаны";
+  const edgeChecks = [
+    "Запас прочности: вход разрешен только если стоп заранее известен, а цель дает асимметрию не хуже выбранного risk/reward.",
+    context.live.active
+      ? "Квантовый фильтр: live-сигнал должен подтверждаться не одной свечой, а сочетанием цены, объема, спреда и режима рынка."
+      : "Квантовый фильтр: без live-данных стратегия остается гипотезой для теста, а не готовым сигналом.",
+    "Фильтр переобучения: если причина сделки слишком сложная или зависит от одного редкого паттерна, позицию лучше уменьшить или пропустить."
+  ];
+
+  return `
+    <section>
+      <h3>Фильтр Грэма и Цукермана</h3>
+      <p>${escapeHtml(rrText)}. Этот блок добавляет дисциплину инвестора и проверку статистического преимущества.</p>
+      <ul>${edgeChecks.map((check) => `<li>${escapeHtml(check)}</li>`).join("")}</ul>
+    </section>
+  `;
 }
 
 function buildTradePlanBlock(tradePlan) {
@@ -357,7 +401,9 @@ function buildLiveStrategyBlock(context) {
 function selectBookRules(context) {
   const selected = [
     ...knowledgeSources.find((source) => source.title === "Криптотрейдинг: Искусство побеждать").rules,
-    ...knowledgeSources.find((source) => source.title === "The Crypto Trader").rules
+    ...knowledgeSources.find((source) => source.title === "The Crypto Trader").rules,
+    ...knowledgeSources.find((source) => source.title === "Разумный инвестор").rules,
+    ...knowledgeSources.find((source) => source.title === "Человек, который разгадал рынок").rules
   ];
 
   if (["5m", "15m"].includes(context.timeframe)) {
@@ -373,7 +419,7 @@ function selectBookRules(context) {
     selected.push(...knowledgeSources.find((source) => source.title === "Как заработать на криптовалютах и блокчейне").rules);
   }
 
-  return [...new Set(selected)].slice(0, 6);
+  return [...new Set(selected)].slice(0, 10);
 }
 
 function generateStrategy(userIdea = "") {
