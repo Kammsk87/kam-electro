@@ -934,7 +934,9 @@ function evaluateRsiForScenario(context, side) {
 function drawChart(mode, tradePlan = null) {
   const width = canvas.width;
   const height = canvas.height;
-  const pad = { left: 52, right: 190, top: 34, bottom: 54 };
+  const compact = height < 380;
+  const rsiBox = getRsiPanelBox(width, height, compact);
+  const pad = { left: 52, right: 190, top: 28, bottom: compact ? 96 : 54 };
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = "#111518";
   ctx.fillRect(0, 0, width, height);
@@ -954,7 +956,7 @@ function drawChart(mode, tradePlan = null) {
     ctx.stroke();
   }
 
-  const points = makePricePath(mode, 68, width, height);
+  const points = makePricePath(mode, 68, width, height, compact);
   ctx.beginPath();
   points.forEach((point, index) => {
     if (index === 0) {
@@ -995,20 +997,15 @@ function drawChart(mode, tradePlan = null) {
     });
     drawScenarioBadge(tradePlan, pad.left, pad.top);
   }
-  drawRsiPanel(makeSyntheticRsiCandles(mode, tradePlan?.basePrice), getVisibleRsiIndicators(), {
-    x: pad.left,
-    y: height - 124,
-    width: width - pad.left - pad.right,
-    height: 92
-  });
+  drawRsiPanel(makeSyntheticRsiCandles(mode, tradePlan?.basePrice), getVisibleRsiIndicators(), rsiBox);
 }
 
-function makePricePath(mode, count, width, height) {
+function makePricePath(mode, count, width, height, compact = false) {
   const points = [];
   const left = 36;
   const right = width - 36;
   const top = 34;
-  const bottom = height - 42;
+  const bottom = compact ? height - 92 : height - 42;
   const span = right - left;
 
   for (let i = 0; i < count; i += 1) {
@@ -1030,7 +1027,9 @@ function makePricePath(mode, count, width, height) {
 function drawLiveChart(candles, tradePlan = null) {
   const width = canvas.width;
   const height = canvas.height;
-  const pad = { left: 52, right: 190, top: 34, bottom: 54 };
+  const compact = height < 380;
+  const rsiBox = getRsiPanelBox(width, height, compact);
+  const pad = { left: 52, right: 190, top: 28, bottom: compact ? 96 : 54 };
   const visible = candles.slice(-80);
   const planLevels = tradePlan?.scenarios?.flatMap((scenario) => [scenario.entry, scenario.stop, scenario.target1, scenario.target2]) || [];
   const lows = [...visible.map((candle) => candle.low), ...planLevels];
@@ -1076,7 +1075,7 @@ function drawLiveChart(candles, tradePlan = null) {
   const last = visible[visible.length - 1];
   ctx.fillStyle = "#f3b14d";
   ctx.font = "700 14px Inter, system-ui, sans-serif";
-  ctx.fillText(`last ${formatPrice(last.close)}`, pad.left, height - 16);
+  ctx.fillText(`last ${formatPrice(last.close)}`, pad.left, compact ? rsiBox.y - 8 : height - 16);
 
   if (tradePlan) {
     drawTradePlanOverlay(tradePlan, {
@@ -1087,12 +1086,17 @@ function drawLiveChart(candles, tradePlan = null) {
     });
     drawScenarioBadge(tradePlan, pad.left, pad.top);
   }
-  drawRsiPanel(visible, getVisibleRsiIndicators(), {
-    x: pad.left,
-    y: height - 124,
-    width: chartWidth,
-    height: 92
-  });
+  drawRsiPanel(visible, getVisibleRsiIndicators(), rsiBox);
+}
+
+function getRsiPanelBox(width, height, compact = false) {
+  const panelHeight = compact ? 58 : 92;
+  return {
+    x: 52,
+    y: height - panelHeight - 24,
+    width: width - 52 - 190,
+    height: panelHeight
+  };
 }
 
 function priceToY(price, min, range, pad, chartHeight) {
