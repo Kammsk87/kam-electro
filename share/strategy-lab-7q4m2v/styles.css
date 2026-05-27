@@ -606,6 +606,11 @@ canvas {
   background: var(--accent-2);
 }
 
+.status-badge.partial {
+  color: #07111e;
+  background: var(--accent);
+}
+
 .live-readout {
   display: grid;
   gap: 8px;
