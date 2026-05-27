@@ -1364,13 +1364,20 @@ function getAvailableAutopilotAssets() {
     .filter((value, index, list) => value && list.indexOf(value) === index);
 }
 
-function createScanContext(symbol, candles = [], derivatives = null, sentiment = null) {
+function getAvailableAutopilotTimeframes() {
+  return [...timeframe.options]
+    .map((option) => option.value || option.textContent)
+    .filter((value, index, list) => value && list.indexOf(value) === index);
+}
+
+function createScanContext(symbol, interval = timeframe.value, candles = [], derivatives = null, sentiment = null) {
   const base = getContext();
   const live = createRestLiveSnapshot(symbol, candles);
   const mode = marketMode.value === "auto" && candles.length >= 18 ? detectMarketMode(candles) : base.mode;
   return {
     ...base,
     asset: symbol,
+    timeframe: interval,
     mode,
     modeSource: marketMode.value === "auto" ? "auto-scan" : base.modeSource,
     rsi: getSelectedRsiIndicators(symbol),
@@ -1471,13 +1478,13 @@ async function runAutopilotScan(force = false) {
       signalQuality: bestCandidate.signalQuality,
       side: bestCandidate.signalQuality.best.side,
       strategyHtml: buildAutopilotStrategyHtml(bestCandidate),
-      reason: `${bestCandidate.context.asset}: score ${bestCandidate.signalQuality.best.score}/100, scan ${bestCandidate.autopilotScore}/100`
+      reason: `${bestCandidate.context.asset} ${bestCandidate.context.timeframe}: score ${bestCandidate.signalQuality.best.score}/100, scan ${bestCandidate.autopilotScore}/100`
     });
     state.autopilot.lastEntryAt = Date.now();
-    state.autopilot.lastMessage = trade ? `вошел: ${trade.side} ${trade.asset}` : "сигнал был, вход не создан";
+    state.autopilot.lastMessage = trade ? `вошел: ${trade.side} ${trade.asset} ${trade.timeframe}` : "сигнал был, вход не создан";
   } else {
     state.autopilot.lastMessage = bestCandidate
-      ? `лучший: ${bestCandidate.context.asset} ${bestCandidate.autopilotScore}/100, минимум ${autopilotMinScore}`
+      ? `лучший: ${bestCandidate.context.asset} ${bestCandidate.context.timeframe} ${bestCandidate.autopilotScore}/100, минимум ${autopilotMinScore}`
       : "нет монет без активной сделки";
   }
 
@@ -1491,26 +1498,30 @@ function isPaperTradeActiveForAsset(symbol) {
 
 async function scanAutopilotCandidates() {
   const symbols = getAvailableAutopilotAssets().filter((symbol) => !isPaperTradeActiveForAsset(symbol));
+  const intervals = getAvailableAutopilotTimeframes();
   if (!symbols.length) return [];
 
-  state.autopilot.lastMessage = `сканирую ${symbols.length} монет`;
+  state.autopilot.lastMessage = `сканирую ${symbols.length} монет x ${intervals.length} ТФ`;
   renderStrategyIntelligence();
   const sentiment = await fetchSentimentIntel().catch(() => null);
   const preliminary = [];
 
   for (const symbol of symbols) {
     if (!state.autopilot.enabled) break;
-    try {
-      const candles = await fetchHistoricalCandlesFor(symbol, timeframe.value, 220);
-      const context = createScanContext(symbol, candles, null, sentiment);
-      const intel = buildMarketIntelForContext(context, candles, null, sentiment);
-      context.intel = intel;
-      const tradePlan = buildTradePlan(context);
-      const signalQuality = evaluateSignalQuality(context, tradePlan);
-      const autopilotScore = scoreAutopilotCandidate(context, tradePlan, signalQuality, intel);
-      preliminary.push({ context, candles, intel, tradePlan, signalQuality, autopilotScore });
-    } catch (error) {
-      preliminary.push({ error, context: { asset: symbol }, autopilotScore: -Infinity });
+    for (const interval of intervals) {
+      if (!state.autopilot.enabled) break;
+      try {
+        const candles = await fetchHistoricalCandlesFor(symbol, interval, 220);
+        const context = createScanContext(symbol, interval, candles, null, sentiment);
+        const intel = buildMarketIntelForContext(context, candles, null, sentiment);
+        context.intel = intel;
+        const tradePlan = buildTradePlan(context);
+        const signalQuality = evaluateSignalQuality(context, tradePlan);
+        const autopilotScore = scoreAutopilotCandidate(context, tradePlan, signalQuality, intel);
+        preliminary.push({ context, candles, intel, tradePlan, signalQuality, autopilotScore });
+      } catch (error) {
+        preliminary.push({ error, context: { asset: symbol, timeframe: interval }, autopilotScore: -Infinity });
+      }
     }
   }
 
@@ -1539,10 +1550,10 @@ function buildAutopilotStrategyHtml(candidate) {
   const best = candidate.signalQuality.best;
   const plan = candidate.tradePlan.scenarios.find((scenario) => scenario.side === best.side) || candidate.tradePlan.primary;
   return `
-    <h2>${candidate.context.asset}: авто-бот выбрал ${best.side}</h2>
+    <h2>${candidate.context.asset} · ${candidate.context.timeframe}: авто-бот выбрал ${best.side}</h2>
     <section>
       <h3>Причина входа</h3>
-      <p>Скан всех монет: итоговый score ${candidate.autopilotScore}/100, сигнал ${best.score}/100. ${escapeHtml(best.decision)}.</p>
+      <p>Скан всех монет и таймфреймов: итоговый score ${candidate.autopilotScore}/100, сигнал ${best.score}/100. ${escapeHtml(best.decision)}.</p>
     </section>
     <section>
       <h3>План</h3>
@@ -1581,7 +1592,8 @@ function detectMarketMode(candles) {
   const lastRangePct = ((last.high - last.low) / last.close) * 100;
   const avgVolume = average(previous.slice(-20).map((candle) => candle.volume));
   const volumeImpulse = avgVolume > 0 && last.volume > avgVolume * 1.25;
-  const volatilityLimit = timeframe.value === "5m" ? 1.1 : timeframe.value === "15m" ? 1.6 : timeframe.value === "1h" ? 2.4 : 3.6;
+  const detectedFrame = candles === state.live.candles ? timeframe.value : null;
+  const volatilityLimit = detectedFrame === "5m" ? 1.1 : detectedFrame === "15m" ? 1.6 : detectedFrame === "1h" ? 2.4 : 3.6;
 
   if (avgRangePct > volatilityLimit || lastRangePct > avgRangePct * 2.4) {
     return "high-volatility";
