@@ -454,6 +454,7 @@ function normalizePaperTrade(trade) {
     result: String(trade.result || "в работе"),
     decision: String(trade.decision || ""),
     score: Number(trade.score) || null,
+    strategySnapshot: normalizeStrategySnapshot(trade.strategySnapshot),
     lastCheckedAt: Number(trade.lastCheckedAt) || Number(trade.openedAt) || Date.now(),
     exitPrice: normalizedExitPrice,
     pnl: normalizedPnl,
@@ -534,6 +535,18 @@ function normalizePaperExitPrice(trade) {
   if (trade.status === "target") return Number(trade.target) || null;
   if (trade.status === "stop") return Number(trade.stop) || null;
   return Number(trade.exitPrice) || null;
+}
+
+function normalizeStrategySnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== "object") return null;
+  return {
+    ...snapshot,
+    version: String(snapshot.version || "1"),
+    capturedAt: Number(snapshot.capturedAt) || Date.now(),
+    strategyText: String(snapshot.strategyText || ""),
+    strategyHtml: String(snapshot.strategyHtml || ""),
+    outcome: snapshot.outcome && typeof snapshot.outcome === "object" ? snapshot.outcome : null
+  };
 }
 
 function persist() {
@@ -1730,6 +1743,7 @@ function enterPaperTrade() {
   const quality = state.signalQuality?.scenarios?.find((item) => item.side === scenario.side);
   const placedPrice = getExecutableMarketPrice(context.asset) || tradePlan.basePrice || entry;
   const triggerDirection = getOrderTriggerDirection(scenario.side, placedPrice, entry);
+  const strategySnapshot = createStrategySnapshot(context, tradePlan, scenario, quality);
 
   const trade = {
     id,
@@ -1764,6 +1778,7 @@ function enterPaperTrade() {
     result: "ордер ожидает вход",
     decision: quality?.decision || "",
     score: quality?.score || null,
+    strategySnapshot,
     lastCheckedAt: Date.now(),
     exitPrice: null,
     pnl: 0,
@@ -1775,6 +1790,82 @@ function enterPaperTrade() {
   state.activePaperTradeId = id;
   persistPaperTrades();
   updatePaperTrades();
+}
+
+function createStrategySnapshot(context, tradePlan, scenario, quality) {
+  const strategyHtml = strategyContainer.innerHTML || buildStrategy(state.lastUserIdea, tradePlan, state.signalQuality);
+  const allScenarios = (tradePlan?.scenarios || []).map(snapshotScenario);
+  const snapshot = {
+    version: "2",
+    capturedAt: Date.now(),
+    strategyText: state.lastStrategy || stripTags(strategyHtml),
+    strategyHtml,
+    userIdea: state.lastUserIdea || "",
+    context: {
+      asset: context.asset,
+      timeframe: context.timeframe,
+      mode: context.mode,
+      modeSource: context.modeSource,
+      risk: Math.min(Number(context.risk) || 1, 2),
+      conservative: context.conservative,
+      includeLongs: context.includeLongs,
+      includeShorts: context.includeShorts,
+      deposit: context.deposit,
+      live: {
+        active: Boolean(context.live?.active),
+        symbol: context.live?.symbol || context.asset,
+        ticker: context.live?.ticker || null,
+        book: context.live?.book || null,
+        updatedAt: context.live?.updatedAt || null
+      },
+      rsi: context.rsi.map(snapshotIndicator),
+      ema: context.ema.map(snapshotIndicator)
+    },
+    selectedScenario: snapshotScenario(scenario),
+    allScenarios,
+    signalQuality: {
+      selected: quality || null,
+      best: state.signalQuality?.best || null,
+      verdict: state.signalQuality?.verdict || "",
+      scenarios: state.signalQuality?.scenarios || []
+    },
+    rules: [...context.rules],
+    sourceRules: [...context.sourceRules],
+    knowledgeSources: knowledgeSources.map((source) => ({
+      title: source.title,
+      author: source.author,
+      theme: source.theme,
+      rules: [...source.rules]
+    })),
+    outcome: null
+  };
+
+  return JSON.parse(JSON.stringify(snapshot));
+}
+
+function snapshotScenario(scenario) {
+  if (!scenario) return null;
+  return {
+    side: scenario.side,
+    entry: scenario.entry,
+    stop: scenario.stop,
+    target1: scenario.target1,
+    target2: scenario.target2,
+    risk: Math.abs(scenario.entry - scenario.stop),
+    reward1: Math.abs(scenario.target1 - scenario.entry),
+    reward2: Math.abs(scenario.target2 - scenario.entry)
+  };
+}
+
+function snapshotIndicator(indicator) {
+  return {
+    id: indicator.id,
+    label: indicator.label,
+    period: indicator.period,
+    show: indicator.show,
+    use: indicator.use,
+    role: indicator.role
+  };
 }
 
 function getBestScenarioSide(tradePlan) {
@@ -2082,6 +2173,7 @@ function executePartialTakeProfit(trade) {
   trade.tp1Order.leavesQty = 0;
   trade.tp2Order.orderStatus = trade.remainingQuantity > 0 ? "Untriggered" : "Cancelled";
   trade.tpOrder = trade.tp2Order;
+  updateStrategySnapshotOutcome(trade, "partial");
   appendPaperPoint(trade, trade.target1, trade.pnl, trade.pnlPct);
 }
 
@@ -2119,7 +2211,34 @@ function closePaperPositionByTpsl(trade, closeType) {
     trade.tp2Order.orderStatus = "Cancelled";
   }
   trade.tpOrder = trade.tp2Order;
+  updateStrategySnapshotOutcome(trade, closeType);
   appendPaperPoint(trade, exitPrice, exitPnl, exitPnlPct);
+}
+
+function updateStrategySnapshotOutcome(trade, eventType) {
+  if (!trade.strategySnapshot) return;
+  trade.strategySnapshot.outcome = {
+    eventType,
+    status: trade.status,
+    result: trade.result,
+    side: trade.side,
+    openedAt: trade.openedAt,
+    filledAt: trade.filledAt,
+    closedAt: trade.closedAt,
+    target1HitAt: trade.target1HitAt,
+    entry: trade.entry,
+    stop: trade.stop,
+    target1: trade.target1,
+    target2: trade.target,
+    exitPrice: trade.exitPrice,
+    amount: trade.amount,
+    initialQuantity: getInitialQuantity(trade),
+    remainingQuantity: getRemainingQuantity(trade),
+    realizedPnl: trade.realizedPnl,
+    pnl: trade.pnl,
+    pnlPct: trade.pnlPct,
+    updatedAt: Date.now()
+  };
 }
 
 function isPaperOrderTriggered(trade, currentPrice) {
@@ -2266,6 +2385,10 @@ function exportJournalToExcel() {
     "Цена выхода": trade.exitPrice || "",
     "PnL USDT": trade.pnl,
     "PnL %": trade.pnlPct,
+    "Стратегия сохранена": trade.strategySnapshot ? "да" : "нет",
+    "Стратегия текст": trade.strategySnapshot?.strategyText || "",
+    "Контекст стратегии JSON": trade.strategySnapshot ? JSON.stringify(trade.strategySnapshot) : "",
+    "Итог для обучения JSON": trade.strategySnapshot?.outcome ? JSON.stringify(trade.strategySnapshot.outcome) : "",
     "Order ID": trade.openingOrder?.orderId || "",
     "TP1 статус": trade.tp1Order?.orderStatus || "",
     "TP2 статус": trade.tp2Order?.orderStatus || trade.tpOrder?.orderStatus || "",
