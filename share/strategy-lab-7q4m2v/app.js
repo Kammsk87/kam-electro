@@ -165,6 +165,7 @@ const marketMode = document.querySelector("#marketMode");
 const risk = document.querySelector("#risk");
 const riskValue = document.querySelector("#riskValue");
 const conservative = document.querySelector("#conservative");
+const includeLongs = document.querySelector("#includeLongs");
 const includeShorts = document.querySelector("#includeShorts");
 const trainingInput = document.querySelector("#trainingInput");
 const rulesContainer = document.querySelector("[data-rules]");
@@ -235,6 +236,7 @@ function getContext() {
     mode: marketMode.value,
     risk: Number(risk.value),
     conservative: conservative.checked,
+    includeLongs: includeLongs.checked,
     includeShorts: includeShorts.checked,
     rules: state.rules,
     sourceRules: knowledgeSources.flatMap((source) => source.rules),
@@ -256,7 +258,7 @@ function modeLabel(mode) {
 function buildStrategy(userIdea = "", tradePlan = null) {
   const context = getContext();
   const isFast = ["5m", "15m"].includes(context.timeframe);
-  const side = "long и short по подтверждению";
+  const side = describeSelectedSides(context);
   const rrTarget = context.conservative ? "1 : 2.2" : "1 : 1.7";
   const setup = {
     trend: "работать от направления старшего тренда, входить после импульса и неглубокого отката к EMA/VWAP",
@@ -661,6 +663,7 @@ function priceToY(price, min, range, pad, chartHeight) {
 }
 
 function buildTradePlan(context) {
+  ensureAtLeastOneScenario();
   const basePrice = getPlanBasePrice(context);
   const volatilityPct = getVolatilityPct(context);
   const rr1 = context.conservative ? 1.6 : 1.25;
@@ -692,14 +695,28 @@ function buildTradePlan(context) {
     comment: "активируется при потере уровня, слабой реакции покупателя и подтверждении продавца."
   };
 
-  const scenarios = [long, short];
+  const scenarios = [];
+  if (includeLongs.checked) scenarios.push(long);
+  if (includeShorts.checked) scenarios.push(short);
 
   return {
     source: context.live.active ? "live" : "simulation",
     basePrice,
     scenarios,
-    primary: scenarios[0]
+    primary: scenarios[0] || long
   };
+}
+
+function ensureAtLeastOneScenario() {
+  if (!includeLongs.checked && !includeShorts.checked) {
+    includeLongs.checked = true;
+  }
+}
+
+function describeSelectedSides(context) {
+  if (context.includeLongs && context.includeShorts) return "long и short по подтверждению";
+  if (context.includeShorts) return "только short-сценарий по подтверждению";
+  return "только long-сценарий по подтверждению";
 }
 
 function getPlanBasePrice(context) {
@@ -959,8 +976,9 @@ chatForm.addEventListener("submit", (event) => {
   answerChat(text);
 });
 
-[asset, timeframe, marketMode, conservative, includeShorts].forEach((control) => {
+[asset, timeframe, marketMode, conservative, includeLongs, includeShorts].forEach((control) => {
   control.addEventListener("change", () => {
+    ensureAtLeastOneScenario();
     if ((control === asset || control === timeframe) && state.live.enabled) {
       restartLiveConnection();
     }
