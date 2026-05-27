@@ -1,4 +1,5 @@
 User-agent: *
+Disallow: /share/strategy-lab-7q4m2v/
 Allow: /
 
 Host: kamtok.ru

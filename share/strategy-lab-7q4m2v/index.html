@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Crypto Strategy Bot</title>
+    <meta
+      name="description"
+      content="Изолированный MVP приложения для генерации и обучения крипто-торговых стратегий."
+    >
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="stylesheet" href="styles.css">
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="side-panel" aria-label="Настройки стратегии">
+        <a class="brand" href="./" aria-label="Crypto Strategy Bot">
+          <span class="brand-mark">CS</span>
+          <span>
+            <strong>Crypto Strategy Bot</strong>
+            <small>исследование стратегий</small>
+          </span>
+        </a>
+
+        <section class="panel-section">
+          <div class="section-title">
+            <span>Рынок</span>
+            <button class="icon-button" type="button" data-randomize title="Случайный сценарий" aria-label="Случайный сценарий">↻</button>
+          </div>
+
+          <label>
+            Актив
+            <select id="asset">
+              <optgroup label="Крупные активы">
+                <option value="BTC/USDT">Bitcoin (BTC)</option>
+                <option value="ETH/USDT">Ethereum (ETH)</option>
+                <option value="SOL/USDT">Solana (SOL)</option>
+                <option value="BNB/USDT">BNB</option>
+                <option value="XRP/USDT">XRP</option>
+                <option value="TON/USDT">Toncoin (TON)</option>
+              </optgroup>
+              <optgroup label="Активно торгуемые альткоины">
+                <option value="ADA/USDT">Cardano (ADA)</option>
+                <option value="DOGE/USDT">Dogecoin (DOGE)</option>
+                <option value="TRX/USDT">TRON (TRX)</option>
+                <option value="AVAX/USDT">Avalanche (AVAX)</option>
+                <option value="LINK/USDT">Chainlink (LINK)</option>
+                <option value="DOT/USDT">Polkadot (DOT)</option>
+                <option value="MATIC/USDT">Polygon (MATIC)</option>
+                <option value="LTC/USDT">Litecoin (LTC)</option>
+                <option value="BCH/USDT">Bitcoin Cash (BCH)</option>
+                <option value="UNI/USDT">Uniswap (UNI)</option>
+                <option value="AAVE/USDT">Aave (AAVE)</option>
+                <option value="APT/USDT">Aptos (APT)</option>
+                <option value="SUI/USDT">Sui (SUI)</option>
+                <option value="ARB/USDT">Arbitrum (ARB)</option>
+                <option value="OP/USDT">Optimism (OP)</option>
+                <option value="NEAR/USDT">NEAR Protocol (NEAR)</option>
+                <option value="ATOM/USDT">Cosmos (ATOM)</option>
+                <option value="INJ/USDT">Injective (INJ)</option>
+                <option value="FIL/USDT">Filecoin (FIL)</option>
+                <option value="ETC/USDT">Ethereum Classic (ETC)</option>
+                <option value="SEI/USDT">Sei (SEI)</option>
+                <option value="TIA/USDT">Celestia (TIA)</option>
+                <option value="TWT/USDT">Trust Wallet Token (TWT)</option>
+              </optgroup>
+            </select>
+          </label>
+
+          <label>
+            Таймфрейм
+            <select id="timeframe">
+              <option>5m</option>
+              <option selected>15m</option>
+              <option>1h</option>
+              <option>4h</option>
+              <option>1d</option>
+            </select>
+          </label>
+
+          <label>
+            Рыночный режим
+            <select id="marketMode">
+              <option value="trend">Тренд</option>
+              <option value="range">Боковик</option>
+              <option value="breakout">Пробой</option>
+              <option value="pullback">Откат</option>
+              <option value="high-volatility">Высокая волатильность</option>
+            </select>
+          </label>
+
+          <label>
+            Риск на сделку: <output id="riskValue">1.0%</output>
+            <input id="risk" type="range" min="0.25" max="3" step="0.25" value="1">
+          </label>
+
+          <fieldset>
+            <legend>Стиль</legend>
+            <label class="check-row">
+              <input type="checkbox" id="conservative" checked>
+              <span>консервативный вход</span>
+            </label>
+            <label class="check-row">
+              <input type="checkbox" id="includeShorts" checked disabled>
+              <span>long и short всегда</span>
+            </label>
+          </fieldset>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-title">
+            <span>Live рынок</span>
+            <span class="mini-counter" data-live-status>offline</span>
+          </div>
+          <button class="primary-action full-width" type="button" data-live-toggle>Включить live</button>
+          <div class="live-readout">
+            <div>
+              <span>Источник</span>
+              <strong data-live-source>Binance public WS</strong>
+            </div>
+            <div>
+              <span>Цена</span>
+              <strong data-live-price>нет данных</strong>
+            </div>
+            <div>
+              <span>Bid / Ask</span>
+              <strong data-live-book>нет данных</strong>
+            </div>
+            <div>
+              <span>Спред</span>
+              <strong data-live-spread>нет данных</strong>
+            </div>
+            <div>
+              <span>24h объем</span>
+              <strong data-live-volume>нет данных</strong>
+            </div>
+            <div>
+              <span>Обновлено</span>
+              <strong data-live-updated>нет данных</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-title">
+            <span>Обучающая база</span>
+            <button class="text-button" type="button" data-reset-training>Сброс</button>
+          </div>
+          <textarea id="trainingInput" rows="5" placeholder="Например: Не торговать пробой без ретеста. После 3 стопов подряд снижать риск вдвое."></textarea>
+          <button class="primary-action" type="button" data-add-training>Добавить правило</button>
+          <div class="rule-list" data-rules></div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-title">
+            <span>Книжная база</span>
+            <span class="mini-counter" data-source-count>0 источников</span>
+          </div>
+          <div class="source-list" data-sources></div>
+        </section>
+      </aside>
+
+      <section class="workspace" aria-label="Рабочая область бота">
+        <header class="top-bar">
+          <div>
+            <p class="eyebrow">MVP / отдельный проект</p>
+            <h1>Бот для торговых стратегий по крипте</h1>
+          </div>
+          <div class="top-actions">
+            <button class="secondary-action" type="button" data-copy>Копировать стратегию</button>
+            <button class="primary-action" type="button" data-generate>Сгенерировать</button>
+          </div>
+        </header>
+
+        <section class="strategy-grid">
+          <div class="strategy-output" aria-live="polite">
+            <div class="output-header">
+              <span>Ответ бота</span>
+              <span class="status-pill" data-confidence>готов к обучению</span>
+            </div>
+            <article class="strategy-card" data-strategy>
+              <h2>Запусти генерацию стратегии</h2>
+              <p>
+                Выбери актив, режим рынка и риск. Добавь правила, по которым хочешь обучать бота:
+                фильтры входа, риск-менеджмент, запреты, любимые индикаторы и стиль сопровождения.
+              </p>
+            </article>
+          </div>
+
+          <div class="market-lab">
+            <div class="chart-panel">
+              <div class="output-header">
+                <span data-chart-title>Сценарий цены</span>
+                <span data-chart-label>BTC/USDT · 15m</span>
+              </div>
+              <canvas id="marketChart" width="1080" height="520" aria-label="Схематичный график рынка"></canvas>
+            </div>
+
+            <div class="metrics">
+              <div>
+                <span>Risk / Reward</span>
+                <strong data-rr>1 : 2.2</strong>
+              </div>
+              <div>
+                <span>Макс. риск</span>
+                <strong data-max-risk>1.0%</strong>
+              </div>
+              <div>
+                <span>Фильтров</span>
+                <strong data-filter-count>4</strong>
+              </div>
+            </div>
+
+            <div class="trade-plan-strip">
+              <div>
+                <span>План</span>
+                <strong data-plan-side>LONG / SHORT</strong>
+              </div>
+              <div>
+                <span>Entry</span>
+                <strong data-plan-entry>нет данных</strong>
+              </div>
+              <div>
+                <span>Stop</span>
+                <strong data-plan-stop>нет данных</strong>
+              </div>
+              <div>
+                <span>Target</span>
+                <strong data-plan-target>нет данных</strong>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="chat-panel">
+          <div class="section-title">
+            <span>Диалог с ботом</span>
+            <button class="text-button" type="button" data-clear-chat>Очистить</button>
+          </div>
+          <div class="chat-log" data-chat-log>
+            <div class="message bot">
+              <strong>Бот</strong>
+              <p>Опиши идею: тренд, пробой, скальпинг, риск, индикаторы. Я соберу торговый план и отмечу, где нужна проверка.</p>
+            </div>
+          </div>
+          <form class="chat-form" data-chat-form>
+            <input id="chatInput" type="text" placeholder="Например: нужна стратегия для SOL на откате после сильного импульса" autocomplete="off">
+            <button class="primary-action" type="submit">Отправить</button>
+          </form>
+        </section>
+      </section>
+    </main>
+  </body>
+</html>
