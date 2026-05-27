@@ -594,7 +594,8 @@ canvas {
   background: var(--danger);
 }
 
-.status-badge.open {
+.status-badge.open,
+.status-badge.pending {
   color: #110d05;
   background: var(--accent-2);
 }

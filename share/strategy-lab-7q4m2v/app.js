@@ -371,6 +371,7 @@ function normalizePaperTrade(trade) {
   const history = Array.isArray(trade.history) && trade.history.length
     ? trade.history
     : [{ time: Number(trade.openedAt) || Date.now(), price: entry, pnl: Number(trade.pnl) || 0, pnlPct: Number(trade.pnlPct) || 0 }];
+  const status = ["pending", "open", "target", "stop"].includes(trade.status) ? trade.status : "open";
   return {
     ...trade,
     id: String(trade.id || `trade-${Date.now()}-${Math.round(Math.random() * 1000)}`),
@@ -385,9 +386,12 @@ function normalizePaperTrade(trade) {
     stop: Number(trade.stop) || entry,
     target: Number(trade.target) || entry,
     target1: Number(trade.target1) || Number(trade.target) || entry,
+    placedPrice: Number(trade.placedPrice) || entry,
+    triggerDirection: trade.triggerDirection === "below" ? "below" : "above",
     openedAt: Number(trade.openedAt) || Date.now(),
+    filledAt: Number(trade.filledAt) || null,
     closedAt: Number(trade.closedAt) || null,
-    status: trade.status === "target" || trade.status === "stop" ? trade.status : "open",
+    status,
     result: String(trade.result || "в работе"),
     decision: String(trade.decision || ""),
     score: Number(trade.score) || null,
@@ -1411,6 +1415,8 @@ function enterPaperTrade() {
   const quantity = amount / entry;
   const id = `trade-${Date.now()}-${Math.round(Math.random() * 1000)}`;
   const quality = state.signalQuality?.scenarios?.find((item) => item.side === scenario.side);
+  const placedPrice = getExecutableMarketPrice(context.asset) || tradePlan.basePrice || entry;
+  const triggerDirection = getOrderTriggerDirection(scenario.side, placedPrice, entry);
 
   const trade = {
     id,
@@ -1426,19 +1432,21 @@ function enterPaperTrade() {
     stop: scenario.stop,
     target: scenario.target2,
     target1: scenario.target1,
+    placedPrice,
+    triggerDirection,
     openedAt: Date.now(),
+    filledAt: null,
     closedAt: null,
-    status: "open",
-    result: "в работе",
+    status: "pending",
+    result: "ордер ожидает вход",
     decision: quality?.decision || "",
     score: quality?.score || null,
     exitPrice: null,
     pnl: 0,
     pnlPct: 0,
-    history: [{ time: Date.now(), price: entry, pnl: 0, pnlPct: 0 }]
+    history: [{ time: Date.now(), price: placedPrice, pnl: 0, pnlPct: 0 }]
   };
 
-  state.paperPriceCache[trade.asset] = { price: entry, updatedAt: Date.now(), source: "entry" };
   state.paperTrades.push(trade);
   state.activePaperTradeId = id;
   persistPaperTrades();
@@ -1450,6 +1458,11 @@ function getBestScenarioSide(tradePlan) {
   const bestSide = state.signalQuality?.best?.side;
   if (bestSide && sides.has(bestSide)) return bestSide;
   return null;
+}
+
+function getOrderTriggerDirection(side, placedPrice, entry) {
+  if (side === "LONG") return entry >= placedPrice ? "above" : "below";
+  return entry <= placedPrice ? "below" : "above";
 }
 
 function resetPaperTrade(shouldDraw = true) {
@@ -1497,7 +1510,7 @@ function updatePaperTrades() {
 async function refreshOpenPaperTradePrices(force = false) {
   const now = Date.now();
   if (!force && now - state.paperPriceLastFetch < 9000) return;
-  const openAssets = [...new Set(state.paperTrades.filter((trade) => trade.status === "open").map((trade) => trade.asset))];
+  const openAssets = [...new Set(state.paperTrades.filter((trade) => ["pending", "open"].includes(trade.status)).map((trade) => trade.asset))];
   if (!openAssets.length) return;
 
   state.paperPriceLastFetch = now;
@@ -1557,6 +1570,21 @@ function updatePaperTradesFromCachedPrices() {
 
 function updateSinglePaperTrade(trade) {
   const currentPrice = getPaperTradePrice(trade);
+  if (trade.status === "pending") {
+    trade.pnl = 0;
+    trade.pnlPct = 0;
+    if (currentPrice > 0) appendPaperPoint(trade, currentPrice, 0, 0);
+    if (currentPrice > 0 && isPaperOrderTriggered(trade, currentPrice)) {
+      trade.status = "open";
+      trade.filledAt = Date.now();
+      trade.result = "позиция открыта";
+      appendPaperPoint(trade, trade.entry, 0, 0);
+      return;
+    } else {
+      return;
+    }
+  }
+
   const pnl = calculatePaperPnl(trade, currentPrice);
   const pnlPct = (pnl / trade.amount) * 100;
   trade.pnl = pnl;
@@ -1574,6 +1602,12 @@ function updateSinglePaperTrade(trade) {
       trade.result = hitTarget ? `${trade.side} отработал` : `${trade.side} не отработал`;
     }
   }
+}
+
+function isPaperOrderTriggered(trade, currentPrice) {
+  return trade.triggerDirection === "above"
+    ? currentPrice >= trade.entry
+    : currentPrice <= trade.entry;
 }
 
 function appendPaperPoint(trade, price, pnl, pnlPct) {
@@ -1598,11 +1632,12 @@ function getActivePaperTrade() {
     const selected = state.paperTrades.find((trade) => trade.id === state.activePaperTradeId);
     if (selected) return selected;
   }
-  return [...state.paperTrades].reverse().find((trade) => trade.status === "open") || state.paperTrades[state.paperTrades.length - 1] || null;
+  return [...state.paperTrades].reverse().find((trade) => ["pending", "open"].includes(trade.status)) || state.paperTrades[state.paperTrades.length - 1] || null;
 }
 
 function renderPaperReadout(trade, currentPrice, pnl, pnlPct) {
   const statusLabels = {
+    pending: "ордер ожидает вход",
     open: "сделка открыта",
     target: "цель достигнута",
     stop: "стоп сработал"
@@ -1617,8 +1652,8 @@ function renderPaperReadout(trade, currentPrice, pnl, pnlPct) {
 
 function renderTradeJournal() {
   const trades = state.paperTrades;
-  const openTrades = trades.filter((trade) => trade.status === "open");
-  const closedTrades = trades.filter((trade) => trade.status !== "open");
+  const openTrades = trades.filter((trade) => ["pending", "open"].includes(trade.status));
+  const closedTrades = trades.filter((trade) => !["pending", "open"].includes(trade.status));
   const wins = closedTrades.filter((trade) => trade.pnl >= 0);
   const losses = closedTrades.filter((trade) => trade.pnl < 0);
   const totalPnl = trades.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0);
@@ -1637,8 +1672,8 @@ function renderTradeJournal() {
   journalRows.innerHTML = trades.map((trade, index) => {
     const currentPrice = getPaperTradePrice(trade);
     const isActive = getActivePaperTrade()?.id === trade.id;
-    const statusClass = trade.status === "open" ? "open" : trade.pnl >= 0 ? "win" : "loss";
-    const statusLabel = trade.status === "open" ? "OPEN" : trade.pnl >= 0 ? "WIN" : "LOSS";
+    const statusClass = trade.status === "pending" ? "pending" : trade.status === "open" ? "open" : trade.pnl >= 0 ? "win" : "loss";
+    const statusLabel = trade.status === "pending" ? "PENDING" : trade.status === "open" ? "OPEN" : trade.pnl >= 0 ? "WIN" : "LOSS";
     const sideClass = trade.side === "SHORT" ? "short" : "long";
     return `
       <tr class="${isActive ? "is-active" : ""}">
@@ -1674,6 +1709,10 @@ function formatJournalTime(timestamp) {
 }
 
 function getCurrentMarketPrice(symbol = asset.value) {
+  return getExecutableMarketPrice(symbol);
+}
+
+function getExecutableMarketPrice(symbol = asset.value) {
   const liveTickerPrice = state.live.asset === symbol ? Number(state.live.ticker?.lastPrice) : 0;
   if (state.live.enabled && liveTickerPrice > 0) return liveTickerPrice;
   const cached = state.paperPriceCache[symbol];
