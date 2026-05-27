@@ -207,7 +207,7 @@
                 <span data-chart-title>Сценарий цены</span>
                 <span data-chart-label>BTC/USDT · 15m</span>
               </div>
-              <canvas id="marketChart" width="1080" height="520" aria-label="Схематичный график рынка"></canvas>
+              <canvas id="marketChart" width="1080" height="460" aria-label="Схематичный график рынка"></canvas>
             </div>
 
             <div class="metrics">
@@ -270,7 +270,7 @@
                   </select>
                 </label>
                 <button class="primary-action full-width" type="button" data-paper-enter>Войти в стратегию</button>
-                <button class="secondary-action full-width" type="button" data-paper-reset>Сброс</button>
+                <button class="secondary-action full-width" type="button" data-paper-reset>Сброс графика</button>
                 <div class="paper-metrics">
                   <div>
                     <span>Entry</span>
@@ -289,6 +289,54 @@
                     <strong data-paper-result>нет сделки</strong>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <div class="trade-journal">
+              <div class="output-header">
+                <span>Журнал операций</span>
+                <button class="text-button" type="button" data-paper-clear>Очистить журнал</button>
+              </div>
+              <div class="journal-summary">
+                <div>
+                  <span>Открыто</span>
+                  <strong data-journal-open>0</strong>
+                </div>
+                <div>
+                  <span>Закрыто</span>
+                  <strong data-journal-closed>0</strong>
+                </div>
+                <div>
+                  <span>Итог PnL</span>
+                  <strong data-journal-pnl>0.00 USDT</strong>
+                </div>
+                <div>
+                  <span>Win / Loss</span>
+                  <strong data-journal-winloss>0 / 0</strong>
+                </div>
+              </div>
+              <div class="journal-table-wrap">
+                <table class="journal-table">
+                  <thead>
+                    <tr>
+                      <th>№</th>
+                      <th>Время</th>
+                      <th>Монета</th>
+                      <th>L/S</th>
+                      <th>Entry</th>
+                      <th>Размер</th>
+                      <th>Текущая / выход</th>
+                      <th>Profit USDT</th>
+                      <th>Profit %</th>
+                      <th>Статус</th>
+                    </tr>
+                  </thead>
+                  <tbody data-journal-rows>
+                    <tr>
+                      <td colspan="10">Сделок пока нет</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>

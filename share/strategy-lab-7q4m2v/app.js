@@ -1,4 +1,5 @@
 const storageKey = "crypto-strategy-bot-v1";
+const paperJournalKey = "crypto-strategy-bot-paper-journal-v1";
 
 const defaultRules = [
   "Не считать стратегию готовой без точки отмены сценария и заранее заданного стопа.",
@@ -266,7 +267,8 @@ const state = {
   lastStrategy: "",
   lastUserIdea: "",
   tradePlan: null,
-  paperTrade: null,
+  paperTrades: loadPaperTrades(),
+  activePaperTradeId: null,
   detectedMode: "trend",
   rsiPreferences: {},
   live: {
@@ -329,6 +331,12 @@ const paperPnl = document.querySelector("[data-paper-pnl]");
 const paperResult = document.querySelector("[data-paper-result]");
 const paperEnter = document.querySelector("[data-paper-enter]");
 const paperReset = document.querySelector("[data-paper-reset]");
+const paperClear = document.querySelector("[data-paper-clear]");
+const journalRows = document.querySelector("[data-journal-rows]");
+const journalOpen = document.querySelector("[data-journal-open]");
+const journalClosed = document.querySelector("[data-journal-closed]");
+const journalPnl = document.querySelector("[data-journal-pnl]");
+const journalWinloss = document.querySelector("[data-journal-winloss]");
 const chatLog = document.querySelector("[data-chat-log]");
 const chatForm = document.querySelector("[data-chat-form]");
 const chatInput = document.querySelector("#chatInput");
@@ -344,8 +352,51 @@ function loadRules() {
   }
 }
 
+function loadPaperTrades() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(paperJournalKey));
+    return Array.isArray(saved?.trades) ? saved.trades.map(normalizePaperTrade).filter(Boolean) : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function normalizePaperTrade(trade) {
+  if (!trade || !Number.isFinite(Number(trade.entry)) || !Number.isFinite(Number(trade.amount))) return null;
+  const entry = Number(trade.entry);
+  const amount = Number(trade.amount);
+  const history = Array.isArray(trade.history) && trade.history.length
+    ? trade.history
+    : [{ time: Number(trade.openedAt) || Date.now(), price: entry, pnl: Number(trade.pnl) || 0, pnlPct: Number(trade.pnlPct) || 0 }];
+  return {
+    ...trade,
+    id: String(trade.id || `trade-${Date.now()}-${Math.round(Math.random() * 1000)}`),
+    asset: String(trade.asset || "BTC/USDT"),
+    timeframe: String(trade.timeframe || "15m"),
+    side: trade.side === "SHORT" ? "SHORT" : "LONG",
+    amount,
+    entry,
+    quantity: Number(trade.quantity) || amount / entry,
+    stop: Number(trade.stop) || entry,
+    target: Number(trade.target) || entry,
+    target1: Number(trade.target1) || Number(trade.target) || entry,
+    openedAt: Number(trade.openedAt) || Date.now(),
+    closedAt: Number(trade.closedAt) || null,
+    status: trade.status === "target" || trade.status === "stop" ? trade.status : "open",
+    result: String(trade.result || "в работе"),
+    exitPrice: Number(trade.exitPrice) || null,
+    pnl: Number(trade.pnl) || 0,
+    pnlPct: Number(trade.pnlPct) || 0,
+    history
+  };
+}
+
 function persist() {
   localStorage.setItem(storageKey, JSON.stringify({ rules: state.rules }));
+}
+
+function persistPaperTrades() {
+  localStorage.setItem(paperJournalKey, JSON.stringify({ trades: state.paperTrades.slice(-250) }));
 }
 
 function renderRules() {
@@ -472,6 +523,7 @@ function buildStrategy(userIdea = "", tradePlan = null, signalQuality = null) {
   ];
 
   const bookRules = selectBookRules(context);
+  const totalRules = context.rules.length + context.sourceRules.length;
   const rules = context.rules.slice(-4).map((rule) => `<li>${escapeHtml(rule)}</li>`).join("");
   const bookRuleItems = bookRules.map((rule) => `<li>${escapeHtml(rule)}</li>`).join("");
   const sourceNames = knowledgeSources
@@ -510,15 +562,20 @@ function buildStrategy(userIdea = "", tradePlan = null, signalQuality = null) {
         <li>Если цена возвращается под уровень входа без импульса, сделка отменяется.</li>
       </ul>
     </section>
-    <section>
-      <h3>Правила обучения, которые учтены</h3>
-      <ul>${rules}</ul>
-    </section>
-    <section>
-      <h3>Книжная база</h3>
-      <p>Использованы тезисы из ${knowledgeSources.length} источников: ${escapeHtml(sourceNames)} и др.</p>
-      <ul>${bookRuleItems}</ul>
-    </section>
+    <details>
+      <summary>${totalRules} правил учтено в стратегии</summary>
+      <section>
+        <h3>Правила обучения</h3>
+        <ul>${rules}</ul>
+      </section>
+    </details>
+    <details>
+      <summary>Книжная база: ${knowledgeSources.length} источников</summary>
+      <section>
+        <p>Использованы тезисы из ${escapeHtml(sourceNames)} и др.</p>
+        <ul>${bookRuleItems}</ul>
+      </section>
+    </details>
     <p class="risk-note">Это исследовательский план, а не финансовая рекомендация. Перед реальной сделкой нужна проверка на истории, демо или малом размере позиции.</p>
   `;
 
@@ -676,6 +733,7 @@ function generateStrategy(userIdea = "") {
   const tradePlan = buildTradePlan(context);
   const signalQuality = evaluateSignalQuality(context, tradePlan);
   state.tradePlan = tradePlan;
+  strategyContainer.classList.add("compact");
   strategyContainer.innerHTML = buildStrategy(userIdea, tradePlan, signalQuality);
   confidence.textContent = `${context.rules.length + context.sourceRules.length} правил учтено`;
   rr.textContent = context.conservative ? "1 : 2.2" : "1 : 1.7";
@@ -693,7 +751,7 @@ function generateStrategy(userIdea = "") {
   } else {
     drawChart(context.mode, tradePlan);
   }
-  updatePaperTrade();
+  updatePaperTrades();
 }
 
 function renderSignalQualityReadout(signalQuality) {
@@ -1334,8 +1392,11 @@ function enterPaperTrade() {
   const currentPrice = getCurrentMarketPrice();
   const entry = currentPrice || scenario.entry;
   const quantity = amount / entry;
+  const id = `trade-${Date.now()}-${Math.round(Math.random() * 1000)}`;
 
-  state.paperTrade = {
+  const trade = {
+    id,
+    index: state.paperTrades.length + 1,
     asset: asset.value,
     timeframe: timeframe.value,
     side: scenario.side,
@@ -1349,14 +1410,20 @@ function enterPaperTrade() {
     closedAt: null,
     status: "open",
     result: "в работе",
+    exitPrice: null,
+    pnl: 0,
+    pnlPct: 0,
     history: [{ time: Date.now(), price: entry, pnl: 0, pnlPct: 0 }]
   };
 
-  updatePaperTrade();
+  state.paperTrades.push(trade);
+  state.activePaperTradeId = id;
+  persistPaperTrades();
+  updatePaperTrades();
 }
 
 function resetPaperTrade(shouldDraw = true) {
-  state.paperTrade = null;
+  state.activePaperTradeId = null;
   paperStatus.textContent = "ожидает вход";
   paperEntry.textContent = "нет данных";
   paperCurrent.textContent = "нет данных";
@@ -1366,16 +1433,42 @@ function resetPaperTrade(shouldDraw = true) {
   if (shouldDraw) drawPaperChart();
 }
 
-function updatePaperTrade() {
-  const trade = state.paperTrade;
-  if (!trade) {
+function clearPaperJournal() {
+  state.paperTrades = [];
+  state.activePaperTradeId = null;
+  persistPaperTrades();
+  resetPaperTrade(false);
+  renderTradeJournal();
+  drawPaperChart();
+}
+
+function updatePaperTrades() {
+  if (!state.paperTrades.length) {
+    renderTradeJournal();
     drawPaperChart();
     return;
   }
 
-  const currentPrice = getCurrentMarketPrice() || trade.entry;
+  state.paperTrades.forEach((trade) => updateSinglePaperTrade(trade));
+  const activeTrade = getActivePaperTrade();
+  if (activeTrade) {
+    const currentPrice = getPaperTradePrice(activeTrade);
+    renderPaperReadout(activeTrade, currentPrice, activeTrade.pnl, activeTrade.pnlPct);
+    drawPaperChart(activeTrade);
+  } else {
+    resetPaperTrade(false);
+    drawPaperChart();
+  }
+  persistPaperTrades();
+  renderTradeJournal();
+}
+
+function updateSinglePaperTrade(trade) {
+  const currentPrice = getPaperTradePrice(trade);
   const pnl = calculatePaperPnl(trade, currentPrice);
   const pnlPct = (pnl / trade.amount) * 100;
+  trade.pnl = pnl;
+  trade.pnlPct = pnlPct;
 
   if (trade.status === "open") {
     appendPaperPoint(trade, currentPrice, pnl, pnlPct);
@@ -1385,12 +1478,10 @@ function updatePaperTrade() {
     if (hitTarget || hitStop) {
       trade.status = hitTarget ? "target" : "stop";
       trade.closedAt = Date.now();
+      trade.exitPrice = currentPrice;
       trade.result = hitTarget ? `${trade.side} отработал` : `${trade.side} не отработал`;
     }
   }
-
-  renderPaperReadout(trade, currentPrice, pnl, pnlPct);
-  drawPaperChart(trade);
 }
 
 function appendPaperPoint(trade, price, pnl, pnlPct) {
@@ -1410,6 +1501,14 @@ function calculatePaperPnl(trade, price) {
   return (price - trade.entry) * trade.quantity * direction;
 }
 
+function getActivePaperTrade() {
+  if (state.activePaperTradeId) {
+    const selected = state.paperTrades.find((trade) => trade.id === state.activePaperTradeId);
+    if (selected) return selected;
+  }
+  return [...state.paperTrades].reverse().find((trade) => trade.status === "open") || state.paperTrades[state.paperTrades.length - 1] || null;
+}
+
 function renderPaperReadout(trade, currentPrice, pnl, pnlPct) {
   const statusLabels = {
     open: "сделка открыта",
@@ -1424,12 +1523,76 @@ function renderPaperReadout(trade, currentPrice, pnl, pnlPct) {
   paperResult.textContent = trade.result;
 }
 
+function renderTradeJournal() {
+  const trades = state.paperTrades;
+  const openTrades = trades.filter((trade) => trade.status === "open");
+  const closedTrades = trades.filter((trade) => trade.status !== "open");
+  const wins = closedTrades.filter((trade) => trade.pnl >= 0);
+  const losses = closedTrades.filter((trade) => trade.pnl < 0);
+  const totalPnl = trades.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0);
+
+  journalOpen.textContent = String(openTrades.length);
+  journalClosed.textContent = String(closedTrades.length);
+  journalPnl.textContent = `${totalPnl >= 0 ? "+" : ""}${totalPnl.toFixed(2)} USDT`;
+  journalPnl.style.color = totalPnl >= 0 ? "#55c7a2" : "#ef6b5b";
+  journalWinloss.textContent = `${wins.length} / ${losses.length}`;
+
+  if (!trades.length) {
+    journalRows.innerHTML = `<tr><td colspan="10">Сделок пока нет</td></tr>`;
+    return;
+  }
+
+  journalRows.innerHTML = trades.map((trade, index) => {
+    const currentPrice = getPaperTradePrice(trade);
+    const isActive = getActivePaperTrade()?.id === trade.id;
+    const statusClass = trade.status === "open" ? "open" : trade.pnl >= 0 ? "win" : "loss";
+    const statusLabel = trade.status === "open" ? "OPEN" : trade.pnl >= 0 ? "WIN" : "LOSS";
+    const sideClass = trade.side === "SHORT" ? "short" : "long";
+    return `
+      <tr class="${isActive ? "is-active" : ""}">
+        <td><button type="button" data-view-trade="${escapeHtml(trade.id)}">${index + 1}</button></td>
+        <td>${formatJournalTime(trade.openedAt)}</td>
+        <td>${escapeHtml(trade.asset.replace("/USDT", ""))}</td>
+        <td><span class="side-badge ${sideClass}">${trade.side}</span></td>
+        <td>${formatPrice(trade.entry)}</td>
+        <td>${trade.amount.toFixed(2)}</td>
+        <td>${formatPrice(trade.exitPrice || currentPrice)}</td>
+        <td style="color:${trade.pnl >= 0 ? "#55c7a2" : "#ef6b5b"}">${trade.pnl >= 0 ? "+" : ""}${trade.pnl.toFixed(2)}</td>
+        <td style="color:${trade.pnl >= 0 ? "#55c7a2" : "#ef6b5b"}">${trade.pnlPct >= 0 ? "+" : ""}${trade.pnlPct.toFixed(2)}%</td>
+        <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
+      </tr>
+    `;
+  }).join("");
+
+  journalRows.querySelectorAll("[data-view-trade]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.activePaperTradeId = button.dataset.viewTrade;
+      updatePaperTrades();
+    });
+  });
+}
+
+function formatJournalTime(timestamp) {
+  return new Date(timestamp).toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
 function getCurrentMarketPrice() {
   const live = getLiveSnapshot();
   if (live.active && live.lastPrice > 0) return live.lastPrice;
   const lastCandle = state.live.candles[state.live.candles.length - 1];
   if (lastCandle?.close > 0) return lastCandle.close;
   return state.tradePlan?.basePrice || 0;
+}
+
+function getPaperTradePrice(trade) {
+  if (trade.status !== "open" && trade.exitPrice) return trade.exitPrice;
+  if (trade.asset !== asset.value) return trade.history[trade.history.length - 1]?.price || trade.entry;
+  return getCurrentMarketPrice() || trade.entry;
 }
 
 function drawPaperChart(trade = null) {
@@ -1678,8 +1841,9 @@ liveToggle.addEventListener("click", () => {
 });
 paperEnter.addEventListener("click", enterPaperTrade);
 paperReset.addEventListener("click", () => resetPaperTrade());
+paperClear.addEventListener("click", clearPaperJournal);
 paperSide.addEventListener("change", () => {
-  if (state.paperTrade?.status === "open") resetPaperTrade();
+  resetPaperTrade();
 });
 
 document.querySelector("[data-copy]").addEventListener("click", async () => {
@@ -1739,6 +1903,7 @@ renderSources();
 renderRsiControls();
 updateRiskLabel();
 renderLiveReadout();
+renderTradeJournal();
 generateStrategy();
 
 function startLiveConnection() {
@@ -1877,7 +2042,7 @@ function handleLiveMessage(message) {
 
   state.live.updatedAt = Date.now();
   renderLiveReadout();
-  updatePaperTrade();
+  updatePaperTrades();
   maybeRefreshLiveStrategy();
 }
 
