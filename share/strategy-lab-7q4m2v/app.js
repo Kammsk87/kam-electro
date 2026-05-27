@@ -266,6 +266,7 @@ const state = {
   lastStrategy: "",
   lastUserIdea: "",
   tradePlan: null,
+  paperTrade: null,
   detectedMode: "trend",
   rsiPreferences: {},
   live: {
@@ -317,6 +318,17 @@ const liveBook = document.querySelector("[data-live-book]");
 const liveSpread = document.querySelector("[data-live-spread]");
 const liveVolume = document.querySelector("[data-live-volume]");
 const liveUpdated = document.querySelector("[data-live-updated]");
+const paperCanvas = document.querySelector("#paperChart");
+const paperCtx = paperCanvas.getContext("2d");
+const paperAmount = document.querySelector("#paperAmount");
+const paperSide = document.querySelector("#paperSide");
+const paperStatus = document.querySelector("[data-paper-status]");
+const paperEntry = document.querySelector("[data-paper-entry]");
+const paperCurrent = document.querySelector("[data-paper-current]");
+const paperPnl = document.querySelector("[data-paper-pnl]");
+const paperResult = document.querySelector("[data-paper-result]");
+const paperEnter = document.querySelector("[data-paper-enter]");
+const paperReset = document.querySelector("[data-paper-reset]");
 const chatLog = document.querySelector("[data-chat-log]");
 const chatForm = document.querySelector("[data-chat-form]");
 const chatInput = document.querySelector("#chatInput");
@@ -675,11 +687,13 @@ function generateStrategy(userIdea = "") {
     ? `Live свечи · ${formatModeTitle(context)} · ${selectedSidesLabel(tradePlan)}`
     : `Сценарий цены · ${formatModeTitle(context)} · ${selectedSidesLabel(tradePlan)}`;
   renderTradePlanReadout(tradePlan);
+  syncPaperSideOptions(tradePlan);
   if (context.live.active && state.live.candles.length > 1) {
     drawLiveChart(state.live.candles, tradePlan);
   } else {
     drawChart(context.mode, tradePlan);
   }
+  updatePaperTrade();
 }
 
 function renderSignalQualityReadout(signalQuality) {
@@ -1297,6 +1311,210 @@ function selectedSidesLabel(tradePlan) {
   return "LONG";
 }
 
+function syncPaperSideOptions(tradePlan) {
+  const availableSides = new Set((tradePlan?.scenarios || []).map((scenario) => scenario.side));
+  [...paperSide.options].forEach((option) => {
+    option.disabled = availableSides.size > 0 && !availableSides.has(option.value);
+  });
+
+  if (!availableSides.has(paperSide.value)) {
+    const fallback = tradePlan?.scenarios?.[0]?.side;
+    if (fallback) paperSide.value = fallback;
+  }
+}
+
+function enterPaperTrade() {
+  const tradePlan = state.tradePlan || buildTradePlan(getContext());
+  const side = paperSide.value;
+  const scenario = tradePlan.scenarios.find((item) => item.side === side) || tradePlan.primary;
+  if (!scenario) return;
+
+  const amount = Math.max(10, Number(paperAmount.value) || 1000);
+  paperAmount.value = String(amount);
+  const currentPrice = getCurrentMarketPrice();
+  const entry = currentPrice || scenario.entry;
+  const quantity = amount / entry;
+
+  state.paperTrade = {
+    asset: asset.value,
+    timeframe: timeframe.value,
+    side: scenario.side,
+    amount,
+    entry,
+    quantity,
+    stop: scenario.stop,
+    target: scenario.target2,
+    target1: scenario.target1,
+    openedAt: Date.now(),
+    closedAt: null,
+    status: "open",
+    result: "в работе",
+    history: [{ time: Date.now(), price: entry, pnl: 0, pnlPct: 0 }]
+  };
+
+  updatePaperTrade();
+}
+
+function resetPaperTrade(shouldDraw = true) {
+  state.paperTrade = null;
+  paperStatus.textContent = "ожидает вход";
+  paperEntry.textContent = "нет данных";
+  paperCurrent.textContent = "нет данных";
+  paperPnl.textContent = "0.00 USDT";
+  paperPnl.style.color = "";
+  paperResult.textContent = "нет сделки";
+  if (shouldDraw) drawPaperChart();
+}
+
+function updatePaperTrade() {
+  const trade = state.paperTrade;
+  if (!trade) {
+    drawPaperChart();
+    return;
+  }
+
+  const currentPrice = getCurrentMarketPrice() || trade.entry;
+  const pnl = calculatePaperPnl(trade, currentPrice);
+  const pnlPct = (pnl / trade.amount) * 100;
+
+  if (trade.status === "open") {
+    appendPaperPoint(trade, currentPrice, pnl, pnlPct);
+    const hitTarget = trade.side === "LONG" ? currentPrice >= trade.target : currentPrice <= trade.target;
+    const hitStop = trade.side === "LONG" ? currentPrice <= trade.stop : currentPrice >= trade.stop;
+
+    if (hitTarget || hitStop) {
+      trade.status = hitTarget ? "target" : "stop";
+      trade.closedAt = Date.now();
+      trade.result = hitTarget ? `${trade.side} отработал` : `${trade.side} не отработал`;
+    }
+  }
+
+  renderPaperReadout(trade, currentPrice, pnl, pnlPct);
+  drawPaperChart(trade);
+}
+
+function appendPaperPoint(trade, price, pnl, pnlPct) {
+  const lastPoint = trade.history[trade.history.length - 1];
+  if (lastPoint && Math.abs(lastPoint.price - price) < price * 0.000001 && Date.now() - lastPoint.time < 1000) {
+    return;
+  }
+
+  trade.history.push({ time: Date.now(), price, pnl, pnlPct });
+  if (trade.history.length > 180) {
+    trade.history = trade.history.slice(-180);
+  }
+}
+
+function calculatePaperPnl(trade, price) {
+  const direction = trade.side === "LONG" ? 1 : -1;
+  return (price - trade.entry) * trade.quantity * direction;
+}
+
+function renderPaperReadout(trade, currentPrice, pnl, pnlPct) {
+  const statusLabels = {
+    open: "сделка открыта",
+    target: "цель достигнута",
+    stop: "стоп сработал"
+  };
+  paperStatus.textContent = statusLabels[trade.status] || "в работе";
+  paperEntry.textContent = `${trade.side} · ${formatPrice(trade.entry)}`;
+  paperCurrent.textContent = formatPrice(currentPrice);
+  paperPnl.textContent = `${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USDT (${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(2)}%)`;
+  paperPnl.style.color = pnl >= 0 ? "#55c7a2" : "#ef6b5b";
+  paperResult.textContent = trade.result;
+}
+
+function getCurrentMarketPrice() {
+  const live = getLiveSnapshot();
+  if (live.active && live.lastPrice > 0) return live.lastPrice;
+  const lastCandle = state.live.candles[state.live.candles.length - 1];
+  if (lastCandle?.close > 0) return lastCandle.close;
+  return state.tradePlan?.basePrice || 0;
+}
+
+function drawPaperChart(trade = null) {
+  const width = paperCanvas.width;
+  const height = paperCanvas.height;
+  const pad = { left: 54, right: 128, top: 24, bottom: 38 };
+  const chartWidth = width - pad.left - pad.right;
+  const chartHeight = height - pad.top - pad.bottom;
+
+  paperCtx.clearRect(0, 0, width, height);
+  paperCtx.fillStyle = "#111518";
+  paperCtx.fillRect(0, 0, width, height);
+
+  paperCtx.strokeStyle = "rgba(255,255,255,0.08)";
+  paperCtx.lineWidth = 1;
+  for (let i = 0; i <= 4; i += 1) {
+    const y = pad.top + chartHeight / 4 * i;
+    paperCtx.beginPath();
+    paperCtx.moveTo(pad.left, y);
+    paperCtx.lineTo(width - pad.right, y);
+    paperCtx.stroke();
+  }
+
+  if (!trade) {
+    paperCtx.fillStyle = "#9aa6ad";
+    paperCtx.font = "800 16px Inter, system-ui, sans-serif";
+    paperCtx.fillText("Открой демо-сделку, чтобы проверить стратегию на live-цене", pad.left, height / 2);
+    return;
+  }
+
+  const history = trade.history.length > 1 ? trade.history : [
+    ...trade.history,
+    { ...trade.history[0], time: trade.history[0].time + 1, price: trade.history[0].price, pnl: 0, pnlPct: 0 }
+  ];
+  const levels = [trade.entry, trade.stop, trade.target, trade.target1, ...history.map((point) => point.price)];
+  const min = Math.min(...levels) * 0.998;
+  const max = Math.max(...levels) * 1.002;
+  const range = max - min || max * 0.001 || 1;
+  const priceToY = (price) => pad.top + (max - price) / range * chartHeight;
+  const pointToX = (index) => pad.left + (index / Math.max(1, history.length - 1)) * chartWidth;
+
+  drawPaperLevel(trade.entry, "ENTRY", "#6da8ff", priceToY, pad, chartWidth);
+  drawPaperLevel(trade.stop, "STOP", "#ef6b5b", priceToY, pad, chartWidth);
+  drawPaperLevel(trade.target, "TARGET", "#55c7a2", priceToY, pad, chartWidth);
+
+  paperCtx.beginPath();
+  history.forEach((point, index) => {
+    const x = pointToX(index);
+    const y = priceToY(point.price);
+    if (index === 0) paperCtx.moveTo(x, y);
+    else paperCtx.lineTo(x, y);
+  });
+  const last = history[history.length - 1];
+  paperCtx.strokeStyle = last.pnl >= 0 ? "#55c7a2" : "#ef6b5b";
+  paperCtx.lineWidth = 3;
+  paperCtx.stroke();
+
+  paperCtx.fillStyle = last.pnl >= 0 ? "#55c7a2" : "#ef6b5b";
+  paperCtx.beginPath();
+  paperCtx.arc(pointToX(history.length - 1), priceToY(last.price), 5, 0, Math.PI * 2);
+  paperCtx.fill();
+
+  paperCtx.fillStyle = "#eef2f3";
+  paperCtx.font = "800 13px Inter, system-ui, sans-serif";
+  paperCtx.fillText(`${trade.side} · ${trade.amount.toFixed(0)} USDT`, pad.left, 18);
+}
+
+function drawPaperLevel(price, label, color, priceToY, pad, chartWidth) {
+  const y = priceToY(price);
+  paperCtx.strokeStyle = color;
+  paperCtx.lineWidth = 1;
+  paperCtx.setLineDash(label === "ENTRY" ? [] : [6, 6]);
+  paperCtx.beginPath();
+  paperCtx.moveTo(pad.left, y);
+  paperCtx.lineTo(pad.left + chartWidth, y);
+  paperCtx.stroke();
+  paperCtx.setLineDash([]);
+  paperCtx.fillStyle = "rgba(17,21,24,0.88)";
+  paperCtx.fillRect(pad.left + chartWidth + 10, y - 12, 104, 24);
+  paperCtx.fillStyle = color;
+  paperCtx.font = "800 11px Inter, system-ui, sans-serif";
+  paperCtx.fillText(label, pad.left + chartWidth + 16, y - 1);
+  paperCtx.fillText(formatPrice(price), pad.left + chartWidth + 16, y + 10);
+}
+
 function drawScenarioBadge(tradePlan, x, y) {
   const label = `Показан: ${selectedSidesLabel(tradePlan)}`;
   const color = selectedSidesLabel(tradePlan) === "SHORT"
@@ -1458,6 +1676,11 @@ liveToggle.addEventListener("click", () => {
     startLiveConnection();
   }
 });
+paperEnter.addEventListener("click", enterPaperTrade);
+paperReset.addEventListener("click", () => resetPaperTrade());
+paperSide.addEventListener("change", () => {
+  if (state.paperTrade?.status === "open") resetPaperTrade();
+});
 
 document.querySelector("[data-copy]").addEventListener("click", async () => {
   if (!state.lastStrategy) generateStrategy();
@@ -1495,6 +1718,9 @@ chatForm.addEventListener("submit", (event) => {
     ensureAtLeastOneScenario();
     if (control === asset) {
       renderRsiControls();
+    }
+    if (control === asset || control === timeframe) {
+      resetPaperTrade(false);
     }
     if ((control === asset || control === timeframe) && state.live.enabled) {
       restartLiveConnection();
@@ -1651,6 +1877,7 @@ function handleLiveMessage(message) {
 
   state.live.updatedAt = Date.now();
   renderLiveReadout();
+  updatePaperTrade();
   maybeRefreshLiveStrategy();
 }
 

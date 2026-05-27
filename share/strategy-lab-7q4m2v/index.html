@@ -247,6 +247,50 @@
                 <strong data-plan-target>нет данных</strong>
               </div>
             </div>
+
+            <div class="paper-panel">
+              <div class="paper-chart-wrap">
+                <div class="output-header">
+                  <span>Демо-сделка</span>
+                  <span class="status-pill" data-paper-status>ожидает вход</span>
+                </div>
+                <canvas id="paperChart" width="1080" height="260" aria-label="График проверки демо-сделки"></canvas>
+              </div>
+
+              <div class="paper-trade-box">
+                <label>
+                  Сумма, USDT
+                  <input id="paperAmount" type="number" min="10" step="10" value="1000">
+                </label>
+                <label>
+                  Направление
+                  <select id="paperSide">
+                    <option value="LONG">LONG</option>
+                    <option value="SHORT">SHORT</option>
+                  </select>
+                </label>
+                <button class="primary-action full-width" type="button" data-paper-enter>Войти в стратегию</button>
+                <button class="secondary-action full-width" type="button" data-paper-reset>Сброс</button>
+                <div class="paper-metrics">
+                  <div>
+                    <span>Entry</span>
+                    <strong data-paper-entry>нет данных</strong>
+                  </div>
+                  <div>
+                    <span>Текущая</span>
+                    <strong data-paper-current>нет данных</strong>
+                  </div>
+                  <div>
+                    <span>PnL</span>
+                    <strong data-paper-pnl>0.00 USDT</strong>
+                  </div>
+                  <div>
+                    <span>Итог</span>
+                    <strong data-paper-result>нет сделки</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 

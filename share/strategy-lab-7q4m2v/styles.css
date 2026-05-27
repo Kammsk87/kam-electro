@@ -143,7 +143,8 @@ legend {
 
 select,
 textarea,
-input[type="text"] {
+input[type="text"],
+input[type="number"] {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -152,7 +153,8 @@ input[type="text"] {
 }
 
 select,
-input[type="text"] {
+input[type="text"],
+input[type="number"] {
   min-height: 44px;
   padding: 0 12px;
 }
@@ -381,6 +383,66 @@ canvas {
   font-size: 20px;
 }
 
+.paper-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+  gap: 16px;
+  align-items: stretch;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 16px;
+  background: rgba(23, 27, 31, 0.88);
+  box-shadow: var(--shadow);
+}
+
+.paper-chart-wrap {
+  min-width: 0;
+}
+
+#paperChart {
+  min-height: 220px;
+  margin-top: 12px;
+}
+
+.paper-trade-box {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.paper-trade-box label {
+  margin-bottom: 0;
+}
+
+.paper-metrics {
+  display: grid;
+  gap: 8px;
+}
+
+.paper-metrics div {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(32, 38, 44, 0.84);
+}
+
+.paper-metrics span,
+.paper-metrics strong {
+  display: block;
+}
+
+.paper-metrics span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.paper-metrics strong {
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+  font-size: 17px;
+}
+
 .live-readout {
   display: grid;
   gap: 8px;
@@ -566,6 +628,10 @@ canvas {
 
   .trade-plan-strip {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .paper-panel {
+    grid-template-columns: 1fr;
   }
 
   .strategy-card {
