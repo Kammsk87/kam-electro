@@ -143,6 +143,7 @@ const state = {
   lastStrategy: "",
   lastUserIdea: "",
   tradePlan: null,
+  detectedMode: "trend",
   live: {
     enabled: false,
     socket: null,
@@ -230,10 +231,12 @@ function renderSources() {
 }
 
 function getContext() {
+  const resolvedMode = marketMode.value === "auto" ? state.detectedMode : marketMode.value;
   return {
     asset: asset.value,
     timeframe: timeframe.value,
-    mode: marketMode.value,
+    mode: resolvedMode,
+    modeSource: marketMode.value === "auto" ? "auto" : "manual",
     risk: Number(risk.value),
     conservative: conservative.checked,
     includeLongs: includeLongs.checked,
@@ -436,8 +439,8 @@ function generateStrategy(userIdea = "") {
   filterCount.textContent = context.conservative ? "4" : "3";
   chartLabel.textContent = `${context.asset} · ${context.timeframe}`;
   chartTitle.textContent = context.live.active
-    ? `Live свечи · ${modeLabel(context.mode)} · ${selectedSidesLabel(tradePlan)}`
-    : `Сценарий цены · ${selectedSidesLabel(tradePlan)}`;
+    ? `Live свечи · ${formatModeTitle(context)} · ${selectedSidesLabel(tradePlan)}`
+    : `Сценарий цены · ${formatModeTitle(context)} · ${selectedSidesLabel(tradePlan)}`;
   renderTradePlanReadout(tradePlan);
   if (context.live.active && state.live.candles.length > 1) {
     drawLiveChart(state.live.candles, tradePlan);
@@ -447,17 +450,17 @@ function generateStrategy(userIdea = "") {
 }
 
 function syncAutoMarketMode() {
-  if (!state.live.enabled || state.live.candles.length < 18) return;
-  const detectedMode = detectMarketMode(state.live.candles);
-  if (detectedMode && marketMode.value !== detectedMode) {
-    marketMode.value = detectedMode;
+  if (!state.live.enabled || state.live.candles.length < 18) {
+    return;
   }
+  const detectedMode = detectMarketMode(state.live.candles);
+  if (detectedMode) state.detectedMode = detectedMode;
 }
 
 function detectMarketMode(candles) {
   const recent = candles.slice(-40);
   const sample = recent.length >= 40 ? recent : candles.slice(-recent.length);
-  if (sample.length < 18) return marketMode.value;
+  if (sample.length < 18) return state.detectedMode;
 
   const last = sample[sample.length - 1];
   const previous = sample.slice(0, -1);
@@ -502,6 +505,12 @@ function detectMarketMode(candles) {
   }
 
   return Math.abs(trendPct) >= rangePct * 0.18 ? "trend" : "range";
+}
+
+function formatModeTitle(context) {
+  return context.modeSource === "auto"
+    ? `авто: ${modeLabel(context.mode)}`
+    : `ручной: ${modeLabel(context.mode)}`;
 }
 
 function average(values) {
@@ -929,7 +938,7 @@ function stripTags(html) {
 
 function randomizeScenario() {
   const assets = [...asset.options];
-  const modes = [...marketMode.options];
+  const modes = [...marketMode.options].filter((option) => option.value !== "auto");
   const frames = [...timeframe.options];
   asset.value = assets[Math.floor(Math.random() * assets.length)].value;
   marketMode.value = modes[Math.floor(Math.random() * modes.length)].value;
