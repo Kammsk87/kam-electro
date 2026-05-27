@@ -305,6 +305,7 @@ const chartTitle = document.querySelector("[data-chart-title]");
 const rr = document.querySelector("[data-rr]");
 const maxRisk = document.querySelector("[data-max-risk]");
 const filterCount = document.querySelector("[data-filter-count]");
+const signalScore = document.querySelector("[data-signal-score]");
 const planSide = document.querySelector("[data-plan-side]");
 const planEntry = document.querySelector("[data-plan-entry]");
 const planStop = document.querySelector("[data-plan-stop]");
@@ -438,7 +439,7 @@ function modeLabel(mode) {
   return labels[mode] || mode;
 }
 
-function buildStrategy(userIdea = "", tradePlan = null) {
+function buildStrategy(userIdea = "", tradePlan = null, signalQuality = null) {
   const context = getContext();
   const isFast = ["5m", "15m"].includes(context.timeframe);
   const side = describeSelectedSides(context);
@@ -468,6 +469,7 @@ function buildStrategy(userIdea = "", tradePlan = null) {
   const liveBlock = buildLiveStrategyBlock(context);
   const tradePlanBlock = buildTradePlanBlock(tradePlan);
   const rsiBlock = buildRsiStrategyBlock(context);
+  const signalQualityBlock = buildSignalQualityBlock(signalQuality);
   const investorDisciplineBlock = buildInvestorDisciplineBlock(context, tradePlan);
   const idea = userIdea ? `<p><strong>Уточнение из чата:</strong> ${escapeHtml(userIdea)}</p>` : "";
 
@@ -480,6 +482,7 @@ function buildStrategy(userIdea = "", tradePlan = null) {
     </section>
     ${liveBlock}
     ${tradePlanBlock}
+    ${signalQualityBlock}
     ${rsiBlock}
     ${investorDisciplineBlock}
     <section>
@@ -509,6 +512,25 @@ function buildStrategy(userIdea = "", tradePlan = null) {
 
   state.lastStrategy = stripTags(html);
   return html;
+}
+
+function buildSignalQualityBlock(signalQuality) {
+  if (!signalQuality?.scenarios?.length) return "";
+
+  const rows = signalQuality.scenarios.map((scenario) => `
+    <li>
+      <strong>${scenario.side}: ${scenario.score}/100</strong> — ${escapeHtml(scenario.decision)}.
+      ${escapeHtml(scenario.summary)}
+    </li>
+  `).join("");
+
+  return `
+    <section>
+      <h3>Качество сигнала</h3>
+      <p><strong>${signalQuality.best.score}/100</strong>: ${escapeHtml(signalQuality.best.decision)}. ${escapeHtml(signalQuality.verdict)}</p>
+      <ul>${rows}</ul>
+    </section>
+  `;
 }
 
 function buildRsiStrategyBlock(context) {
@@ -640,12 +662,14 @@ function generateStrategy(userIdea = "") {
   syncAutoMarketMode();
   const context = getContext();
   const tradePlan = buildTradePlan(context);
+  const signalQuality = evaluateSignalQuality(context, tradePlan);
   state.tradePlan = tradePlan;
-  strategyContainer.innerHTML = buildStrategy(userIdea, tradePlan);
+  strategyContainer.innerHTML = buildStrategy(userIdea, tradePlan, signalQuality);
   confidence.textContent = `${context.rules.length + context.sourceRules.length} правил учтено`;
   rr.textContent = context.conservative ? "1 : 2.2" : "1 : 1.7";
   maxRisk.textContent = `${context.risk.toFixed(2)}%`;
   filterCount.textContent = String((context.conservative ? 4 : 3) + context.rsi.filter((indicator) => indicator.use).length);
+  renderSignalQualityReadout(signalQuality);
   chartLabel.textContent = `${context.asset} · ${context.timeframe}`;
   chartTitle.textContent = context.live.active
     ? `Live свечи · ${formatModeTitle(context)} · ${selectedSidesLabel(tradePlan)}`
@@ -656,6 +680,14 @@ function generateStrategy(userIdea = "") {
   } else {
     drawChart(context.mode, tradePlan);
   }
+}
+
+function renderSignalQualityReadout(signalQuality) {
+  if (!signalQuality?.best) {
+    signalScore.textContent = "--";
+    return;
+  }
+  signalScore.textContent = `${signalQuality.best.score}/100`;
 }
 
 function syncAutoMarketMode() {
@@ -726,6 +758,105 @@ function average(values) {
   const clean = values.filter((value) => Number.isFinite(value));
   if (!clean.length) return 0;
   return clean.reduce((sum, value) => sum + value, 0) / clean.length;
+}
+
+function evaluateSignalQuality(context, tradePlan) {
+  const scenarios = tradePlan.scenarios.map((scenario) => evaluateScenarioQuality(context, scenario));
+  const best = scenarios.reduce((winner, item) => item.score > winner.score ? item : winner, scenarios[0]);
+  const verdict = best.score >= 80
+    ? "Сигнал сильный, но вход все равно только по подтверждению и с заданным стопом."
+    : best.score >= 60
+      ? "Сигнал умеренный: допустим малый или обычный риск без увеличения позиции."
+      : best.score >= 40
+        ? "Сигнал слабый: лучше ждать подтверждения уровня, объема или RSI."
+        : "Сделку лучше пропустить: вероятность случайного входа выше, чем качество преимущества.";
+
+  return { best, scenarios, verdict };
+}
+
+function evaluateScenarioQuality(context, scenario) {
+  const reasons = [];
+  let score = 48;
+  const riskDistance = Math.abs(scenario.entry - scenario.stop);
+  const rewardDistance = Math.abs(scenario.target2 - scenario.entry);
+  const rrValue = riskDistance > 0 ? rewardDistance / riskDistance : 0;
+
+  if (rrValue >= 2.1) addScore(16, "risk/reward дает запас прочности");
+  else if (rrValue >= 1.6) addScore(9, "risk/reward приемлемый");
+  else addScore(-12, "risk/reward слабый для умеренного риска");
+
+  if (context.risk <= 1) addScore(7, "риск на сделку умеренный");
+  else if (context.risk <= 1.5) addScore(3, "риск не выше среднего");
+  else addScore(-8, "риск выше комфортного диапазона");
+
+  if (context.live.active) {
+    if (context.live.spreadPct <= 0.04) addScore(9, "спред узкий");
+    else if (context.live.spreadPct <= 0.1) addScore(3, "спред допустимый");
+    else addScore(-13, "спред широкий");
+
+    if (context.live.volume24h > 50000000) addScore(8, "ликвидность высокая");
+    else if (context.live.volume24h > 5000000) addScore(4, "ликвидность достаточная");
+    else addScore(-7, "ликвидность слабая");
+
+    const trendFitsLong = scenario.side === "LONG" && context.live.trendPct >= -0.25;
+    const trendFitsShort = scenario.side === "SHORT" && context.live.trendPct <= 0.25;
+    if (trendFitsLong || trendFitsShort) addScore(8, "направление не конфликтует с динамикой свечей");
+    else addScore(-9, "направление конфликтует с текущей динамикой");
+  } else {
+    addScore(-5, "нет live-подтверждения рынка");
+  }
+
+  if (context.mode === "high-volatility") addScore(-8, "высокая волатильность требует меньшего размера позиции");
+  if (context.mode === "breakout") addScore(5, "режим пробоя дает потенциал движения");
+  if (context.mode === "range" && scenario.side === "LONG") addScore(2, "в боковике long допустим только от поддержки");
+  if (context.mode === "range" && scenario.side === "SHORT") addScore(2, "в боковике short допустим только от сопротивления");
+
+  const rsiResult = evaluateRsiForScenario(context, scenario.side);
+  addScore(rsiResult.delta, rsiResult.reason);
+
+  const finalScore = Math.max(0, Math.min(100, Math.round(score)));
+  const decision = finalScore >= 80
+    ? "можно рассматривать вход"
+    : finalScore >= 60
+      ? "только с умеренным риском"
+      : finalScore >= 40
+        ? "ждать подтверждения"
+        : "пропустить сделку";
+
+  return {
+    side: scenario.side,
+    score: finalScore,
+    decision,
+    summary: reasons.slice(0, 4).join("; ")
+  };
+
+  function addScore(delta, reason) {
+    score += delta;
+    reasons.push(`${delta > 0 ? "+" : ""}${delta}: ${reason}`);
+  }
+}
+
+function evaluateRsiForScenario(context, side) {
+  const used = context.rsi.filter((indicator) => indicator.use);
+  if (!used.length) return { delta: 0, reason: "RSI выключен" };
+  const candles = getCandlesForRsi(context);
+  const values = used
+    .map((indicator) => getLatestRsiValue(candles, indicator.period))
+    .filter((value) => Number.isFinite(value));
+  if (!values.length) return { delta: -3, reason: "RSI не рассчитан из-за нехватки свечей" };
+  const avgRsi = average(values);
+
+  if (side === "LONG") {
+    if (avgRsi >= 42 && avgRsi <= 62) return { delta: 10, reason: `RSI ${avgRsi.toFixed(1)} поддерживает long без перегрева` };
+    if (avgRsi < 35) return { delta: 5, reason: `RSI ${avgRsi.toFixed(1)} показывает перепроданность, нужен разворот` };
+    if (avgRsi > 70) return { delta: -14, reason: `RSI ${avgRsi.toFixed(1)} перегрет для long` };
+    return { delta: -2, reason: `RSI ${avgRsi.toFixed(1)} нейтрален для long` };
+  }
+
+  if (avgRsi >= 38 && avgRsi <= 58) return { delta: 10, reason: `RSI ${avgRsi.toFixed(1)} поддерживает short без экстремума` };
+  if (avgRsi > 65) return { delta: 6, reason: `RSI ${avgRsi.toFixed(1)} показывает перекупленность, нужен разворот вниз` };
+  if (avgRsi < 30) return { delta: -14, reason: `RSI ${avgRsi.toFixed(1)} перепродан для short` };
+  return { delta: -2, reason: `RSI ${avgRsi.toFixed(1)} нейтрален для short` };
 }
 
 function drawChart(mode, tradePlan = null) {
