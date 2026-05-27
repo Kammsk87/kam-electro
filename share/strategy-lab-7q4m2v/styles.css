@@ -411,6 +411,47 @@ canvas {
   font-size: 13px;
 }
 
+.indicator-list {
+  display: grid;
+  gap: 10px;
+}
+
+.indicator-item {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(32, 38, 44, 0.7);
+}
+
+.indicator-item strong,
+.indicator-item span {
+  display: block;
+}
+
+.indicator-item strong {
+  margin-bottom: 4px;
+  color: var(--accent-2);
+  font-size: 13px;
+}
+
+.indicator-item span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.indicator-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.indicator-actions label {
+  margin: 0;
+  font-size: 12px;
+}
+
 .chat-panel {
   display: grid;
   grid-template-rows: auto minmax(190px, 1fr) auto;

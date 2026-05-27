@@ -138,12 +138,136 @@ const knowledgeSources = [
   }
 ];
 
+const rsiProfiles = {
+  "BTC/USDT": [
+    rsiProfile("btc-rsi-14", "RSI 14", 14, "#6da8ff", "Базовый фильтр перекупленности/перепроданности для ликвидного тренда."),
+    rsiProfile("btc-rsi-21", "RSI 21", 21, "#f3b14d", "Медленный фильтр структуры, чтобы отсекать рыночный шум.")
+  ],
+  "ETH/USDT": [
+    rsiProfile("eth-rsi-14", "RSI 14", 14, "#6da8ff", "Основной фильтр импульса и отката."),
+    rsiProfile("eth-rsi-10", "RSI 10", 10, "#55c7a2", "Более быстрый входной фильтр для активных intraday-движений.")
+  ],
+  "SOL/USDT": [
+    rsiProfile("sol-rsi-9", "RSI 9", 9, "#55c7a2", "Быстрый фильтр для волатильных импульсов SOL."),
+    rsiProfile("sol-rsi-14", "RSI 14", 14, "#6da8ff", "Контроль перегрева и подтверждение силы движения.")
+  ],
+  "BNB/USDT": [
+    rsiProfile("bnb-rsi-14", "RSI 14", 14, "#6da8ff", "Сбалансированный фильтр для более плавной структуры BNB."),
+    rsiProfile("bnb-rsi-21", "RSI 21", 21, "#f3b14d", "Медленный режим для отсечения ложных сигналов.")
+  ],
+  "XRP/USDT": [
+    rsiProfile("xrp-rsi-7", "RSI 7", 7, "#ef6b5b", "Быстрый фильтр резких новостных импульсов XRP."),
+    rsiProfile("xrp-rsi-14", "RSI 14", 14, "#6da8ff", "Базовая проверка перегрева перед входом.")
+  ],
+  "TON/USDT": [
+    rsiProfile("ton-rsi-10", "RSI 10", 10, "#55c7a2", "Фильтр локальных импульсов и откатов."),
+    rsiProfile("ton-rsi-21", "RSI 21", 21, "#f3b14d", "Медленный фильтр для более чистого тренда.")
+  ],
+  "ADA/USDT": [
+    rsiProfile("ada-rsi-14", "RSI 14", 14, "#6da8ff", "Стандартный фильтр диапазонов и откатов."),
+    rsiProfile("ada-rsi-21", "RSI 21", 21, "#f3b14d", "Подходит для более медленных swing-сценариев.")
+  ],
+  "DOGE/USDT": [
+    rsiProfile("doge-rsi-7", "RSI 7", 7, "#ef6b5b", "Быстрый фильтр мем-импульсов и резких разворотов."),
+    rsiProfile("doge-rsi-14", "RSI 14", 14, "#6da8ff", "Контроль перегрева после сильных движений.")
+  ],
+  "TRX/USDT": [
+    rsiProfile("trx-rsi-14", "RSI 14", 14, "#6da8ff", "Базовый фильтр для устойчивых диапазонов TRX."),
+    rsiProfile("trx-rsi-21", "RSI 21", 21, "#f3b14d", "Медленный фильтр для спокойного тренда.")
+  ],
+  "AVAX/USDT": [
+    rsiProfile("avax-rsi-10", "RSI 10", 10, "#55c7a2", "Быстрый фильтр для волатильных входов."),
+    rsiProfile("avax-rsi-14", "RSI 14", 14, "#6da8ff", "Баланс импульса и риска перегрева.")
+  ],
+  "LINK/USDT": [
+    rsiProfile("link-rsi-14", "RSI 14", 14, "#6da8ff", "Хорош для трендовых и новостных движений LINK."),
+    rsiProfile("link-rsi-21", "RSI 21", 21, "#f3b14d", "Фильтр структуры для среднесрочных входов.")
+  ],
+  "DOT/USDT": [
+    rsiProfile("dot-rsi-14", "RSI 14", 14, "#6da8ff", "Базовый фильтр отката."),
+    rsiProfile("dot-rsi-21", "RSI 21", 21, "#f3b14d", "Медленный фильтр для спокойной структуры.")
+  ],
+  "MATIC/USDT": [
+    rsiProfile("matic-rsi-10", "RSI 10", 10, "#55c7a2", "Быстрый фильтр импульса."),
+    rsiProfile("matic-rsi-14", "RSI 14", 14, "#6da8ff", "Контроль перегрева и ложных пробоев.")
+  ],
+  "LTC/USDT": [
+    rsiProfile("ltc-rsi-14", "RSI 14", 14, "#6da8ff", "Классический фильтр для ликвидного актива."),
+    rsiProfile("ltc-rsi-21", "RSI 21", 21, "#f3b14d", "Медленный фильтр swing-структуры.")
+  ],
+  "BCH/USDT": [
+    rsiProfile("bch-rsi-10", "RSI 10", 10, "#55c7a2", "Быстрее реагирует на резкие движения BCH."),
+    rsiProfile("bch-rsi-14", "RSI 14", 14, "#6da8ff", "Базовый фильтр перегрева.")
+  ],
+  "UNI/USDT": [
+    rsiProfile("uni-rsi-14", "RSI 14", 14, "#6da8ff", "Фильтр DeFi-нарратива и откатов."),
+    rsiProfile("uni-rsi-21", "RSI 21", 21, "#f3b14d", "Отсекает шум в менее резких движениях.")
+  ],
+  "AAVE/USDT": [
+    rsiProfile("aave-rsi-14", "RSI 14", 14, "#6da8ff", "Базовая оценка импульса AAVE."),
+    rsiProfile("aave-rsi-21", "RSI 21", 21, "#f3b14d", "Подходит для swing-фильтра.")
+  ],
+  "APT/USDT": [
+    rsiProfile("apt-rsi-9", "RSI 9", 9, "#55c7a2", "Быстрый фильтр волатильных импульсов."),
+    rsiProfile("apt-rsi-14", "RSI 14", 14, "#6da8ff", "Контроль перегрева и подтверждение тренда.")
+  ],
+  "SUI/USDT": [
+    rsiProfile("sui-rsi-9", "RSI 9", 9, "#55c7a2", "Быстрый фильтр импульса."),
+    rsiProfile("sui-rsi-14", "RSI 14", 14, "#6da8ff", "Базовый фильтр разворота/продолжения.")
+  ],
+  "ARB/USDT": [
+    rsiProfile("arb-rsi-10", "RSI 10", 10, "#55c7a2", "Быстрый фильтр для L2-нарратива."),
+    rsiProfile("arb-rsi-14", "RSI 14", 14, "#6da8ff", "Стандартный контроль перегрева.")
+  ],
+  "OP/USDT": [
+    rsiProfile("op-rsi-10", "RSI 10", 10, "#55c7a2", "Быстрый фильтр отката."),
+    rsiProfile("op-rsi-14", "RSI 14", 14, "#6da8ff", "Основной фильтр силы движения.")
+  ],
+  "NEAR/USDT": [
+    rsiProfile("near-rsi-10", "RSI 10", 10, "#55c7a2", "Подходит для быстрых импульсов NEAR."),
+    rsiProfile("near-rsi-14", "RSI 14", 14, "#6da8ff", "Базовая проверка перегрева.")
+  ],
+  "ATOM/USDT": [
+    rsiProfile("atom-rsi-14", "RSI 14", 14, "#6da8ff", "Базовый фильтр структуры."),
+    rsiProfile("atom-rsi-21", "RSI 21", 21, "#f3b14d", "Медленный фильтр swing-сценариев.")
+  ],
+  "INJ/USDT": [
+    rsiProfile("inj-rsi-9", "RSI 9", 9, "#55c7a2", "Быстрый фильтр сильных импульсов."),
+    rsiProfile("inj-rsi-14", "RSI 14", 14, "#6da8ff", "Контроль перегрева после тренда.")
+  ],
+  "FIL/USDT": [
+    rsiProfile("fil-rsi-14", "RSI 14", 14, "#6da8ff", "Базовый фильтр отката."),
+    rsiProfile("fil-rsi-21", "RSI 21", 21, "#f3b14d", "Медленный фильтр для более шумного актива.")
+  ],
+  "ETC/USDT": [
+    rsiProfile("etc-rsi-10", "RSI 10", 10, "#55c7a2", "Быстрый фильтр резких импульсов ETC."),
+    rsiProfile("etc-rsi-14", "RSI 14", 14, "#6da8ff", "Базовый фильтр перегрева.")
+  ],
+  "SEI/USDT": [
+    rsiProfile("sei-rsi-7", "RSI 7", 7, "#ef6b5b", "Очень быстрый фильтр молодой волатильной монеты."),
+    rsiProfile("sei-rsi-14", "RSI 14", 14, "#6da8ff", "Контроль ложных импульсов.")
+  ],
+  "TIA/USDT": [
+    rsiProfile("tia-rsi-9", "RSI 9", 9, "#55c7a2", "Быстрый фильтр волатильных входов."),
+    rsiProfile("tia-rsi-14", "RSI 14", 14, "#6da8ff", "Базовая оценка перегрева.")
+  ],
+  "TWT/USDT": [
+    rsiProfile("twt-rsi-10", "RSI 10", 10, "#55c7a2", "Быстрый фильтр локального импульса TWT."),
+    rsiProfile("twt-rsi-21", "RSI 21", 21, "#f3b14d", "Медленный фильтр для отсечения шума.")
+  ]
+};
+
+function rsiProfile(id, label, period, color, role) {
+  return { id, label, period, color, role };
+}
+
 const state = {
   rules: loadRules(),
   lastStrategy: "",
   lastUserIdea: "",
   tradePlan: null,
   detectedMode: "trend",
+  rsiPreferences: {},
   live: {
     enabled: false,
     socket: null,
@@ -172,6 +296,8 @@ const trainingInput = document.querySelector("#trainingInput");
 const rulesContainer = document.querySelector("[data-rules]");
 const sourcesContainer = document.querySelector("[data-sources]");
 const sourceCount = document.querySelector("[data-source-count]");
+const rsiAssetLabel = document.querySelector("[data-rsi-asset]");
+const rsiControls = document.querySelector("[data-rsi-controls]");
 const strategyContainer = document.querySelector("[data-strategy]");
 const confidence = document.querySelector("[data-confidence]");
 const chartLabel = document.querySelector("[data-chart-label]");
@@ -230,6 +356,59 @@ function renderSources() {
   });
 }
 
+function renderRsiControls() {
+  const profiles = getRsiProfilesForAsset(asset.value);
+  rsiAssetLabel.textContent = asset.value.split("/")[0];
+  rsiControls.innerHTML = "";
+
+  profiles.forEach((profile) => {
+    const prefs = getRsiPreference(profile.id);
+    const item = document.createElement("div");
+    item.className = "indicator-item";
+    item.innerHTML = `
+      <strong>${escapeHtml(profile.label)} · period ${profile.period}</strong>
+      <span>${escapeHtml(profile.role)}</span>
+      <div class="indicator-actions">
+        <label class="check-row">
+          <input type="checkbox" data-rsi-show="${profile.id}" ${prefs.show ? "checked" : ""}>
+          <span>на график</span>
+        </label>
+        <label class="check-row">
+          <input type="checkbox" data-rsi-use="${profile.id}" ${prefs.use ? "checked" : ""}>
+          <span>в стратегию</span>
+        </label>
+      </div>
+    `;
+    rsiControls.append(item);
+  });
+
+  rsiControls.querySelectorAll("input").forEach((input) => {
+    input.addEventListener("change", () => {
+      const id = input.dataset.rsiShow || input.dataset.rsiUse;
+      const prefs = getRsiPreference(id);
+      if (input.dataset.rsiShow) prefs.show = input.checked;
+      if (input.dataset.rsiUse) prefs.use = input.checked;
+      state.rsiPreferences[id] = prefs;
+      generateStrategy(state.lastUserIdea);
+    });
+  });
+}
+
+function getRsiProfilesForAsset(symbol) {
+  return rsiProfiles[symbol] || rsiProfiles["BTC/USDT"];
+}
+
+function getRsiPreference(id) {
+  return state.rsiPreferences[id] || { show: true, use: true };
+}
+
+function getSelectedRsiIndicators() {
+  return getRsiProfilesForAsset(asset.value).map((profile) => {
+    const prefs = getRsiPreference(profile.id);
+    return { ...profile, show: prefs.show, use: prefs.use };
+  });
+}
+
 function getContext() {
   const resolvedMode = marketMode.value === "auto" ? state.detectedMode : marketMode.value;
   return {
@@ -243,6 +422,7 @@ function getContext() {
     includeShorts: includeShorts.checked,
     rules: state.rules,
     sourceRules: knowledgeSources.flatMap((source) => source.rules),
+    rsi: getSelectedRsiIndicators(),
     live: getLiveSnapshot()
   };
 }
@@ -287,6 +467,7 @@ function buildStrategy(userIdea = "", tradePlan = null) {
     .join("; ");
   const liveBlock = buildLiveStrategyBlock(context);
   const tradePlanBlock = buildTradePlanBlock(tradePlan);
+  const rsiBlock = buildRsiStrategyBlock(context);
   const investorDisciplineBlock = buildInvestorDisciplineBlock(context, tradePlan);
   const idea = userIdea ? `<p><strong>Уточнение из чата:</strong> ${escapeHtml(userIdea)}</p>` : "";
 
@@ -299,6 +480,7 @@ function buildStrategy(userIdea = "", tradePlan = null) {
     </section>
     ${liveBlock}
     ${tradePlanBlock}
+    ${rsiBlock}
     ${investorDisciplineBlock}
     <section>
       <h3>Условия входа</h3>
@@ -327,6 +509,33 @@ function buildStrategy(userIdea = "", tradePlan = null) {
 
   state.lastStrategy = stripTags(html);
   return html;
+}
+
+function buildRsiStrategyBlock(context) {
+  const used = context.rsi.filter((indicator) => indicator.use);
+  if (!used.length) {
+    return `
+      <section>
+        <h3>RSI-фильтры</h3>
+        <p>RSI не учитывается в стратегии: все RSI-фильтры выключены в меню.</p>
+      </section>
+    `;
+  }
+
+  const candles = getCandlesForRsi(context);
+  const rows = used.map((indicator) => {
+    const value = getLatestRsiValue(candles, indicator.period);
+    const signal = describeRsiSignal(value, context);
+    const valueText = Number.isFinite(value) ? value.toFixed(1) : "нет live-данных";
+    return `<li><strong>${escapeHtml(indicator.label)}</strong>: ${valueText}. ${escapeHtml(signal)} ${escapeHtml(indicator.role)}</li>`;
+  }).join("");
+
+  return `
+    <section>
+      <h3>RSI-фильтры</h3>
+      <ul>${rows}</ul>
+    </section>
+  `;
 }
 
 function buildInvestorDisciplineBlock(context, tradePlan) {
@@ -436,7 +645,7 @@ function generateStrategy(userIdea = "") {
   confidence.textContent = `${context.rules.length + context.sourceRules.length} правил учтено`;
   rr.textContent = context.conservative ? "1 : 2.2" : "1 : 1.7";
   maxRisk.textContent = `${context.risk.toFixed(2)}%`;
-  filterCount.textContent = context.conservative ? "4" : "3";
+  filterCount.textContent = String((context.conservative ? 4 : 3) + context.rsi.filter((indicator) => indicator.use).length);
   chartLabel.textContent = `${context.asset} · ${context.timeframe}`;
   chartTitle.textContent = context.live.active
     ? `Live свечи · ${formatModeTitle(context)} · ${selectedSidesLabel(tradePlan)}`
@@ -583,6 +792,12 @@ function drawChart(mode, tradePlan = null) {
     });
     drawScenarioBadge(tradePlan, pad.left, pad.top);
   }
+  drawRsiPanel(makeSyntheticRsiCandles(mode, tradePlan?.basePrice), getVisibleRsiIndicators(), {
+    x: pad.left,
+    y: height - 124,
+    width: width - pad.left - pad.right,
+    height: 92
+  });
 }
 
 function makePricePath(mode, count, width, height) {
@@ -669,10 +884,140 @@ function drawLiveChart(candles, tradePlan = null) {
     });
     drawScenarioBadge(tradePlan, pad.left, pad.top);
   }
+  drawRsiPanel(visible, getVisibleRsiIndicators(), {
+    x: pad.left,
+    y: height - 124,
+    width: chartWidth,
+    height: 92
+  });
 }
 
 function priceToY(price, min, range, pad, chartHeight) {
   return pad.top + (1 - (price - min) / range) * chartHeight;
+}
+
+function drawRsiPanel(candles, indicators, box) {
+  const visible = indicators.filter((indicator) => indicator.show);
+  if (!visible.length || candles.length < 8) return;
+
+  ctx.fillStyle = "rgba(9,12,15,0.88)";
+  ctx.fillRect(box.x, box.y, box.width, box.height);
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.strokeRect(box.x, box.y, box.width, box.height);
+
+  [70, 50, 30].forEach((level) => {
+    const y = rsiToY(level, box);
+    ctx.strokeStyle = level === 50 ? "rgba(255,255,255,0.18)" : "rgba(243,177,77,0.25)";
+    ctx.setLineDash(level === 50 ? [] : [5, 6]);
+    ctx.beginPath();
+    ctx.moveTo(box.x, y);
+    ctx.lineTo(box.x + box.width, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#9aa6ad";
+    ctx.font = "700 10px Inter, system-ui, sans-serif";
+    ctx.fillText(String(level), box.x + box.width + 8, y + 3);
+  });
+
+  visible.forEach((indicator, lineIndex) => {
+    const values = calculateRsiSeries(candles.map((candle) => candle.close), indicator.period);
+    const start = Math.max(0, values.length - candles.length);
+    ctx.strokeStyle = indicator.color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    let hasPoint = false;
+    values.slice(start).forEach((value, index, arr) => {
+      if (!Number.isFinite(value)) return;
+      const x = box.x + (box.width / Math.max(1, arr.length - 1)) * index;
+      const y = rsiToY(value, box);
+      if (!hasPoint) {
+        ctx.moveTo(x, y);
+        hasPoint = true;
+      } else {
+        ctx.lineTo(x, y);
+      }
+    });
+    if (hasPoint) ctx.stroke();
+    const latest = getLatestRsiValue(candles, indicator.period);
+    ctx.fillStyle = indicator.color;
+    ctx.font = "800 11px Inter, system-ui, sans-serif";
+    ctx.fillText(`${indicator.label}: ${Number.isFinite(latest) ? latest.toFixed(1) : "--"}`, box.x + 10 + lineIndex * 150, box.y + 16);
+  });
+}
+
+function rsiToY(value, box) {
+  return box.y + (1 - value / 100) * box.height;
+}
+
+function getVisibleRsiIndicators() {
+  return getSelectedRsiIndicators().filter((indicator) => indicator.show);
+}
+
+function getCandlesForRsi(context) {
+  if (context.live.active && state.live.candles.length) return state.live.candles.slice(-80);
+  return makeSyntheticRsiCandles(context.mode, getPlanBasePrice(context));
+}
+
+function makeSyntheticRsiCandles(mode, basePrice = 100) {
+  const points = [];
+  for (let i = 0; i < 80; i += 1) {
+    const t = i / 79;
+    let factor;
+    if (mode === "trend") factor = 1 + t * 0.045 + Math.sin(i * 0.55) * 0.006;
+    else if (mode === "range") factor = 1 + Math.sin(i * 0.45) * 0.018;
+    else if (mode === "breakout") factor = 1 + (t > 0.62 ? (t - 0.62) * 0.11 : Math.sin(i * 0.35) * 0.008);
+    else if (mode === "pullback") factor = 1 + t * 0.04 - Math.max(0, t - 0.62) * 0.065 + Math.sin(i * 0.4) * 0.005;
+    else factor = 1 + Math.sin(i * 0.75) * 0.035 + Math.cos(i * 0.21) * 0.012;
+    const close = basePrice * factor;
+    points.push({ close, open: close, high: close * 1.002, low: close * 0.998, volume: 1 });
+  }
+  return points;
+}
+
+function getLatestRsiValue(candles, period) {
+  const values = calculateRsiSeries(candles.map((candle) => candle.close), period);
+  for (let i = values.length - 1; i >= 0; i -= 1) {
+    if (Number.isFinite(values[i])) return values[i];
+  }
+  return NaN;
+}
+
+function calculateRsiSeries(closes, period) {
+  const result = Array(closes.length).fill(NaN);
+  if (closes.length <= period) return result;
+
+  let gains = 0;
+  let losses = 0;
+  for (let i = 1; i <= period; i += 1) {
+    const delta = closes[i] - closes[i - 1];
+    if (delta >= 0) gains += delta;
+    else losses -= delta;
+  }
+
+  let avgGain = gains / period;
+  let avgLoss = losses / period;
+  result[period] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+
+  for (let i = period + 1; i < closes.length; i += 1) {
+    const delta = closes[i] - closes[i - 1];
+    const gain = Math.max(delta, 0);
+    const loss = Math.max(-delta, 0);
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+    result[i] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+  }
+
+  return result;
+}
+
+function describeRsiSignal(value, context) {
+  if (!Number.isFinite(value)) return "Недостаточно свечей для расчета; фильтр описан как профиль, но не подтверждает вход.";
+  if (context.includeLongs && value < 35) return "Поддерживает поиск long после подтверждения разворота из перепроданности.";
+  if (context.includeShorts && value > 65) return "Поддерживает поиск short после подтверждения слабости из перекупленности.";
+  if (value > 45 && value < 55) return "Нейтральная зона: вход лучше подтверждать уровнем, объемом и структурой свечей.";
+  if (value >= 55 && value <= 65) return "Умеренно бычья зона: long допустим по тренду, short только от сопротивления.";
+  if (value >= 35 && value <= 45) return "Умеренно медвежья зона: short допустим по тренду, long только от сильной поддержки.";
+  return "Экстремальная зона: вход без подтверждения повышает риск ложного сигнала.";
 }
 
 function buildTradePlan(context) {
@@ -945,6 +1290,7 @@ function randomizeScenario() {
   timeframe.value = frames[Math.floor(Math.random() * frames.length)].value;
   risk.value = String([0.5, 0.75, 1, 1.25, 1.5][Math.floor(Math.random() * 5)]);
   updateRiskLabel();
+  renderRsiControls();
   if (state.live.enabled) {
     restartLiveConnection();
   }
@@ -1016,6 +1362,9 @@ chatForm.addEventListener("submit", (event) => {
 [asset, timeframe, marketMode, conservative, includeLongs, includeShorts].forEach((control) => {
   control.addEventListener("change", () => {
     ensureAtLeastOneScenario();
+    if (control === asset) {
+      renderRsiControls();
+    }
     if ((control === asset || control === timeframe) && state.live.enabled) {
       restartLiveConnection();
     }
@@ -1030,6 +1379,7 @@ risk.addEventListener("input", () => {
 
 renderRules();
 renderSources();
+renderRsiControls();
 updateRiskLabel();
 renderLiveReadout();
 generateStrategy();
