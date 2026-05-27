@@ -1407,7 +1407,6 @@ function enterPaperTrade() {
 
   const amount = Math.max(10, Number(paperAmount.value) || 1000);
   paperAmount.value = String(amount);
-  const currentPrice = getCurrentMarketPrice(context.asset);
   const entry = scenario.entry;
   const quantity = amount / entry;
   const id = `trade-${Date.now()}-${Math.round(Math.random() * 1000)}`;
@@ -1439,7 +1438,7 @@ function enterPaperTrade() {
     history: [{ time: Date.now(), price: entry, pnl: 0, pnlPct: 0 }]
   };
 
-  state.paperPriceCache[trade.asset] = { price: currentPrice || entry, updatedAt: Date.now(), source: "entry" };
+  state.paperPriceCache[trade.asset] = { price: entry, updatedAt: Date.now(), source: "entry" };
   state.paperTrades.push(trade);
   state.activePaperTradeId = id;
   persistPaperTrades();
@@ -1503,9 +1502,10 @@ async function refreshOpenPaperTradePrices(force = false) {
 
   state.paperPriceLastFetch = now;
   const currentSnapshot = getLiveSnapshot();
-  if (currentSnapshot.active && currentSnapshot.lastPrice > 0) {
+  const liveTickerPrice = state.live.asset === currentSnapshot.symbol ? Number(state.live.ticker?.lastPrice) : 0;
+  if (currentSnapshot.active && liveTickerPrice > 0) {
     state.paperPriceCache[currentSnapshot.symbol] = {
-      price: currentSnapshot.lastPrice,
+      price: liveTickerPrice,
       updatedAt: currentSnapshot.updatedAt,
       source: "live"
     };
@@ -1674,14 +1674,11 @@ function formatJournalTime(timestamp) {
 }
 
 function getCurrentMarketPrice(symbol = asset.value) {
-  const live = getLiveSnapshot();
-  if (live.active && live.symbol === symbol && live.lastPrice > 0) return live.lastPrice;
+  const liveTickerPrice = state.live.asset === symbol ? Number(state.live.ticker?.lastPrice) : 0;
+  if (state.live.enabled && liveTickerPrice > 0) return liveTickerPrice;
   const cached = state.paperPriceCache[symbol];
   if (cached?.price > 0) return cached.price;
-  const lastCandle = live.symbol === symbol ? state.live.candles[state.live.candles.length - 1] : null;
-  if (lastCandle?.close > 0) return lastCandle.close;
-  if (symbol !== asset.value) return 0;
-  return state.tradePlan?.basePrice || 0;
+  return 0;
 }
 
 function getPaperTradePrice(trade) {
