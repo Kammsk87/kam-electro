@@ -1530,7 +1530,8 @@ async function refreshOpenPaperTradePrices(force = false) {
 
   state.paperPriceLastFetch = now;
   const currentSnapshot = getLiveSnapshot();
-  const liveTickerPrice = state.live.asset === currentSnapshot.symbol ? Number(state.live.ticker?.lastPrice) : 0;
+  const liveSymbol = toBinanceSymbol(currentSnapshot.symbol);
+  const liveTickerPrice = state.live.ticker?.symbol === liveSymbol ? Number(state.live.ticker?.lastPrice) : 0;
   if (currentSnapshot.active && liveTickerPrice > 0) {
     state.paperPriceCache[currentSnapshot.symbol] = {
       price: liveTickerPrice,
@@ -1734,7 +1735,7 @@ function getCurrentMarketPrice(symbol = asset.value) {
 }
 
 function getExecutableMarketPrice(symbol = asset.value) {
-  const liveTickerPrice = state.live.asset === symbol ? Number(state.live.ticker?.lastPrice) : 0;
+  const liveTickerPrice = state.live.ticker?.symbol === toBinanceSymbol(symbol) ? Number(state.live.ticker?.lastPrice) : 0;
   if (state.live.enabled && liveTickerPrice > 0) return liveTickerPrice;
   const cached = state.paperPriceCache[symbol];
   if (cached?.price > 0) return cached.price;
@@ -2123,7 +2124,7 @@ async function connectLiveSocket() {
     });
 
     socket.addEventListener("message", (event) => {
-      handleLiveMessage(JSON.parse(event.data));
+      handleLiveMessage(JSON.parse(event.data), symbol);
     });
 
     socket.addEventListener("error", () => {
@@ -2162,13 +2163,17 @@ async function loadHistoricalCandles(symbol, interval) {
   }
 }
 
-function handleLiveMessage(message) {
+function handleLiveMessage(message, expectedSymbol = toBinanceSymbol(state.live.asset || asset.value)) {
   const topic = message.topic || "";
   const data = message.data;
   if (!data) return;
+  const topicSymbol = getTopicSymbol(topic);
+  if (topicSymbol && topicSymbol !== expectedSymbol) return;
+  if (expectedSymbol !== toBinanceSymbol(state.live.asset || asset.value)) return;
 
   if (topic.startsWith("tickers.")) {
     state.live.ticker = {
+      symbol: topicSymbol,
       lastPrice: Number(data.lastPrice),
       priceChangePct: Number(data.price24hPcnt) * 100,
       volume: Number(data.volume24h),
@@ -2180,6 +2185,7 @@ function handleLiveMessage(message) {
     const bid = data.b?.[0];
     const ask = data.a?.[0];
     state.live.book = {
+      symbol: topicSymbol,
       bid: Number(bid?.[0]),
       ask: Number(ask?.[0]),
       bidQty: Number(bid?.[1]),
@@ -2214,6 +2220,11 @@ function upsertLiveCandle(kline) {
     state.live.candles.push(candle);
     state.live.candles = state.live.candles.slice(-120);
   }
+}
+
+function getTopicSymbol(topic) {
+  const parts = topic.split(".");
+  return parts[parts.length - 1] || "";
 }
 
 function scheduleReconnect() {
@@ -2262,9 +2273,12 @@ function getLiveSnapshot() {
   const candles = state.live.candles;
   const lastCandle = candles[candles.length - 1];
   const firstCandle = candles[Math.max(0, candles.length - 20)];
-  const lastPrice = ticker?.lastPrice || lastCandle?.close || 0;
-  const bid = book?.bid || lastPrice;
-  const ask = book?.ask || lastPrice;
+  const currentBybitSymbol = toBinanceSymbol(state.live.asset || asset.value);
+  const validTicker = ticker?.symbol === currentBybitSymbol ? ticker : null;
+  const validBook = book?.symbol === currentBybitSymbol ? book : null;
+  const lastPrice = validTicker?.lastPrice || lastCandle?.close || 0;
+  const bid = validBook?.bid || lastPrice;
+  const ask = validBook?.ask || lastPrice;
   const spreadPct = bid && ask ? ((ask - bid) / ((ask + bid) / 2)) * 100 : 0;
   const trendPct = firstCandle?.close && lastCandle?.close
     ? ((lastCandle.close - firstCandle.close) / firstCandle.close) * 100
@@ -2279,7 +2293,7 @@ function getLiveSnapshot() {
     ask,
     spreadPct,
     trendPct,
-    volume24h: ticker?.quoteVolume || 0,
+    volume24h: validTicker?.quoteVolume || 0,
     updatedAt: state.live.updatedAt || Date.now()
   };
 }
