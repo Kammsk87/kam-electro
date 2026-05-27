@@ -93,7 +93,12 @@
 
           <label>
             Риск на сделку: <output id="riskValue">1.0%</output>
-            <input id="risk" type="range" min="0.25" max="3" step="0.25" value="1">
+            <input id="risk" type="range" min="0.25" max="2" step="0.25" value="1">
+          </label>
+
+          <label>
+            Депозит, USDT
+            <input id="deposit" type="number" min="100" step="100" value="10000">
           </label>
 
           <fieldset>
@@ -119,6 +124,14 @@
             <span class="mini-counter" data-rsi-asset>BTC</span>
           </div>
           <div class="indicator-list" data-rsi-controls></div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-title">
+            <span>EMA Фибоначчи</span>
+            <span class="mini-counter">34 / 89</span>
+          </div>
+          <div class="indicator-list" data-ema-controls></div>
         </section>
 
         <section class="panel-section">
@@ -295,7 +308,10 @@
             <div class="trade-journal">
               <div class="output-header">
                 <span>Журнал операций</span>
-                <button class="text-button" type="button" data-paper-clear>Очистить журнал</button>
+                <div class="journal-actions">
+                  <button class="text-button" type="button" data-export-journal>Excel</button>
+                  <button class="text-button" type="button" data-paper-clear>Очистить журнал</button>
+                </div>
               </div>
               <div class="journal-summary">
                 <div>

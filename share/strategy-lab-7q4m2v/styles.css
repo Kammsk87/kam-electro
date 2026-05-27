@@ -502,6 +502,12 @@ canvas {
   margin: 8px 0;
 }
 
+.journal-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
 .journal-summary div {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;

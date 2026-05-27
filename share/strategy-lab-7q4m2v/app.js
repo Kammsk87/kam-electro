@@ -1,5 +1,13 @@
 const storageKey = "crypto-strategy-bot-v1";
 const paperJournalKey = "crypto-strategy-bot-paper-journal-v1";
+const paperSessionKey = "crypto-strategy-bot-session-id";
+const depositKey = "crypto-strategy-bot-deposit-v1";
+
+const currentSessionId = getCurrentSessionId();
+const emaProfiles = [
+  { id: "ema-34", label: "EMA 34", period: 34, color: "#c084fc", role: "быстрая EMA из чисел Фибоначчи: фильтр импульса и отката." },
+  { id: "ema-89", label: "EMA 89", period: 89, color: "#38bdf8", role: "медленная EMA из чисел Фибоначчи: фильтр старшего направления." }
+];
 
 const defaultRules = [
   "Не считать стратегию готовой без точки отмены сценария и заранее заданного стопа.",
@@ -262,6 +270,15 @@ function rsiProfile(id, label, period, color, role) {
   return { id, label, period, color, role };
 }
 
+function getCurrentSessionId() {
+  let sessionId = sessionStorage.getItem(paperSessionKey);
+  if (!sessionId) {
+    sessionId = `session-${Date.now()}-${Math.round(Math.random() * 10000)}`;
+    sessionStorage.setItem(paperSessionKey, sessionId);
+  }
+  return sessionId;
+}
+
 const state = {
   rules: loadRules(),
   lastStrategy: "",
@@ -272,6 +289,7 @@ const state = {
   activePaperTradeId: null,
   paperPriceCache: {},
   paperPriceLastFetch: 0,
+  emaPreferences: {},
   detectedMode: "trend",
   rsiPreferences: {},
   live: {
@@ -295,6 +313,7 @@ const timeframe = document.querySelector("#timeframe");
 const marketMode = document.querySelector("#marketMode");
 const risk = document.querySelector("#risk");
 const riskValue = document.querySelector("#riskValue");
+const deposit = document.querySelector("#deposit");
 const conservative = document.querySelector("#conservative");
 const includeLongs = document.querySelector("#includeLongs");
 const includeShorts = document.querySelector("#includeShorts");
@@ -304,6 +323,7 @@ const sourcesContainer = document.querySelector("[data-sources]");
 const sourceCount = document.querySelector("[data-source-count]");
 const rsiAssetLabel = document.querySelector("[data-rsi-asset]");
 const rsiControls = document.querySelector("[data-rsi-controls]");
+const emaControls = document.querySelector("[data-ema-controls]");
 const strategyContainer = document.querySelector("[data-strategy]");
 const confidence = document.querySelector("[data-confidence]");
 const chartLabel = document.querySelector("[data-chart-label]");
@@ -335,6 +355,7 @@ const paperResult = document.querySelector("[data-paper-result]");
 const paperEnter = document.querySelector("[data-paper-enter]");
 const paperReset = document.querySelector("[data-paper-reset]");
 const paperClear = document.querySelector("[data-paper-clear]");
+const exportJournal = document.querySelector("[data-export-journal]");
 const journalRows = document.querySelector("[data-journal-rows]");
 const journalOpen = document.querySelector("[data-journal-open]");
 const journalClosed = document.querySelector("[data-journal-closed]");
@@ -385,11 +406,15 @@ function normalizePaperTrade(trade) {
     ...trade,
     id: String(trade.id || `trade-${Date.now()}-${Math.round(Math.random() * 1000)}`),
     asset: String(trade.asset || "BTC/USDT"),
+    sessionId: String(trade.sessionId || "legacy"),
     timeframe: String(trade.timeframe || "15m"),
     mode: String(trade.mode || ""),
     modeSource: String(trade.modeSource || ""),
     side,
     amount,
+    deposit: Number(trade.deposit) || loadDeposit(),
+    riskBudget: Number(trade.riskBudget) || (Number(trade.deposit) || loadDeposit()) * 0.02,
+    riskLimitPct: Number(trade.riskLimitPct) || 2,
     entry,
     quantity: Number(trade.quantity) || amount / entry,
     stop,
@@ -485,6 +510,20 @@ function persistPaperTrades() {
   localStorage.setItem(paperJournalKey, JSON.stringify({ trades: state.paperTrades }));
 }
 
+function loadDeposit() {
+  const saved = Number(localStorage.getItem(depositKey));
+  return Number.isFinite(saved) && saved > 0 ? saved : 10000;
+}
+
+function persistDeposit() {
+  localStorage.setItem(depositKey, String(getDepositValue()));
+}
+
+function getDepositValue() {
+  const value = Number(deposit.value);
+  return Number.isFinite(value) && value > 0 ? value : 10000;
+}
+
 function renderRules() {
   rulesContainer.innerHTML = "";
   state.rules.slice(-6).forEach((rule) => {
@@ -544,6 +583,41 @@ function renderRsiControls() {
   });
 }
 
+function renderEmaControls() {
+  emaControls.innerHTML = "";
+  emaProfiles.forEach((profile) => {
+    const prefs = getEmaPreference(profile.id);
+    const item = document.createElement("div");
+    item.className = "indicator-item";
+    item.innerHTML = `
+      <strong>${escapeHtml(profile.label)} · period ${profile.period}</strong>
+      <span>${escapeHtml(profile.role)}</span>
+      <div class="indicator-actions">
+        <label class="check-row">
+          <input type="checkbox" data-ema-show="${profile.id}" ${prefs.show ? "checked" : ""}>
+          <span>на график</span>
+        </label>
+        <label class="check-row">
+          <input type="checkbox" data-ema-use="${profile.id}" ${prefs.use ? "checked" : ""}>
+          <span>в стратегию</span>
+        </label>
+      </div>
+    `;
+    emaControls.append(item);
+  });
+
+  emaControls.querySelectorAll("input").forEach((input) => {
+    input.addEventListener("change", () => {
+      const id = input.dataset.emaShow || input.dataset.emaUse;
+      const prefs = getEmaPreference(id);
+      if (input.dataset.emaShow) prefs.show = input.checked;
+      if (input.dataset.emaUse) prefs.use = input.checked;
+      state.emaPreferences[id] = prefs;
+      generateStrategy(state.lastUserIdea);
+    });
+  });
+}
+
 function getRsiProfilesForAsset(symbol) {
   return rsiProfiles[symbol] || rsiProfiles["BTC/USDT"];
 }
@@ -555,6 +629,17 @@ function getRsiPreference(id) {
 function getSelectedRsiIndicators() {
   return getRsiProfilesForAsset(asset.value).map((profile) => {
     const prefs = getRsiPreference(profile.id);
+    return { ...profile, show: prefs.show, use: prefs.use };
+  });
+}
+
+function getEmaPreference(id) {
+  return state.emaPreferences[id] || { show: true, use: true };
+}
+
+function getSelectedEmaIndicators() {
+  return emaProfiles.map((profile) => {
+    const prefs = getEmaPreference(profile.id);
     return { ...profile, show: prefs.show, use: prefs.use };
   });
 }
@@ -573,6 +658,8 @@ function getContext() {
     rules: state.rules,
     sourceRules: knowledgeSources.flatMap((source) => source.rules),
     rsi: getSelectedRsiIndicators(),
+    ema: getSelectedEmaIndicators(),
+    deposit: getDepositValue(),
     live: getLiveSnapshot()
   };
 }
@@ -619,6 +706,7 @@ function buildStrategy(userIdea = "", tradePlan = null, signalQuality = null) {
   const liveBlock = buildLiveStrategyBlock(context);
   const tradePlanBlock = buildTradePlanBlock(tradePlan);
   const rsiBlock = buildRsiStrategyBlock(context);
+  const emaBlock = buildEmaStrategyBlock(context);
   const signalQualityBlock = buildSignalQualityBlock(signalQuality);
   const investorDisciplineBlock = buildInvestorDisciplineBlock(context, tradePlan);
   const idea = userIdea ? `<p><strong>Уточнение из чата:</strong> ${escapeHtml(userIdea)}</p>` : "";
@@ -634,6 +722,7 @@ function buildStrategy(userIdea = "", tradePlan = null, signalQuality = null) {
     ${tradePlanBlock}
     ${signalQualityBlock}
     ${rsiBlock}
+    ${emaBlock}
     ${investorDisciplineBlock}
     <section>
       <h3>Условия входа</h3>
@@ -642,7 +731,7 @@ function buildStrategy(userIdea = "", tradePlan = null, signalQuality = null) {
     <section>
       <h3>Риск и сопровождение</h3>
       <ul>
-        <li>Риск на сделку: не более ${context.risk.toFixed(2)}% от депозита.</li>
+        <li>Депозит: ${formatPrice(context.deposit)} USDT. Риск на сделку: не более ${Math.min(context.risk, 2).toFixed(2)}% от депозита.</li>
         <li>Стоп: за локальный экстремум или за уровень отмены сценария.</li>
         <li>Цель: частичная фиксация на ${rrTarget}, остаток вести по структуре.</li>
         <li>Если цена возвращается под уровень входа без импульса, сделка отменяется.</li>
@@ -710,6 +799,37 @@ function buildRsiStrategyBlock(context) {
   return `
     <section>
       <h3>RSI-фильтры</h3>
+      <ul>${rows}</ul>
+    </section>
+  `;
+}
+
+function buildEmaStrategyBlock(context) {
+  const used = context.ema.filter((indicator) => indicator.use);
+  if (!used.length) {
+    return `
+      <section>
+        <h3>EMA Фибоначчи</h3>
+        <p>EMA 34/89 не учитываются в стратегии: фильтры выключены в меню.</p>
+      </section>
+    `;
+  }
+
+  const candles = getCandlesForRsi(context);
+  const rows = used.map((indicator) => {
+    const latest = getLatestEmaValue(candles.map((candle) => candle.close), indicator.period);
+    const lastClose = candles[candles.length - 1]?.close;
+    const signal = Number.isFinite(latest) && Number.isFinite(lastClose)
+      ? lastClose >= latest
+        ? "цена выше EMA, фильтр поддерживает long или удержание импульса"
+        : "цена ниже EMA, фильтр поддерживает short или осторожность с long"
+      : "нужно больше свечей для расчета";
+    return `<li><strong>${escapeHtml(indicator.label)}</strong>: ${Number.isFinite(latest) ? formatPrice(latest) : "нет данных"}. ${escapeHtml(signal)}.</li>`;
+  }).join("");
+
+  return `
+    <section>
+      <h3>EMA Фибоначчи</h3>
       <ul>${rows}</ul>
     </section>
   `;
@@ -825,7 +945,7 @@ function generateStrategy(userIdea = "") {
   confidence.textContent = `${context.rules.length + context.sourceRules.length} правил учтено`;
   rr.textContent = context.conservative ? "1 : 2.2" : "1 : 1.7";
   maxRisk.textContent = `${context.risk.toFixed(2)}%`;
-  filterCount.textContent = String((context.conservative ? 4 : 3) + context.rsi.filter((indicator) => indicator.use).length);
+  filterCount.textContent = String((context.conservative ? 4 : 3) + context.rsi.filter((indicator) => indicator.use).length + context.ema.filter((indicator) => indicator.use).length);
   renderSignalQualityReadout(signalQuality);
   chartLabel.textContent = `${context.asset} · ${context.timeframe}`;
   chartTitle.textContent = context.live.active
@@ -972,6 +1092,8 @@ function evaluateScenarioQuality(context, scenario) {
 
   const rsiResult = evaluateRsiForScenario(context, scenario.side);
   addScore(rsiResult.delta, rsiResult.reason);
+  const emaResult = evaluateEmaForScenario(context, scenario.side);
+  addScore(emaResult.delta, emaResult.reason);
 
   const finalScore = Math.max(0, Math.min(100, Math.round(score)));
   const decision = finalScore >= 80
@@ -993,6 +1115,25 @@ function evaluateScenarioQuality(context, scenario) {
     score += delta;
     reasons.push(`${delta > 0 ? "+" : ""}${delta}: ${reason}`);
   }
+}
+
+function evaluateEmaForScenario(context, side) {
+  const used = context.ema.filter((indicator) => indicator.use);
+  if (!used.length) return { delta: 0, reason: "EMA 34/89 выключены" };
+  const candles = getCandlesForRsi(context);
+  const closes = candles.map((candle) => candle.close);
+  const lastClose = closes[closes.length - 1];
+  const ema34 = getLatestEmaValue(closes, 34);
+  const ema89 = getLatestEmaValue(closes, 89);
+  if (!Number.isFinite(lastClose) || !Number.isFinite(ema34) || !Number.isFinite(ema89)) {
+    return { delta: -2, reason: "EMA 34/89 не рассчитаны из-за нехватки свечей" };
+  }
+  const bullish = lastClose >= ema34 && ema34 >= ema89;
+  const bearish = lastClose <= ema34 && ema34 <= ema89;
+  if (side === "LONG" && bullish) return { delta: 8, reason: "EMA 34 выше EMA 89 и поддерживает long" };
+  if (side === "SHORT" && bearish) return { delta: 8, reason: "EMA 34 ниже EMA 89 и поддерживает short" };
+  if ((side === "LONG" && bearish) || (side === "SHORT" && bullish)) return { delta: -8, reason: "EMA 34/89 конфликтуют с направлением сделки" };
+  return { delta: 1, reason: "EMA 34/89 дают нейтральный фильтр" };
 }
 
 function evaluateRsiForScenario(context, side) {
@@ -1084,6 +1225,13 @@ function drawChart(mode, tradePlan = null) {
     });
     drawScenarioBadge(tradePlan, pad.left, pad.top);
   }
+  drawEmaOverlay(makeSyntheticRsiCandles(mode, tradePlan?.basePrice), getVisibleEmaIndicators(), {
+    pad,
+    chartWidth: width - pad.left - pad.right,
+    chartHeight: height - pad.top - pad.bottom,
+    min: tradePlan ? Math.min(...tradePlan.scenarios.flatMap((scenario) => [scenario.entry, scenario.stop, scenario.target1, scenario.target2])) * 0.998 : tradePlan?.basePrice * 0.98 || 1,
+    range: tradePlan ? (Math.max(...tradePlan.scenarios.flatMap((scenario) => [scenario.entry, scenario.stop, scenario.target1, scenario.target2])) * 1.002 - Math.min(...tradePlan.scenarios.flatMap((scenario) => [scenario.entry, scenario.stop, scenario.target1, scenario.target2])) * 0.998) : tradePlan?.basePrice * 0.04 || 1
+  });
   drawRsiPanel(makeSyntheticRsiCandles(mode, tradePlan?.basePrice), getVisibleRsiIndicators(), rsiBox);
 }
 
@@ -1173,6 +1321,7 @@ function drawLiveChart(candles, tradePlan = null) {
     });
     drawScenarioBadge(tradePlan, pad.left, pad.top);
   }
+  drawEmaOverlay(visible, getVisibleEmaIndicators(), { pad, chartWidth, chartHeight, min, range });
   drawRsiPanel(visible, getVisibleRsiIndicators(), rsiBox);
 }
 
@@ -1184,6 +1333,34 @@ function getRsiPanelBox(width, height, compact = false) {
     width: width - 52 - 190,
     height: panelHeight
   };
+}
+
+function drawEmaOverlay(candles, indicators, scale) {
+  const visible = indicators.filter((indicator) => indicator.show);
+  if (!visible.length || candles.length < 4) return;
+
+  visible.forEach((indicator, index) => {
+    const values = calculateEmaSeries(candles.map((candle) => candle.close), indicator.period);
+    ctx.beginPath();
+    values.forEach((value, pointIndex) => {
+      if (!Number.isFinite(value)) return;
+      const x = scale.pad.left + (pointIndex / Math.max(1, values.length - 1)) * scale.chartWidth;
+      const y = priceToY(value, scale.min, scale.range || 1, scale.pad, scale.chartHeight);
+      if (pointIndex === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = indicator.color;
+    ctx.lineWidth = 2;
+    ctx.setLineDash(index === 0 ? [] : [5, 5]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const latest = values.filter((value) => Number.isFinite(value)).at(-1);
+    if (Number.isFinite(latest)) {
+      ctx.fillStyle = indicator.color;
+      ctx.font = "800 11px Inter, system-ui, sans-serif";
+      ctx.fillText(`${indicator.label} ${formatPrice(latest)}`, scale.pad.left + 12, scale.pad.top + 18 + index * 14);
+    }
+  });
 }
 
 function priceToY(price, min, range, pad, chartHeight) {
@@ -1247,6 +1424,10 @@ function getVisibleRsiIndicators() {
   return getSelectedRsiIndicators().filter((indicator) => indicator.show);
 }
 
+function getVisibleEmaIndicators() {
+  return getSelectedEmaIndicators().filter((indicator) => indicator.show);
+}
+
 function getCandlesForRsi(context) {
   if (context.live.active && state.live.candles.length) return state.live.candles.slice(-80);
   return makeSyntheticRsiCandles(context.mode, getPlanBasePrice(context));
@@ -1274,6 +1455,27 @@ function getLatestRsiValue(candles, period) {
     if (Number.isFinite(values[i])) return values[i];
   }
   return NaN;
+}
+
+function getLatestEmaValue(closes, period) {
+  const values = calculateEmaSeries(closes, period);
+  for (let i = values.length - 1; i >= 0; i -= 1) {
+    if (Number.isFinite(values[i])) return values[i];
+  }
+  return NaN;
+}
+
+function calculateEmaSeries(closes, period) {
+  const result = Array(closes.length).fill(NaN);
+  if (!closes.length) return result;
+  const multiplier = 2 / (period + 1);
+  let ema = closes[0];
+  result[0] = ema;
+  for (let i = 1; i < closes.length; i += 1) {
+    ema = closes[i] * multiplier + ema * (1 - multiplier);
+    result[i] = ema;
+  }
+  return result;
 }
 
 function calculateRsiSeries(closes, period) {
@@ -1484,7 +1686,8 @@ function enterPaperTrade() {
   const scenario = tradePlan.scenarios.find((item) => item.side === side) || tradePlan.primary;
   if (!scenario) return;
 
-  const amount = Math.max(10, Number(paperAmount.value) || 1000);
+  const requestedAmount = Math.max(10, Number(paperAmount.value) || 1000);
+  const amount = clampTradeAmountByRisk(requestedAmount, scenario);
   paperAmount.value = String(amount);
   const entry = scenario.entry;
   const quantity = amount / entry;
@@ -1496,12 +1699,16 @@ function enterPaperTrade() {
   const trade = {
     id,
     index: state.paperTrades.length + 1,
+    sessionId: currentSessionId,
     asset: context.asset,
     timeframe: context.timeframe,
     mode: context.mode,
     modeSource: context.modeSource,
     side: scenario.side,
     amount,
+    deposit: context.deposit,
+    riskBudget: getRiskBudget(),
+    riskLimitPct: Math.min(Number(risk.value) || 1, 2),
     entry,
     quantity,
     stop: scenario.stop,
@@ -1545,6 +1752,17 @@ function getOpeningOrderType(side, placedPrice, entry) {
   return isLimitEntry ? "Limit" : "Conditional";
 }
 
+function getRiskBudget() {
+  return getDepositValue() * (Math.min(Number(risk.value) || 1, 2) / 100);
+}
+
+function clampTradeAmountByRisk(requestedAmount, scenario) {
+  const riskPerUnit = Math.abs(scenario.entry - scenario.stop);
+  if (!Number.isFinite(riskPerUnit) || riskPerUnit <= 0) return requestedAmount;
+  const maxAmount = (getRiskBudget() / riskPerUnit) * scenario.entry;
+  return Math.max(10, Math.min(requestedAmount, Math.floor(maxAmount * 100) / 100));
+}
+
 function resetPaperTrade(shouldDraw = true) {
   state.activePaperTradeId = null;
   paperStatus.textContent = "ожидает вход";
@@ -1557,7 +1775,7 @@ function resetPaperTrade(shouldDraw = true) {
 }
 
 function clearPaperJournal() {
-  state.paperTrades = [];
+  state.paperTrades = state.paperTrades.filter((trade) => trade.sessionId !== currentSessionId);
   state.activePaperTradeId = null;
   persistPaperTrades();
   resetPaperTrade(false);
@@ -1767,7 +1985,7 @@ function renderPaperReadout(trade, currentPrice, pnl, pnlPct) {
 }
 
 function renderTradeJournal() {
-  const trades = state.paperTrades;
+  const trades = state.paperTrades.filter((trade) => trade.sessionId === currentSessionId);
   const openTrades = trades.filter((trade) => ["pending", "open"].includes(trade.status));
   const closedTrades = trades.filter((trade) => !["pending", "open"].includes(trade.status));
   const wins = closedTrades.filter((trade) => trade.pnl >= 0);
@@ -1781,7 +1999,7 @@ function renderTradeJournal() {
   journalWinloss.textContent = `${wins.length} / ${losses.length}`;
 
   if (!trades.length) {
-    journalRows.innerHTML = `<tr><td colspan="10">Сделок пока нет</td></tr>`;
+    journalRows.innerHTML = `<tr><td colspan="10">В этой сессии сделок пока нет</td></tr>`;
     return;
   }
 
@@ -1813,6 +2031,45 @@ function renderTradeJournal() {
       updatePaperTrades();
     });
   });
+}
+
+function exportJournalToExcel() {
+  const rows = state.paperTrades.map((trade, index) => ({
+    "#": index + 1,
+    "Сессия": trade.sessionId || "",
+    "Время": formatJournalTime(trade.openedAt),
+    "Монета": trade.asset,
+    "Сторона": trade.side,
+    "Статус": trade.status,
+    "Entry": trade.entry,
+    "Stop": trade.stop,
+    "Target": trade.target,
+    "Сумма USDT": trade.amount,
+    "Депозит": trade.deposit || "",
+    "Риск лимит %": trade.riskLimitPct || "",
+    "Цена выхода": trade.exitPrice || "",
+    "PnL USDT": trade.pnl,
+    "PnL %": trade.pnlPct,
+    "Order ID": trade.openingOrder?.orderId || "",
+    "TP статус": trade.tpOrder?.orderStatus || "",
+    "SL статус": trade.slOrder?.orderStatus || ""
+  }));
+
+  const headers = Object.keys(rows[0] || { "#": "", "Сессия": "", "Время": "", "Монета": "", "Статус": "" });
+  const tableRows = [
+    `<tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr>`,
+    ...rows.map((row) => `<tr>${headers.map((header) => `<td>${escapeHtml(String(row[header] ?? ""))}</td>`).join("")}</tr>`)
+  ].join("");
+  const html = `<!doctype html><html><head><meta charset="utf-8"></head><body><table>${tableRows}</table></body></html>`;
+  const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `crypto-strategy-journal-${new Date().toISOString().slice(0, 10)}.xls`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function formatJournalTime(timestamp) {
@@ -2057,6 +2314,7 @@ function randomizeScenario() {
 }
 
 function updateRiskLabel() {
+  if (Number(risk.value) > 2) risk.value = "2";
   riskValue.textContent = `${Number(risk.value).toFixed(1)}%`;
 }
 
@@ -2089,6 +2347,7 @@ liveToggle.addEventListener("click", () => {
 paperEnter.addEventListener("click", enterPaperTrade);
 paperReset.addEventListener("click", () => resetPaperTrade());
 paperClear.addEventListener("click", clearPaperJournal);
+exportJournal.addEventListener("click", exportJournalToExcel);
 paperSide.addEventListener("change", () => {
   resetPaperTrade();
 });
@@ -2142,9 +2401,16 @@ risk.addEventListener("input", () => {
   generateStrategy();
 });
 
+deposit.addEventListener("input", () => {
+  persistDeposit();
+  generateStrategy(state.lastUserIdea);
+});
+
 renderRules();
 renderSources();
 renderRsiControls();
+renderEmaControls();
+deposit.value = String(loadDeposit());
 updateRiskLabel();
 renderLiveReadout();
 renderTradeJournal();
