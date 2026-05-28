@@ -296,16 +296,26 @@ function getCurrentClientId() {
 }
 
 function loadRemoteJournalConfig() {
+  const sharedConfig = normalizeRemoteJournalConfig(window.BOTALIN_REMOTE_JOURNAL_CONFIG);
   try {
     const saved = JSON.parse(localStorage.getItem(remoteJournalConfigKey));
-    return {
-      url: String(saved?.url || ""),
-      anonKey: String(saved?.anonKey || ""),
-      table: String(saved?.table || "crypto_strategy_trades")
-    };
+    const savedConfig = normalizeRemoteJournalConfig(saved);
+    return isRemoteJournalConfigFilled(savedConfig) ? savedConfig : sharedConfig;
   } catch (error) {
-    return { url: "", anonKey: "", table: "crypto_strategy_trades" };
+    return sharedConfig;
   }
+}
+
+function normalizeRemoteJournalConfig(config = {}) {
+  return {
+    url: String(config?.url || "").trim().replace(/\/$/, ""),
+    anonKey: String(config?.anonKey || "").trim(),
+    table: String(config?.table || "crypto_strategy_trades").trim() || "crypto_strategy_trades"
+  };
+}
+
+function isRemoteJournalConfigFilled(config) {
+  return Boolean(config?.url && config?.anonKey && config?.table);
 }
 
 function createEmptyMarketIntel() {
@@ -669,11 +679,11 @@ function initRemoteJournalControls() {
 }
 
 function saveRemoteJournalConfig() {
-  state.remoteJournal.config = {
-    url: remoteUrl.value.trim().replace(/\/$/, ""),
-    anonKey: remoteKey.value.trim(),
-    table: remoteTable.value.trim() || "crypto_strategy_trades"
-  };
+  state.remoteJournal.config = normalizeRemoteJournalConfig({
+    url: remoteUrl.value,
+    anonKey: remoteKey.value,
+    table: remoteTable.value
+  });
   localStorage.setItem(remoteJournalConfigKey, JSON.stringify(state.remoteJournal.config));
   setRemoteJournalStatus(isRemoteJournalConfigured() ? "saved" : "local");
   syncRemoteJournal(true);
@@ -1145,7 +1155,7 @@ function generateStrategy(userIdea = "") {
   confidence.textContent = `${context.rules.length + context.sourceRules.length} правил учтено`;
   rr.textContent = context.conservative ? "1 : 2.2" : "1 : 1.7";
   maxRisk.textContent = `${context.risk.toFixed(2)}%`;
-  filterCount.textContent = String((context.conservative ? 4 : 3) + context.rsi.filter((indicator) => indicator.use).length + context.ema.filter((indicator) => indicator.use).length);
+  filterCount.textContent = String((context.conservative ? 4 : 3) + context.rsi.filter((indicator) => indicator.use).length + context.ema.filter((indicator) => indicator.use).length + 3);
   renderSignalQualityReadout(signalQuality);
   renderStrategyIntelligence();
   chartLabel.textContent = `${context.asset} · ${context.timeframe}`;
@@ -1233,15 +1243,17 @@ async function refreshSharedLearningMemory(force = false) {
 
 function buildMarketIntelForContext(context, candles, derivatives = null, sentiment = null) {
   const backtest = candles.length ? runStrategyBacktest(candles, context) : null;
+  const marketStructure = candles.length ? analyzeMarketStructure(candles) : null;
   const learning = analyzeLearningJournal(context.asset);
   const monthly = calculateMonthlyGoalProgress();
-  const notes = buildIntelNotes(backtest, derivatives, sentiment, learning, monthly, candles.length);
+  const notes = buildIntelNotes(backtest, derivatives, sentiment, learning, monthly, candles.length, marketStructure);
   return {
     loading: false,
     updatedAt: Date.now(),
     asset: context.asset,
     timeframe: context.timeframe,
     backtest,
+    marketStructure,
     derivatives,
     sentiment,
     learning,
@@ -1320,20 +1332,27 @@ function runStrategyBacktest(candles, context) {
   const ema34 = calculateEmaSeries(closes, 34);
   const ema89 = calculateEmaSeries(closes, 89);
   const rsi14 = calculateRsiSeries(closes, 14);
+  const atr14 = calculateAtrSeries(candles, 14);
+  const adxBundle = calculateAdxSeries(candles, 14);
   const trades = [];
 
   for (let i = 90; i < candles.length - 12; i += 1) {
     const candle = candles[i];
-    const avgRange = average(candles.slice(Math.max(0, i - 20), i).map((item) => (item.high - item.low) / item.close));
-    const riskDistance = Math.max(candle.close * 0.0035, candle.close * Math.max(0.004, Math.min(0.03, avgRange * 1.15)));
+    const structure = getBacktestStructureAt(candles, atr14, adxBundle, i);
+    const atrRiskPct = structure.atrPct ? structure.atrPct / 100 : 0;
+    const riskDistance = Math.max(candle.close * 0.0035, candle.close * Math.max(0.004, Math.min(0.03, atrRiskPct * 1.25)));
     const rr1 = context.conservative ? 1.6 : 1.25;
     const rr2 = context.conservative ? 2.2 : 1.7;
     const candidates = [];
 
-    if (context.includeLongs && candle.close > ema34[i] && ema34[i] > ema89[i] && rsi14[i] >= 42 && rsi14[i] <= 68) {
+    const strongTrend = structure.adx >= 18;
+    const longStructure = structure.plusDi >= structure.minusDi && structure.priceVsVwapPct >= -0.35 && structure.volumeRatio >= 0.75;
+    const shortStructure = structure.minusDi >= structure.plusDi && structure.priceVsVwapPct <= 0.35 && structure.volumeRatio >= 0.75;
+
+    if (context.includeLongs && strongTrend && longStructure && candle.close > ema34[i] && ema34[i] > ema89[i] && rsi14[i] >= 42 && rsi14[i] <= 68) {
       candidates.push({ side: "LONG", entry: candle.close, stop: candle.close - riskDistance, target1: candle.close + riskDistance * rr1, target2: candle.close + riskDistance * rr2 });
     }
-    if (context.includeShorts && candle.close < ema34[i] && ema34[i] < ema89[i] && rsi14[i] >= 32 && rsi14[i] <= 58) {
+    if (context.includeShorts && strongTrend && shortStructure && candle.close < ema34[i] && ema34[i] < ema89[i] && rsi14[i] >= 32 && rsi14[i] <= 58) {
       candidates.push({ side: "SHORT", entry: candle.close, stop: candle.close + riskDistance, target1: candle.close - riskDistance * rr1, target2: candle.close - riskDistance * rr2 });
     }
 
@@ -1387,6 +1406,24 @@ function simulateBacktestTrade(plan, futureCandles) {
     }
   }
   return { side: plan.side, status: partial ? "partial" : "timeout", pnlPct };
+}
+
+function getBacktestStructureAt(candles, atrSeries, adxBundle, index) {
+  const slice = candles.slice(Math.max(0, index - 95), index + 1);
+  const vwap = calculateRollingVwap(slice);
+  const candle = candles[index];
+  const previous = candles.slice(Math.max(0, index - 20), index);
+  const avgVolume = average(previous.map((item) => item.volume));
+  const atr = atrSeries[index];
+  return {
+    adx: Number.isFinite(adxBundle.adx[index]) ? adxBundle.adx[index] : 0,
+    plusDi: Number.isFinite(adxBundle.plusDi[index]) ? adxBundle.plusDi[index] : 0,
+    minusDi: Number.isFinite(adxBundle.minusDi[index]) ? adxBundle.minusDi[index] : 0,
+    atrPct: candle.close > 0 && Number.isFinite(atr) ? (atr / candle.close) * 100 : 0,
+    vwap,
+    priceVsVwapPct: vwap > 0 ? ((candle.close - vwap) / vwap) * 100 : 0,
+    volumeRatio: avgVolume > 0 ? candle.volume / avgVolume : 1
+  };
 }
 
 function calculateMaxDrawdown(equity) {
@@ -1467,11 +1504,40 @@ function calculateMonthlyGoalProgress() {
   };
 }
 
-function buildIntelNotes(backtest, derivatives, sentiment, learning, monthly, candleCount) {
+function analyzeMarketStructure(candles) {
+  const closes = candles.map((candle) => candle.close);
+  const atrSeries = calculateAtrSeries(candles, 14);
+  const adxBundle = calculateAdxSeries(candles, 14);
+  const last = candles[candles.length - 1];
+  const atr = getLatestFiniteValue(atrSeries);
+  const adx = getLatestFiniteValue(adxBundle.adx);
+  const plusDi = getLatestFiniteValue(adxBundle.plusDi);
+  const minusDi = getLatestFiniteValue(adxBundle.minusDi);
+  const vwap = calculateRollingVwap(candles.slice(-96));
+  const volumeWindow = candles.slice(-21, -1);
+  const avgVolume = average(volumeWindow.map((candle) => candle.volume));
+  const volumeRatio = avgVolume > 0 ? last.volume / avgVolume : 1;
+  return {
+    adx: Number.isFinite(adx) ? adx : 0,
+    plusDi: Number.isFinite(plusDi) ? plusDi : 0,
+    minusDi: Number.isFinite(minusDi) ? minusDi : 0,
+    atr,
+    atrPct: last.close > 0 && Number.isFinite(atr) ? (atr / last.close) * 100 : 0,
+    vwap,
+    priceVsVwapPct: vwap > 0 ? ((last.close - vwap) / vwap) * 100 : 0,
+    volumeRatio: Number.isFinite(volumeRatio) ? volumeRatio : 1,
+    lastClose: last.close,
+    ema34: getLatestEmaValue(closes, 34),
+    ema89: getLatestEmaValue(closes, 89)
+  };
+}
+
+function buildIntelNotes(backtest, derivatives, sentiment, learning, monthly, candleCount, marketStructure = null) {
   const notes = [];
   const journalScope = isRemoteJournalConfigured() ? "общий" : "локальный";
   notes.push(candleCount ? `Бэктест рассчитан по ${candleCount} свечам Bybit.` : "Bybit-история временно недоступна, бэктест не обновлен.");
   if (backtest) notes.push(`Бэктест winrate ${backtest.winRate.toFixed(0)}% при цели не ниже ${targetWinRatePct}%, матожидание ${backtest.expectancyPct >= 0 ? "+" : ""}${backtest.expectancyPct.toFixed(2)}% на сделку, просадка ${backtest.maxDrawdownPct.toFixed(2)}%.`);
+  if (marketStructure) notes.push(`Структура рынка: ADX ${marketStructure.adx.toFixed(0)}, ATR ${marketStructure.atrPct.toFixed(2)}%, цена ${marketStructure.priceVsVwapPct >= 0 ? "выше" : "ниже"} VWAP на ${Math.abs(marketStructure.priceVsVwapPct).toFixed(2)}%, объем x${marketStructure.volumeRatio.toFixed(2)}.`);
   if (derivatives) notes.push(`${derivatives.bias}.`);
   else notes.push("Деривативные данные недоступны для этой пары или временно не ответили.");
   if (sentiment) notes.push(`Fear & Greed: ${sentiment.value} (${sentiment.label}).`);
@@ -1563,6 +1629,15 @@ function evaluateAutopilotQualityGate(context, signalQuality, intel) {
   if (backtest.winRate < targetWinRatePct) return { ok: false, reason: `бэктест winrate ${backtest.winRate.toFixed(0)}% ниже ${targetWinRatePct}%`, score: best.score - 50 };
   if (backtest.expectancyPct <= 0) return { ok: false, reason: `матожидание ${backtest.expectancyPct.toFixed(2)}% не положительное`, score: best.score - 45 };
   if (backtest.maxDrawdownPct > 4.5) return { ok: false, reason: `просадка ${backtest.maxDrawdownPct.toFixed(2)}% выше лимита`, score: best.score - 35 };
+  if (intel?.marketStructure?.adx < 18 && (context.mode === "trend" || context.mode === "breakout")) {
+    return { ok: false, reason: `ADX ${intel.marketStructure.adx.toFixed(0)} слабый для ${modeLabel(context.mode)}`, score: best.score - 30 };
+  }
+  if (intel?.marketStructure?.volumeRatio < 1 && context.mode === "breakout") {
+    return { ok: false, reason: "пробой без повышенного объема", score: best.score - 28 };
+  }
+  if (intel?.marketStructure?.atrPct > 4.5) {
+    return { ok: false, reason: `ATR ${intel.marketStructure.atrPct.toFixed(2)}% выше лимита умеренного риска`, score: best.score - 30 };
+  }
   if (pattern?.trades >= 3 && pattern.winRate < targetWinRatePct) {
     return { ok: false, reason: `журнал связки ${pattern.winRate.toFixed(0)}% ниже ${targetWinRatePct}%`, score: best.score - 40 };
   }
@@ -1850,6 +1925,8 @@ function evaluateScenarioQuality(context, scenario) {
   addScore(rsiResult.delta, rsiResult.reason);
   const emaResult = evaluateEmaForScenario(context, scenario.side);
   addScore(emaResult.delta, emaResult.reason);
+  const structureResult = evaluateMarketStructureForScenario(context, scenario);
+  addScore(structureResult.delta, structureResult.reason);
 
   const finalScore = Math.max(0, Math.min(100, Math.round(score)));
   const decision = finalScore >= 80
@@ -1926,6 +2003,60 @@ function evaluateIntelForScenario(context, scenario) {
   }
 
   return { delta, reason: reasons.join("; ") || "лабораторные фильтры еще не накопили данных" };
+}
+
+function evaluateMarketStructureForScenario(context, scenario) {
+  const structure = context.intel?.marketStructure;
+  if (!structure) return { delta: -2, reason: "ADX/ATR/VWAP еще не рассчитаны" };
+
+  let delta = 0;
+  const reasons = [];
+  const trendAligned = scenario.side === "LONG"
+    ? structure.plusDi >= structure.minusDi
+    : structure.minusDi >= structure.plusDi;
+  const vwapAligned = scenario.side === "LONG"
+    ? structure.priceVsVwapPct >= -0.25
+    : structure.priceVsVwapPct <= 0.25;
+
+  if (structure.adx >= 25 && trendAligned) {
+    delta += 8;
+    reasons.push("ADX подтверждает силу направления");
+  } else if (structure.adx < 18 && (context.mode === "trend" || context.mode === "breakout")) {
+    delta -= 8;
+    reasons.push("ADX слабый для трендового входа");
+  } else if (!trendAligned) {
+    delta -= 6;
+    reasons.push("DI-линии спорят со стороной сделки");
+  } else {
+    delta += 2;
+    reasons.push("ADX нейтральный, но направление не конфликтует");
+  }
+
+  if (vwapAligned) {
+    delta += 4;
+    reasons.push("цена не конфликтует с VWAP");
+  } else {
+    delta -= 6;
+    reasons.push("цена по VWAP против выбранной стороны");
+  }
+
+  if (structure.volumeRatio >= 1.2) {
+    delta += 4;
+    reasons.push("объем выше среднего");
+  } else if (context.mode === "breakout" && structure.volumeRatio < 1) {
+    delta -= 6;
+    reasons.push("пробой без объема рискован");
+  }
+
+  if (structure.atrPct > 4.5) {
+    delta -= 7;
+    reasons.push("ATR слишком высокий для умеренного риска");
+  } else if (structure.atrPct >= 0.35) {
+    delta += 2;
+    reasons.push("ATR достаточный для движения");
+  }
+
+  return { delta, reason: reasons.join("; ") };
 }
 
 function evaluateEmaForScenario(context, side) {
@@ -2270,6 +2401,10 @@ function getLatestRsiValue(candles, period) {
 
 function getLatestEmaValue(closes, period) {
   const values = calculateEmaSeries(closes, period);
+  return getLatestFiniteValue(values);
+}
+
+function getLatestFiniteValue(values) {
   for (let i = values.length - 1; i >= 0; i -= 1) {
     if (Number.isFinite(values[i])) return values[i];
   }
@@ -2315,6 +2450,91 @@ function calculateRsiSeries(closes, period) {
   }
 
   return result;
+}
+
+function calculateAtrSeries(candles, period = 14) {
+  const result = Array(candles.length).fill(NaN);
+  if (candles.length <= period) return result;
+  const trueRanges = candles.map((candle, index) => {
+    if (index === 0) return candle.high - candle.low;
+    const previousClose = candles[index - 1].close;
+    return Math.max(
+      candle.high - candle.low,
+      Math.abs(candle.high - previousClose),
+      Math.abs(candle.low - previousClose)
+    );
+  });
+  let atr = average(trueRanges.slice(1, period + 1));
+  result[period] = atr;
+  for (let i = period + 1; i < candles.length; i += 1) {
+    atr = (atr * (period - 1) + trueRanges[i]) / period;
+    result[i] = atr;
+  }
+  return result;
+}
+
+function calculateAdxSeries(candles, period = 14) {
+  const adx = Array(candles.length).fill(NaN);
+  const plusDi = Array(candles.length).fill(NaN);
+  const minusDi = Array(candles.length).fill(NaN);
+  if (candles.length <= period * 2) return { adx, plusDi, minusDi };
+
+  const trueRanges = Array(candles.length).fill(0);
+  const plusDm = Array(candles.length).fill(0);
+  const minusDm = Array(candles.length).fill(0);
+  for (let i = 1; i < candles.length; i += 1) {
+    const current = candles[i];
+    const previous = candles[i - 1];
+    const upMove = current.high - previous.high;
+    const downMove = previous.low - current.low;
+    trueRanges[i] = Math.max(
+      current.high - current.low,
+      Math.abs(current.high - previous.close),
+      Math.abs(current.low - previous.close)
+    );
+    plusDm[i] = upMove > downMove && upMove > 0 ? upMove : 0;
+    minusDm[i] = downMove > upMove && downMove > 0 ? downMove : 0;
+  }
+
+  let smoothedTr = sumValues(trueRanges.slice(1, period + 1));
+  let smoothedPlus = sumValues(plusDm.slice(1, period + 1));
+  let smoothedMinus = sumValues(minusDm.slice(1, period + 1));
+  const dx = Array(candles.length).fill(NaN);
+
+  for (let i = period; i < candles.length; i += 1) {
+    if (i > period) {
+      smoothedTr = smoothedTr - smoothedTr / period + trueRanges[i];
+      smoothedPlus = smoothedPlus - smoothedPlus / period + plusDm[i];
+      smoothedMinus = smoothedMinus - smoothedMinus / period + minusDm[i];
+    }
+    plusDi[i] = smoothedTr > 0 ? (smoothedPlus / smoothedTr) * 100 : 0;
+    minusDi[i] = smoothedTr > 0 ? (smoothedMinus / smoothedTr) * 100 : 0;
+    const directionalSum = plusDi[i] + minusDi[i];
+    dx[i] = directionalSum > 0 ? Math.abs(plusDi[i] - minusDi[i]) / directionalSum * 100 : 0;
+  }
+
+  let adxValue = average(dx.slice(period, period * 2).filter(Number.isFinite));
+  adx[period * 2 - 1] = adxValue;
+  for (let i = period * 2; i < candles.length; i += 1) {
+    adxValue = (adxValue * (period - 1) + dx[i]) / period;
+    adx[i] = adxValue;
+  }
+  return { adx, plusDi, minusDi };
+}
+
+function calculateRollingVwap(candles) {
+  const totals = candles.reduce((acc, candle) => {
+    const typicalPrice = (candle.high + candle.low + candle.close) / 3;
+    const volume = Number(candle.volume) || 0;
+    acc.priceVolume += typicalPrice * volume;
+    acc.volume += volume;
+    return acc;
+  }, { priceVolume: 0, volume: 0 });
+  return totals.volume > 0 ? totals.priceVolume / totals.volume : 0;
+}
+
+function sumValues(values) {
+  return values.reduce((sum, value) => sum + (Number(value) || 0), 0);
 }
 
 function describeRsiSignal(value, context) {
@@ -2595,6 +2815,7 @@ function createStrategySnapshot(context, tradePlan, scenario, quality, options =
     },
     intelligence: {
       backtest: context.intel?.backtest || null,
+      marketStructure: context.intel?.marketStructure || null,
       derivatives: context.intel?.derivatives || null,
       sentiment: context.intel?.sentiment || null,
       learning: context.intel?.learning || null,
