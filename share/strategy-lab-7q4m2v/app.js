@@ -7,6 +7,7 @@ const autopilotKey = "crypto-strategy-bot-autopilot-v1";
 const currentSessionId = getCurrentSessionId();
 const autopilotMinScore = 74;
 const autopilotScanMs = 30000;
+const targetWinRatePct = 60;
 const emaProfiles = [
   { id: "ema-34", label: "EMA 34", period: 34, color: "#c084fc", role: "быстрая EMA из чисел Фибоначчи: фильтр импульса и отката." },
   { id: "ema-89", label: "EMA 89", period: 89, color: "#38bdf8", role: "медленная EMA из чисел Фибоначчи: фильтр старшего направления." }
@@ -1326,8 +1327,40 @@ function analyzeLearningJournal(symbol = null) {
     closedTrades: closed.length,
     winRate: closed.length ? (wins / closed.length) * 100 : 0,
     sideStats,
+    patternStats: buildLearningPatternStats(closed),
     bestPattern
   };
+}
+
+function buildLearningPatternStats(trades) {
+  const stats = {};
+  trades.forEach((trade) => {
+    const key = getLearningPatternKey(trade.asset, trade.timeframe, trade.side);
+    stats[key] ||= {
+      key,
+      asset: trade.asset,
+      timeframe: trade.timeframe,
+      side: trade.side,
+      trades: 0,
+      wins: 0,
+      losses: 0,
+      pnl: 0
+    };
+    stats[key].trades += 1;
+    stats[key].pnl += Number(trade.pnl) || 0;
+    if ((Number(trade.pnl) || 0) > 0) stats[key].wins += 1;
+    else stats[key].losses += 1;
+  });
+
+  Object.values(stats).forEach((item) => {
+    item.winRate = item.trades ? (item.wins / item.trades) * 100 : 0;
+    item.avgPnl = item.trades ? item.pnl / item.trades : 0;
+  });
+  return stats;
+}
+
+function getLearningPatternKey(symbol, interval, side) {
+  return `${symbol || "unknown"}|${interval || "unknown"}|${side || "unknown"}`;
 }
 
 function calculateMonthlyGoalProgress() {
@@ -1348,11 +1381,11 @@ function calculateMonthlyGoalProgress() {
 function buildIntelNotes(backtest, derivatives, sentiment, learning, monthly, candleCount) {
   const notes = [];
   notes.push(candleCount ? `Бэктест рассчитан по ${candleCount} свечам Bybit.` : "Bybit-история временно недоступна, бэктест не обновлен.");
-  if (backtest) notes.push(`Матожидание ${backtest.expectancyPct >= 0 ? "+" : ""}${backtest.expectancyPct.toFixed(2)}% на сделку, просадка ${backtest.maxDrawdownPct.toFixed(2)}%.`);
+  if (backtest) notes.push(`Бэктест winrate ${backtest.winRate.toFixed(0)}% при цели не ниже ${targetWinRatePct}%, матожидание ${backtest.expectancyPct >= 0 ? "+" : ""}${backtest.expectancyPct.toFixed(2)}% на сделку, просадка ${backtest.maxDrawdownPct.toFixed(2)}%.`);
   if (derivatives) notes.push(`${derivatives.bias}.`);
   else notes.push("Деривативные данные недоступны для этой пары или временно не ответили.");
   if (sentiment) notes.push(`Fear & Greed: ${sentiment.value} (${sentiment.label}).`);
-  if (learning) notes.push(`Журнал: ${learning.closedTrades} закрытых сделок, winrate ${learning.winRate.toFixed(0)}%.`);
+  if (learning) notes.push(`Журнал этой пары: ${learning.closedTrades} закрытых сделок, winrate ${learning.winRate.toFixed(0)}%. Связки ниже 60% авто-бот блокирует после накопления статистики.`);
   if (monthly) notes.push(`До цели 10%/мес: ${monthly.remainingPct.toFixed(2)}% от депозита.`);
   notes.push("CoinGlass-ликвидации можно подключить отдельным ключом API: сейчас бот готов учитывать этот слой, но не хранит ключи в коде.");
   return notes;
@@ -1418,13 +1451,44 @@ function scoreAutopilotCandidate(context, tradePlan, signalQuality, intel) {
   if (!best) return -Infinity;
   const backtest = intel?.backtest;
   const monthly = intel?.monthlyGoal;
+  const gate = evaluateAutopilotQualityGate(context, signalQuality, intel);
+  if (!gate.ok) return gate.score;
   let score = best.score;
-  if (backtest?.trades >= 8) score += Math.max(-14, Math.min(12, backtest.expectancyPct * 18));
-  if (backtest?.maxDrawdownPct > 6) score -= 8;
+  if (backtest?.trades >= 8) score += Math.max(-8, Math.min(16, backtest.expectancyPct * 20));
+  if (backtest?.winRate >= targetWinRatePct) score += 8;
+  if (backtest?.maxDrawdownPct > 4.5) score -= 8;
   if (monthly?.currentPct < -6) score -= 10;
   if (intel?.derivatives?.sideBias === "CAUTION") score -= 6;
   if (intel?.derivatives?.sideBias === best.side) score += 4;
   return Math.round(score);
+}
+
+function evaluateAutopilotQualityGate(context, signalQuality, intel) {
+  const best = signalQuality?.best;
+  const backtest = intel?.backtest;
+  const pattern = getLearningPatternStat(context.asset, context.timeframe, best?.side);
+  if (!best) return { ok: false, reason: "нет сигнала", score: -Infinity };
+  if (best.score < autopilotMinScore) return { ok: false, reason: `score ${best.score}/100 ниже ${autopilotMinScore}`, score: best.score - 100 };
+  if (!backtest || backtest.trades < 12) return { ok: false, reason: "недостаточно сделок в бэктесте", score: best.score - 60 };
+  if (backtest.winRate < targetWinRatePct) return { ok: false, reason: `бэктест winrate ${backtest.winRate.toFixed(0)}% ниже ${targetWinRatePct}%`, score: best.score - 50 };
+  if (backtest.expectancyPct <= 0) return { ok: false, reason: `матожидание ${backtest.expectancyPct.toFixed(2)}% не положительное`, score: best.score - 45 };
+  if (backtest.maxDrawdownPct > 4.5) return { ok: false, reason: `просадка ${backtest.maxDrawdownPct.toFixed(2)}% выше лимита`, score: best.score - 35 };
+  if (pattern?.trades >= 3 && pattern.winRate < targetWinRatePct) {
+    return { ok: false, reason: `журнал связки ${pattern.winRate.toFixed(0)}% ниже ${targetWinRatePct}%`, score: best.score - 40 };
+  }
+  if (pattern?.trades >= 3 && pattern.avgPnl <= 0) {
+    return { ok: false, reason: "журнал связки имеет отрицательный средний PnL", score: best.score - 35 };
+  }
+  if (intel?.derivatives?.sideBias === "CAUTION") return { ok: false, reason: "деривативы показывают перегрев", score: best.score - 25 };
+  if (intel?.sentiment?.value >= 82 && best.side === "LONG") return { ok: false, reason: "экстремальная жадность блокирует late long", score: best.score - 20 };
+  if (intel?.sentiment?.value <= 18 && best.side === "SHORT") return { ok: false, reason: "экстремальный страх блокирует late short", score: best.score - 20 };
+  return { ok: true, reason: "фильтры 60% пройдены", score: best.score };
+}
+
+function getLearningPatternStat(symbol, interval, side) {
+  if (!symbol || !interval || !side) return null;
+  const learning = analyzeLearningJournal(symbol);
+  return learning.patternStats[getLearningPatternKey(symbol, interval, side)] || null;
 }
 
 function toggleAutopilot() {
@@ -1483,8 +1547,9 @@ async function runAutopilotScan(force = false) {
     state.autopilot.lastEntryAt = Date.now();
     state.autopilot.lastMessage = trade ? `вошел: ${trade.side} ${trade.asset} ${trade.timeframe}` : "сигнал был, вход не создан";
   } else {
+    const gate = bestCandidate ? evaluateAutopilotQualityGate(bestCandidate.context, bestCandidate.signalQuality, bestCandidate.intel) : null;
     state.autopilot.lastMessage = bestCandidate
-      ? `лучший: ${bestCandidate.context.asset} ${bestCandidate.context.timeframe} ${bestCandidate.autopilotScore}/100, минимум ${autopilotMinScore}`
+      ? `лучший: ${bestCandidate.context.asset} ${bestCandidate.context.timeframe} ${bestCandidate.autopilotScore}/100, вход запрещен: ${gate?.reason || "фильтр"}`
       : "нет монет без активной сделки";
   }
 
@@ -3016,6 +3081,8 @@ function exportJournalToExcel() {
     "Цена выхода": trade.exitPrice || "",
     "PnL USDT": trade.pnl,
     "PnL %": trade.pnlPct,
+    "Win/Loss": Number(trade.pnl) > 0 ? "WIN" : !isPaperTradeActive(trade) ? "LOSS" : "",
+    "Pattern": getLearningPatternKey(trade.asset, trade.timeframe, trade.side),
     "Стратегия сохранена": trade.strategySnapshot ? "да" : "нет",
     "Стратегия текст": trade.strategySnapshot?.strategyText || "",
     "Контекст стратегии JSON": trade.strategySnapshot ? JSON.stringify(trade.strategySnapshot) : "",
