@@ -170,6 +170,29 @@
 
         <section class="panel-section">
           <div class="section-title">
+            <span>Общий журнал</span>
+            <span class="mini-counter" data-remote-status>local</span>
+          </div>
+          <label>
+            Supabase URL
+            <input id="remoteUrl" type="url" placeholder="https://project.supabase.co">
+          </label>
+          <label>
+            Anon key
+            <input id="remoteKey" type="password" placeholder="public anon key">
+          </label>
+          <label>
+            Таблица
+            <input id="remoteTable" type="text" value="crypto_strategy_trades">
+          </label>
+          <div class="remote-actions">
+            <button class="primary-action" type="button" data-remote-save>Сохранить</button>
+            <button class="secondary-action" type="button" data-remote-sync>Синхронизировать</button>
+          </div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-title">
             <span>Обучающая база</span>
             <button class="text-button" type="button" data-reset-training>Сброс</button>
           </div>

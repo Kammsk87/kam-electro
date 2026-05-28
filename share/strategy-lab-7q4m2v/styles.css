@@ -555,6 +555,12 @@ canvas {
   align-items: center;
 }
 
+.remote-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
 .journal-summary div {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;

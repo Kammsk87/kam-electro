@@ -3,8 +3,11 @@ const paperJournalKey = "crypto-strategy-bot-paper-journal-v1";
 const paperSessionKey = "crypto-strategy-bot-session-id";
 const depositKey = "crypto-strategy-bot-deposit-v1";
 const autopilotKey = "crypto-strategy-bot-autopilot-v1";
+const remoteJournalConfigKey = "crypto-strategy-bot-remote-journal-v1";
+const remoteClientIdKey = "crypto-strategy-bot-client-id";
 
 const currentSessionId = getCurrentSessionId();
+const currentClientId = getCurrentClientId();
 const autopilotMinScore = 74;
 const autopilotScanMs = 30000;
 const targetWinRatePct = 60;
@@ -283,6 +286,28 @@ function getCurrentSessionId() {
   return sessionId;
 }
 
+function getCurrentClientId() {
+  let clientId = localStorage.getItem(remoteClientIdKey);
+  if (!clientId) {
+    clientId = `client-${Date.now()}-${Math.round(Math.random() * 100000)}`;
+    localStorage.setItem(remoteClientIdKey, clientId);
+  }
+  return clientId;
+}
+
+function loadRemoteJournalConfig() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(remoteJournalConfigKey));
+    return {
+      url: String(saved?.url || ""),
+      anonKey: String(saved?.anonKey || ""),
+      table: String(saved?.table || "crypto_strategy_trades")
+    };
+  } catch (error) {
+    return { url: "", anonKey: "", table: "crypto_strategy_trades" };
+  }
+}
+
 function createEmptyMarketIntel() {
   return {
     loading: false,
@@ -320,6 +345,12 @@ const state = {
   activePaperTradeId: null,
   paperPriceCache: {},
   paperPriceLastFetch: 0,
+  remoteJournal: {
+    config: loadRemoteJournalConfig(),
+    syncing: false,
+    lastSyncAt: 0,
+    status: "local"
+  },
   marketIntel: createEmptyMarketIntel(),
   autopilot: loadAutopilotState(),
   emaPreferences: {},
@@ -384,6 +415,12 @@ const liveBook = document.querySelector("[data-live-book]");
 const liveSpread = document.querySelector("[data-live-spread]");
 const liveVolume = document.querySelector("[data-live-volume]");
 const liveUpdated = document.querySelector("[data-live-updated]");
+const remoteUrl = document.querySelector("#remoteUrl");
+const remoteKey = document.querySelector("#remoteKey");
+const remoteTable = document.querySelector("#remoteTable");
+const remoteStatus = document.querySelector("[data-remote-status]");
+const remoteSave = document.querySelector("[data-remote-save]");
+const remoteSync = document.querySelector("[data-remote-sync]");
 const paperCanvas = document.querySelector("#paperChart");
 const paperCtx = paperCanvas.getContext("2d");
 const paperAmount = document.querySelector("#paperAmount");
@@ -598,6 +635,7 @@ function persist() {
 
 function persistPaperTrades() {
   localStorage.setItem(paperJournalKey, JSON.stringify({ trades: state.paperTrades }));
+  scheduleRemoteJournalSync();
 }
 
 function loadDeposit() {
@@ -612,6 +650,39 @@ function persistDeposit() {
 function getDepositValue() {
   const value = Number(deposit.value);
   return Number.isFinite(value) && value > 0 ? value : 10000;
+}
+
+function initRemoteJournalControls() {
+  const config = state.remoteJournal.config;
+  remoteUrl.value = config.url;
+  remoteKey.value = config.anonKey;
+  remoteTable.value = config.table || "crypto_strategy_trades";
+  renderRemoteJournalStatus();
+}
+
+function saveRemoteJournalConfig() {
+  state.remoteJournal.config = {
+    url: remoteUrl.value.trim().replace(/\/$/, ""),
+    anonKey: remoteKey.value.trim(),
+    table: remoteTable.value.trim() || "crypto_strategy_trades"
+  };
+  localStorage.setItem(remoteJournalConfigKey, JSON.stringify(state.remoteJournal.config));
+  setRemoteJournalStatus(isRemoteJournalConfigured() ? "saved" : "local");
+  syncRemoteJournal(true);
+}
+
+function isRemoteJournalConfigured() {
+  const config = state.remoteJournal.config;
+  return Boolean(config.url && config.anonKey && config.table);
+}
+
+function renderRemoteJournalStatus() {
+  remoteStatus.textContent = state.remoteJournal.status;
+}
+
+function setRemoteJournalStatus(status) {
+  state.remoteJournal.status = status;
+  renderRemoteJournalStatus();
 }
 
 function renderRules() {
@@ -2610,6 +2681,117 @@ function clearPaperJournal() {
   drawPaperChart();
 }
 
+let remoteSyncTimer = null;
+
+function scheduleRemoteJournalSync() {
+  if (!isRemoteJournalConfigured()) return;
+  if (state.remoteJournal.syncing) return;
+  window.clearTimeout(remoteSyncTimer);
+  remoteSyncTimer = window.setTimeout(() => syncRemoteJournal(false), 1200);
+}
+
+async function syncRemoteJournal(force = false) {
+  if (!isRemoteJournalConfigured() || state.remoteJournal.syncing) {
+    renderRemoteJournalStatus();
+    return;
+  }
+  if (!force && Date.now() - state.remoteJournal.lastSyncAt < 12000) return;
+
+  state.remoteJournal.syncing = true;
+  setRemoteJournalStatus("sync");
+  try {
+    await pushRemoteJournalTrades();
+    const remoteTrades = await fetchRemoteJournalTrades();
+    mergeRemoteJournalTrades(remoteTrades);
+    state.remoteJournal.lastSyncAt = Date.now();
+    setRemoteJournalStatus(`ok ${state.paperTrades.length}`);
+    localStorage.setItem(paperJournalKey, JSON.stringify({ trades: state.paperTrades }));
+    renderTradeJournal();
+    updatePaperTrades();
+  } catch (error) {
+    setRemoteJournalStatus("error");
+  } finally {
+    state.remoteJournal.syncing = false;
+  }
+}
+
+async function pushRemoteJournalTrades() {
+  const rows = state.paperTrades.map((trade) => ({
+    id: trade.id,
+    client_id: currentClientId,
+    session_id: trade.sessionId,
+    asset: trade.asset,
+    timeframe: trade.timeframe,
+    side: trade.side,
+    status: trade.status,
+    opened_at: toIsoOrNull(trade.openedAt),
+    closed_at: toIsoOrNull(trade.closedAt),
+    updated_at: toIsoOrNull(getTradeUpdatedAt(trade)),
+    pnl: Number(trade.pnl) || 0,
+    trade
+  }));
+  if (!rows.length) return;
+  await remoteJournalFetch(`/${encodeURIComponent(state.remoteJournal.config.table)}?on_conflict=id`, {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify(rows)
+  });
+}
+
+async function fetchRemoteJournalTrades() {
+  const table = encodeURIComponent(state.remoteJournal.config.table);
+  const rows = await remoteJournalFetch(`/${table}?select=*&order=updated_at.desc&limit=5000`);
+  return Array.isArray(rows) ? rows.map((row) => row.trade).filter(Boolean) : [];
+}
+
+async function remoteJournalFetch(path, options = {}) {
+  const config = state.remoteJournal.config;
+  const response = await fetch(`${config.url}/rest/v1${path}`, {
+    ...options,
+    headers: {
+      apikey: config.anonKey,
+      Authorization: `Bearer ${config.anonKey}`,
+      "Content-Type": "application/json",
+      ...(options.headers || {})
+    }
+  });
+  if (!response.ok) throw new Error("Remote journal request failed");
+  if (response.status === 204) return null;
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
+}
+
+function mergeRemoteJournalTrades(remoteTrades) {
+  const byId = new Map(state.paperTrades.map((trade) => [trade.id, trade]));
+  remoteTrades.forEach((trade) => {
+    const normalized = normalizePaperTrade(trade);
+    if (!normalized) return;
+    const local = byId.get(normalized.id);
+    if (!local || getTradeUpdatedAt(normalized) >= getTradeUpdatedAt(local)) {
+      byId.set(normalized.id, normalized);
+    }
+  });
+  state.paperTrades = [...byId.values()].sort((a, b) => (Number(a.openedAt) || 0) - (Number(b.openedAt) || 0));
+}
+
+function getTradeUpdatedAt(trade) {
+  const historyTime = Array.isArray(trade.history) && trade.history.length ? Number(trade.history[trade.history.length - 1].time) || 0 : 0;
+  return Math.max(
+    Number(trade.updatedAt) || 0,
+    Number(trade.closedAt) || 0,
+    Number(trade.target1HitAt) || 0,
+    Number(trade.filledAt) || 0,
+    Number(trade.lastCheckedAt) || 0,
+    historyTime,
+    Number(trade.openedAt) || 0
+  );
+}
+
+function toIsoOrNull(timestamp) {
+  const value = Number(timestamp);
+  return Number.isFinite(value) && value > 0 ? new Date(value).toISOString() : null;
+}
+
 function updatePaperTrades() {
   if (!state.paperTrades.length) {
     renderTradeJournal();
@@ -3389,6 +3571,8 @@ paperClear.addEventListener("click", clearPaperJournal);
 exportJournal.addEventListener("click", exportJournalToExcel);
 intelRefresh.addEventListener("click", () => refreshStrategyIntelligence(true));
 autopilotToggle.addEventListener("click", toggleAutopilot);
+remoteSave.addEventListener("click", saveRemoteJournalConfig);
+remoteSync.addEventListener("click", () => syncRemoteJournal(true));
 paperSide.addEventListener("change", () => {
   resetPaperTrade();
 });
@@ -3454,6 +3638,7 @@ renderRules();
 renderSources();
 renderRsiControls();
 renderEmaControls();
+initRemoteJournalControls();
 deposit.value = String(loadDeposit());
 updateRiskLabel();
 renderLiveReadout();
@@ -3461,8 +3646,10 @@ renderTradeJournal();
 generateStrategy();
 refreshStrategyIntelligence(false);
 refreshOpenPaperTradePrices(true);
+syncRemoteJournal(true);
 window.setInterval(() => refreshOpenPaperTradePrices(), 10000);
 window.setInterval(() => runAutopilotScan(), autopilotScanMs);
+window.setInterval(() => syncRemoteJournal(false), 30000);
 
 function startLiveConnection() {
   state.live.enabled = true;
