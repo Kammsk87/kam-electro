@@ -413,6 +413,58 @@
                 </table>
               </div>
             </div>
+
+            <div class="trade-archive">
+              <div class="output-header">
+                <span>Все операции</span>
+                <div class="journal-actions">
+                  <button class="text-button" type="button" data-archive-refresh>Обновить</button>
+                  <button class="text-button" type="button" data-archive-toggle>Показать</button>
+                </div>
+              </div>
+              <div class="journal-summary archive-summary">
+                <div>
+                  <span>Всего</span>
+                  <strong data-archive-total>0</strong>
+                </div>
+                <div>
+                  <span>Ручные</span>
+                  <strong data-archive-manual>0</strong>
+                </div>
+                <div>
+                  <span>Авто</span>
+                  <strong data-archive-auto>0</strong>
+                </div>
+                <div>
+                  <span>Итог PnL</span>
+                  <strong data-archive-pnl>0.00 USDT</strong>
+                </div>
+              </div>
+              <div class="journal-table-wrap archive-table-wrap" data-archive-panel hidden>
+                <table class="journal-table archive-table">
+                  <thead>
+                    <tr>
+                      <th>№</th>
+                      <th>Дата</th>
+                      <th>Источник</th>
+                      <th>Монета</th>
+                      <th>ТФ</th>
+                      <th>L/S</th>
+                      <th>Entry</th>
+                      <th>Выход / текущая</th>
+                      <th>Profit USDT</th>
+                      <th>Profit %</th>
+                      <th>Статус</th>
+                    </tr>
+                  </thead>
+                  <tbody data-archive-rows>
+                    <tr>
+                      <td colspan="11">Архив пока пуст</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </section>
 

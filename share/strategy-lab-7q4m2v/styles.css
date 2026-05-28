@@ -534,12 +534,17 @@ canvas {
   font-size: 12px;
 }
 
-.trade-journal {
+.trade-journal,
+.trade-archive {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   padding: 10px;
   background: rgba(23, 27, 31, 0.88);
   box-shadow: var(--shadow);
+}
+
+.trade-archive {
+  margin-top: 8px;
 }
 
 .journal-summary {
@@ -590,11 +595,23 @@ canvas {
   overflow-y: auto;
 }
 
+.archive-table-wrap {
+  max-height: 168px;
+}
+
+.archive-table-wrap[hidden] {
+  display: none;
+}
+
 .journal-table {
   width: 100%;
   min-width: 920px;
   border-collapse: collapse;
   font-size: 11px;
+}
+
+.archive-table {
+  min-width: 1080px;
 }
 
 .journal-table th,
@@ -631,7 +648,8 @@ canvas {
 }
 
 .side-badge,
-.status-badge {
+.status-badge,
+.source-badge {
   display: inline-flex;
   align-items: center;
   min-height: 18px;
@@ -662,6 +680,16 @@ canvas {
 .status-badge.partial {
   color: #07111e;
   background: var(--accent);
+}
+
+.source-badge.manual {
+  color: #07111e;
+  background: rgba(109, 168, 255, 0.86);
+}
+
+.source-badge.auto {
+  color: #110d05;
+  background: var(--accent-2);
 }
 
 .live-readout {
@@ -1030,7 +1058,8 @@ canvas {
     font-size: 11px;
   }
 
-  .trade-journal {
+  .trade-journal,
+  .trade-archive {
     padding: 7px;
   }
 
@@ -1054,7 +1083,8 @@ canvas {
   }
 
   .side-badge,
-  .status-badge {
+  .status-badge,
+  .source-badge {
     min-height: 16px;
     padding: 0 5px;
     font-size: 10px;

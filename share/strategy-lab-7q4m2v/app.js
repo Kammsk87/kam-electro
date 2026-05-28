@@ -439,6 +439,14 @@ const journalOpen = document.querySelector("[data-journal-open]");
 const journalClosed = document.querySelector("[data-journal-closed]");
 const journalPnl = document.querySelector("[data-journal-pnl]");
 const journalWinloss = document.querySelector("[data-journal-winloss]");
+const archiveToggle = document.querySelector("[data-archive-toggle]");
+const archiveRefresh = document.querySelector("[data-archive-refresh]");
+const archivePanel = document.querySelector("[data-archive-panel]");
+const archiveRows = document.querySelector("[data-archive-rows]");
+const archiveTotal = document.querySelector("[data-archive-total]");
+const archiveManual = document.querySelector("[data-archive-manual]");
+const archiveAuto = document.querySelector("[data-archive-auto]");
+const archivePnl = document.querySelector("[data-archive-pnl]");
 const chatLog = document.querySelector("[data-chat-log]");
 const chatForm = document.querySelector("[data-chat-form]");
 const chatInput = document.querySelector("#chatInput");
@@ -3201,6 +3209,7 @@ function renderPaperReadout(trade, currentPrice, pnl, pnlPct) {
 }
 
 function renderTradeJournal() {
+  renderTradeArchive();
   const trades = getVisibleJournalTrades();
   const openTrades = trades.filter(isPaperTradeActive);
   const closedTrades = trades.filter((trade) => !isPaperTradeActive(trade));
@@ -3251,6 +3260,73 @@ function renderTradeJournal() {
 
 function getVisibleJournalTrades() {
   return state.paperTrades.filter((trade) => trade.sessionId === currentSessionId || isPaperTradeActive(trade));
+}
+
+function renderTradeArchive() {
+  if (!archiveRows) return;
+  const trades = [...state.paperTrades].sort((a, b) => getTradeSortTime(b) - getTradeSortTime(a));
+  const manualTrades = trades.filter((trade) => !trade.autopilot);
+  const autoTrades = trades.filter((trade) => trade.autopilot);
+  const totalPnl = trades.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0);
+
+  archiveTotal.textContent = String(trades.length);
+  archiveManual.textContent = String(manualTrades.length);
+  archiveAuto.textContent = String(autoTrades.length);
+  archivePnl.textContent = `${totalPnl >= 0 ? "+" : ""}${totalPnl.toFixed(2)} USDT`;
+  archivePnl.style.color = totalPnl >= 0 ? "#55c7a2" : "#ef6b5b";
+
+  if (!trades.length) {
+    archiveRows.innerHTML = `<tr><td colspan="11">Архив пока пуст: сделки будут появляться здесь из ручных входов и авто-бота</td></tr>`;
+    return;
+  }
+
+  archiveRows.innerHTML = trades.map((trade, index) => {
+    const currentPrice = getPaperTradePrice(trade);
+    const statusClass = trade.status === "pending" ? "pending" : trade.status === "open" ? "open" : trade.status === "partial" ? "partial" : trade.pnl >= 0 ? "win" : "loss";
+    const statusLabel = trade.status === "pending" ? "PENDING" : trade.status === "open" ? "OPEN" : trade.status === "partial" ? "T1 50%" : trade.pnl >= 0 ? "WIN" : "LOSS";
+    const sideClass = trade.side === "SHORT" ? "short" : "long";
+    const sourceClass = trade.autopilot ? "auto" : "manual";
+    const sourceLabel = trade.autopilot ? "АВТО" : "РУЧНОЙ";
+    return `
+      <tr>
+        <td><button type="button" data-view-archive-trade="${escapeHtml(trade.id)}">${index + 1}</button></td>
+        <td>${formatArchiveTime(trade.openedAt)}</td>
+        <td><span class="source-badge ${sourceClass}">${sourceLabel}</span></td>
+        <td>${escapeHtml(trade.asset.replace("/USDT", ""))}</td>
+        <td>${escapeHtml(trade.timeframe || "")}</td>
+        <td><span class="side-badge ${sideClass}">${trade.side}</span></td>
+        <td>${formatPrice(trade.entry)}</td>
+        <td>${formatPrice(trade.exitPrice || currentPrice)}</td>
+        <td style="color:${trade.pnl >= 0 ? "#55c7a2" : "#ef6b5b"}">${trade.pnl >= 0 ? "+" : ""}${trade.pnl.toFixed(2)}</td>
+        <td style="color:${trade.pnl >= 0 ? "#55c7a2" : "#ef6b5b"}">${trade.pnlPct >= 0 ? "+" : ""}${trade.pnlPct.toFixed(2)}%</td>
+        <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
+      </tr>
+    `;
+  }).join("");
+
+  archiveRows.querySelectorAll("[data-view-archive-trade]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.activePaperTradeId = button.dataset.viewArchiveTrade;
+      updatePaperTrades();
+    });
+  });
+}
+
+function getTradeSortTime(trade) {
+  return Number(trade.closedAt || trade.updatedAt || trade.openedAt) || 0;
+}
+
+function toggleTradeArchive() {
+  if (!archivePanel || !archiveToggle) return;
+  const shouldOpen = archivePanel.hasAttribute("hidden");
+  if (shouldOpen) {
+    archivePanel.removeAttribute("hidden");
+    archiveToggle.textContent = "Скрыть";
+  } else {
+    archivePanel.setAttribute("hidden", "");
+    archiveToggle.textContent = "Показать";
+  }
+  renderTradeArchive();
 }
 
 function exportJournalToExcel() {
@@ -3309,6 +3385,16 @@ function formatJournalTime(timestamp) {
   return new Date(timestamp).toLocaleString("ru-RU", {
     day: "2-digit",
     month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function formatArchiveTime(timestamp) {
+  return new Date(timestamp).toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
     hour: "2-digit",
     minute: "2-digit"
   });
@@ -3582,6 +3668,11 @@ paperEnter.addEventListener("click", () => enterPaperTrade());
 paperReset.addEventListener("click", () => resetPaperTrade());
 paperClear.addEventListener("click", clearPaperJournal);
 exportJournal.addEventListener("click", exportJournalToExcel);
+archiveToggle.addEventListener("click", toggleTradeArchive);
+archiveRefresh.addEventListener("click", async () => {
+  await syncRemoteJournal(true);
+  renderTradeArchive();
+});
 intelRefresh.addEventListener("click", () => refreshStrategyIntelligence(true));
 autopilotToggle.addEventListener("click", toggleAutopilot);
 remoteSave.addEventListener("click", saveRemoteJournalConfig);
