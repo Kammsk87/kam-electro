@@ -1186,10 +1186,14 @@ function renderStrategyIntelligence() {
   autopilotStatus.textContent = state.autopilot.enabled ? state.autopilot.lastMessage : "выключен";
   autopilotToggle.textContent = state.autopilot.enabled ? "Авто-бот: вкл" : "Авто-бот: выкл";
   autopilotToggle.classList.toggle("is-live", state.autopilot.enabled);
-  intelDetails.textContent = intel.notes.join(" ");
+  const learningMode = isRemoteJournalConfigured()
+    ? "Обучение общее: опыт подтягивается из Supabase перед анализом и автосделками."
+    : "Обучение локальное: для общего опыта подключи Supabase в блоке Общий журнал.";
+  intelDetails.textContent = `${learningMode} ${intel.notes.join(" ")}`;
 }
 
 async function refreshStrategyIntelligence(force = false) {
+  await refreshSharedLearningMemory(false);
   const context = getContext();
   const now = Date.now();
   if (!force && state.marketIntel.updatedAt && now - state.marketIntel.updatedAt < 60000 && state.marketIntel.asset === context.asset && state.marketIntel.timeframe === context.timeframe) {
@@ -1211,6 +1215,12 @@ async function refreshStrategyIntelligence(force = false) {
   const sentiment = sentimentResult.status === "fulfilled" ? sentimentResult.value : null;
   state.marketIntel = buildMarketIntelForContext(context, candles, derivatives, sentiment);
   generateStrategy(state.lastUserIdea);
+}
+
+async function refreshSharedLearningMemory(force = false) {
+  if (!isRemoteJournalConfigured() || state.remoteJournal.syncing) return false;
+  await syncRemoteJournal(force);
+  return true;
 }
 
 function buildMarketIntelForContext(context, candles, derivatives = null, sentiment = null) {
@@ -1451,12 +1461,13 @@ function calculateMonthlyGoalProgress() {
 
 function buildIntelNotes(backtest, derivatives, sentiment, learning, monthly, candleCount) {
   const notes = [];
+  const journalScope = isRemoteJournalConfigured() ? "общий" : "локальный";
   notes.push(candleCount ? `Бэктест рассчитан по ${candleCount} свечам Bybit.` : "Bybit-история временно недоступна, бэктест не обновлен.");
   if (backtest) notes.push(`Бэктест winrate ${backtest.winRate.toFixed(0)}% при цели не ниже ${targetWinRatePct}%, матожидание ${backtest.expectancyPct >= 0 ? "+" : ""}${backtest.expectancyPct.toFixed(2)}% на сделку, просадка ${backtest.maxDrawdownPct.toFixed(2)}%.`);
   if (derivatives) notes.push(`${derivatives.bias}.`);
   else notes.push("Деривативные данные недоступны для этой пары или временно не ответили.");
   if (sentiment) notes.push(`Fear & Greed: ${sentiment.value} (${sentiment.label}).`);
-  if (learning) notes.push(`Журнал этой пары: ${learning.closedTrades} закрытых сделок, winrate ${learning.winRate.toFixed(0)}%. Связки ниже 60% авто-бот блокирует после накопления статистики.`);
+  if (learning) notes.push(`${journalScope} журнал этой пары: ${learning.closedTrades} закрытых сделок, winrate ${learning.winRate.toFixed(0)}%. Связки ниже 60% авто-бот блокирует после накопления статистики.`);
   if (monthly) notes.push(`До цели 10%/мес: ${monthly.remainingPct.toFixed(2)}% от депозита.`);
   notes.push("CoinGlass-ликвидации можно подключить отдельным ключом API: сейчас бот готов учитывать этот слой, но не хранит ключи в коде.");
   return notes;
@@ -1585,6 +1596,7 @@ async function runAutopilotScan(force = false) {
   const now = Date.now();
   if (!force && now - state.autopilot.lastScanAt < autopilotScanMs) return;
   state.autopilot.lastScanAt = now;
+  await refreshSharedLearningMemory(false);
 
   if (now - state.autopilot.lastEntryAt < 5 * 60 * 1000) {
     state.autopilot.lastMessage = "пауза после входа";
@@ -2691,10 +2703,11 @@ function scheduleRemoteJournalSync() {
 }
 
 async function syncRemoteJournal(force = false) {
-  if (!isRemoteJournalConfigured() || state.remoteJournal.syncing) {
+  if (!isRemoteJournalConfigured()) {
     renderRemoteJournalStatus();
     return;
   }
+  if (state.remoteJournal.syncing) return;
   if (!force && Date.now() - state.remoteJournal.lastSyncAt < 12000) return;
 
   state.remoteJournal.syncing = true;
@@ -2704,7 +2717,7 @@ async function syncRemoteJournal(force = false) {
     const remoteTrades = await fetchRemoteJournalTrades();
     mergeRemoteJournalTrades(remoteTrades);
     state.remoteJournal.lastSyncAt = Date.now();
-    setRemoteJournalStatus(`ok ${state.paperTrades.length}`);
+    setRemoteJournalStatus(`shared ${state.paperTrades.length}`);
     localStorage.setItem(paperJournalKey, JSON.stringify({ trades: state.paperTrades }));
     renderTradeJournal();
     updatePaperTrades();
