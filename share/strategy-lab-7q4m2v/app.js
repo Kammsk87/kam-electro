@@ -1105,6 +1105,7 @@ function buildStrategy(userIdea = "", tradePlan = null, signalQuality = null) {
   const rsiBlock = buildRsiStrategyBlock(context);
   const emaBlock = buildEmaStrategyBlock(context);
   const signalQualityBlock = buildSignalQualityBlock(signalQuality);
+  const historyRestrictionsBlock = buildHistoryRestrictionsBlock(context, tradePlan);
   const investorDisciplineBlock = buildInvestorDisciplineBlock(context, tradePlan);
   const idea = userIdea ? `<p><strong>Уточнение из чата:</strong> ${escapeHtml(userIdea)}</p>` : "";
 
@@ -1119,6 +1120,7 @@ function buildStrategy(userIdea = "", tradePlan = null, signalQuality = null) {
     ${intelligenceBlock}
     ${tradePlanBlock}
     ${signalQualityBlock}
+    ${historyRestrictionsBlock}
     ${rsiBlock}
     ${emaBlock}
     ${investorDisciplineBlock}
@@ -1171,6 +1173,27 @@ function buildSignalQualityBlock(signalQuality) {
       <h3>Качество сигнала</h3>
       <p><strong>${signalQuality.best.score}/100</strong>: ${escapeHtml(signalQuality.best.decision)}. ${escapeHtml(signalQuality.verdict)}</p>
       <ul>${rows}</ul>
+    </section>
+  `;
+}
+
+function buildHistoryRestrictionsBlock(context, tradePlan) {
+  const warnings = tradePlan?.scenarios
+    ?.flatMap((scenario) => getManualStrategyRestrictions(context, scenario))
+    ?.filter((item, index, list) => list.indexOf(item) === index) || [];
+  if (!warnings.length) {
+    return `
+      <section>
+        <h3>Ограничения из журнала</h3>
+        <p>По текущей монете, таймфрейму и стороне нет жесткого запрета из истории. Вход все равно только после подтверждения графиком.</p>
+      </section>
+    `;
+  }
+
+  return `
+    <section>
+      <h3>Ограничения из журнала</h3>
+      <ul>${warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")}</ul>
     </section>
   `;
 }
@@ -2187,6 +2210,8 @@ function evaluateScenarioQuality(context, scenario) {
   addScore(structureResult.delta, structureResult.reason);
   const radarResult = evaluateMarketRadarForScenario(context);
   addScore(radarResult.delta, radarResult.reason);
+  const historyResult = evaluateHistoryRestrictionsForScenario(context, scenario);
+  addScore(historyResult.delta, historyResult.reason);
 
   const finalScore = Math.max(0, Math.min(100, Math.round(score)));
   const decision = finalScore >= 80
@@ -2338,6 +2363,30 @@ function evaluateMarketRadarForScenario(context) {
     reasons.push("интерес за 24ч падает");
   }
   return { delta, reason: reasons.join("; ") };
+}
+
+function evaluateHistoryRestrictionsForScenario(context, scenario) {
+  const warnings = getManualStrategyRestrictions(context, scenario);
+  if (!warnings.length) return { delta: 0, reason: "журнал не накладывает запрет на этот сценарий" };
+  const hardPenalty = warnings.some((warning) => warning.includes("не применять"));
+  return {
+    delta: hardPenalty ? -28 : -14,
+    reason: warnings.join("; ")
+  };
+}
+
+function getManualStrategyRestrictions(context, scenario) {
+  const warnings = [];
+  if (context.timeframe === "15m" && scenario.side === "LONG") {
+    warnings.push("15m LONG не применять для ручного входа: по журналу 1 WIN / 11 LOSS.");
+  }
+  if (autopilotQuarantineAssets.has(context.asset)) {
+    warnings.push(`${context.asset} в карантине после анализа журнала: ручной вход только после отдельного подтверждения и минимальным размером.`);
+  }
+  if (hasRecentSimilarAutopilotSignal(context, scenario)) {
+    warnings.push("Похожий авто-сигнал уже был недавно: не дублировать вход руками без нового сетапа.");
+  }
+  return warnings;
 }
 
 function evaluateEmaForScenario(context, side) {
