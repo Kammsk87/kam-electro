@@ -147,7 +147,9 @@ legend {
 select,
 textarea,
 input[type="text"],
-input[type="number"] {
+input[type="number"],
+input[type="password"],
+input[type="url"] {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -157,7 +159,9 @@ input[type="number"] {
 
 select,
 input[type="text"],
-input[type="number"] {
+input[type="number"],
+input[type="password"],
+input[type="url"] {
   min-height: 34px;
   padding: 0 10px;
 }
@@ -564,6 +568,39 @@ canvas {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
+}
+
+.radar-grid {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  gap: 8px;
+}
+
+.radar-list {
+  display: grid;
+  gap: 6px;
+  max-height: 132px;
+  overflow: auto;
+  margin-top: 8px;
+  font-size: 11px;
+}
+
+.radar-list > span,
+.radar-list > button {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 6px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 6px;
+  color: var(--ink);
+  background: rgba(32, 38, 44, 0.66);
+  text-align: left;
+}
+
+.radar-list strong {
+  color: var(--accent);
 }
 
 .journal-summary div {

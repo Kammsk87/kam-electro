@@ -5,6 +5,7 @@ const depositKey = "crypto-strategy-bot-deposit-v1";
 const autopilotKey = "crypto-strategy-bot-autopilot-v1";
 const remoteJournalConfigKey = "crypto-strategy-bot-remote-journal-v1";
 const remoteClientIdKey = "crypto-strategy-bot-client-id";
+const cmcRadarConfigKey = "crypto-strategy-bot-cmc-radar-v1";
 
 const currentSessionId = getCurrentSessionId();
 const currentClientId = getCurrentClientId();
@@ -318,6 +319,28 @@ function isRemoteJournalConfigFilled(config) {
   return Boolean(config?.url && config?.anonKey && config?.table);
 }
 
+function loadCmcRadarConfig() {
+  const sharedConfig = normalizeCmcRadarConfig(window.BOTALIN_MARKET_RADAR_CONFIG);
+  try {
+    const saved = JSON.parse(localStorage.getItem(cmcRadarConfigKey));
+    const savedConfig = normalizeCmcRadarConfig(saved);
+    return savedConfig.apiKey || savedConfig.proxyUrl ? { ...sharedConfig, ...savedConfig } : sharedConfig;
+  } catch (error) {
+    return sharedConfig;
+  }
+}
+
+function normalizeCmcRadarConfig(config = {}) {
+  return {
+    apiKey: String(config?.apiKey || "").trim(),
+    proxyUrl: String(config?.proxyUrl || "").trim().replace(/\/$/, ""),
+    limit: Number(config?.limit) || 100,
+    minVolume24h: Number(config?.minVolume24h) || 50000000,
+    minAgeDays: Number(config?.minAgeDays) || 180,
+    topCount: Number(config?.topCount) || 10
+  };
+}
+
 function createEmptyMarketIntel() {
   return {
     loading: false,
@@ -361,6 +384,13 @@ const state = {
     lastSyncAt: 0,
     status: "local"
   },
+  cmcRadar: {
+    config: loadCmcRadarConfig(),
+    assets: [],
+    updatedAt: 0,
+    status: "off",
+    error: ""
+  },
   marketIntel: createEmptyMarketIntel(),
   autopilot: loadAutopilotState(),
   emaPreferences: {},
@@ -391,6 +421,14 @@ const deposit = document.querySelector("#deposit");
 const conservative = document.querySelector("#conservative");
 const includeLongs = document.querySelector("#includeLongs");
 const includeShorts = document.querySelector("#includeShorts");
+const cmcApiKey = document.querySelector("#cmcApiKey");
+const cmcProxyUrl = document.querySelector("#cmcProxyUrl");
+const cmcLimit = document.querySelector("#cmcLimit");
+const cmcMinVolume = document.querySelector("#cmcMinVolume");
+const cmcStatus = document.querySelector("[data-cmc-status]");
+const cmcSave = document.querySelector("[data-cmc-save]");
+const cmcRefresh = document.querySelector("[data-cmc-refresh]");
+const cmcRadarList = document.querySelector("[data-cmc-radar-list]");
 const trainingInput = document.querySelector("#trainingInput");
 const rulesContainer = document.querySelector("[data-rules]");
 const sourcesContainer = document.querySelector("[data-sources]");
@@ -701,6 +739,173 @@ function renderRemoteJournalStatus() {
 function setRemoteJournalStatus(status) {
   state.remoteJournal.status = status;
   renderRemoteJournalStatus();
+}
+
+function initCmcRadarControls() {
+  const config = state.cmcRadar.config;
+  cmcApiKey.value = config.apiKey;
+  cmcProxyUrl.value = config.proxyUrl;
+  cmcLimit.value = String(config.limit);
+  cmcMinVolume.value = String(config.minVolume24h);
+  renderCmcRadar();
+}
+
+function saveCmcRadarConfig() {
+  state.cmcRadar.config = normalizeCmcRadarConfig({
+    apiKey: cmcApiKey.value,
+    proxyUrl: cmcProxyUrl.value,
+    limit: cmcLimit.value,
+    minVolume24h: cmcMinVolume.value
+  });
+  localStorage.setItem(cmcRadarConfigKey, JSON.stringify(state.cmcRadar.config));
+  renderCmcRadar();
+  refreshCmcRadar(true);
+}
+
+function isCmcRadarConfigured() {
+  const config = state.cmcRadar.config;
+  return Boolean(config.proxyUrl || config.apiKey);
+}
+
+function setCmcRadarStatus(status, error = "") {
+  state.cmcRadar.status = status;
+  state.cmcRadar.error = error;
+  renderCmcRadar();
+}
+
+async function refreshCmcRadar(force = false) {
+  if (!isCmcRadarConfigured()) {
+    setCmcRadarStatus("off");
+    return;
+  }
+  if (!force && Date.now() - state.cmcRadar.updatedAt < 10 * 60 * 1000) return;
+  setCmcRadarStatus("sync");
+  try {
+    const listings = await fetchCmcListings();
+    state.cmcRadar.assets = buildCmcRadarAssets(listings);
+    state.cmcRadar.updatedAt = Date.now();
+    setCmcRadarStatus(`top ${state.cmcRadar.assets.length}`);
+    generateStrategy(state.lastUserIdea);
+  } catch (error) {
+    setCmcRadarStatus("error", "CMC недоступен: проверь API key или proxy URL");
+  }
+}
+
+async function fetchCmcListings() {
+  const config = state.cmcRadar.config;
+  const params = new URLSearchParams({
+    start: "1",
+    limit: String(config.limit),
+    convert: "USD",
+    sort: "market_cap",
+    cryptocurrency_type: "coins"
+  });
+  const url = config.proxyUrl
+    ? `${config.proxyUrl}?${params.toString()}`
+    : `https://pro-api.coinmarketcap.com/v3/cryptocurrency/listings/latest?${params.toString()}`;
+  const response = await fetch(url, {
+    headers: config.proxyUrl ? {} : { "X-CMC_PRO_API_KEY": config.apiKey }
+  });
+  if (!response.ok) throw new Error("CMC request failed");
+  const data = await response.json();
+  return Array.isArray(data?.data) ? data.data : [];
+}
+
+function buildCmcRadarAssets(listings) {
+  const config = state.cmcRadar.config;
+  const now = Date.now();
+  return listings
+    .map(normalizeCmcAsset)
+    .filter((item) => item.asset && item.rank <= config.limit)
+    .filter((item) => item.volume24h >= config.minVolume24h)
+    .filter((item) => item.ageDays >= config.minAgeDays)
+    .sort((a, b) => b.radarScore - a.radarScore)
+    .slice(0, config.topCount)
+    .map((item) => ({ ...item, updatedAt: now }));
+}
+
+function normalizeCmcAsset(item) {
+  const quote = item.quote?.USD || {};
+  const symbol = String(item.symbol || "").toUpperCase();
+  const marketCap = Number(quote.market_cap) || 0;
+  const fdv = Number(quote.fully_diluted_market_cap) || 0;
+  const fdvRatio = marketCap > 0 && fdv > 0 ? fdv / marketCap : 1;
+  const ageDays = item.date_added ? (Date.now() - new Date(item.date_added).getTime()) / 86400000 : 0;
+  const volume24h = Number(quote.volume_24h) || 0;
+  const volumeChange24h = Number(quote.volume_change_24h) || 0;
+  const change30d = Number(quote.percent_change_30d) || 0;
+  const change90d = Number(quote.percent_change_90d) || 0;
+  const liquidityBonus = Math.min(20, Math.log10(Math.max(1, volume24h)) * 2);
+  const fdvPenalty = fdvRatio > 2 ? Math.min(30, (fdvRatio - 2) * 8) : 0;
+  const radarScore = change30d + change90d + volumeChange24h + liquidityBonus - fdvPenalty;
+  return {
+    id: item.id,
+    symbol,
+    name: item.name,
+    slug: item.slug,
+    tags: Array.isArray(item.tags) ? item.tags.slice(0, 6) : [],
+    asset: findAssetValueBySymbol(symbol),
+    rank: Number(item.cmc_rank) || 9999,
+    price: Number(quote.price) || 0,
+    volume24h,
+    volumeChange24h,
+    change1h: Number(quote.percent_change_1h) || 0,
+    change24h: Number(quote.percent_change_24h) || 0,
+    change7d: Number(quote.percent_change_7d) || 0,
+    change30d,
+    change60d: Number(quote.percent_change_60d) || 0,
+    change90d,
+    marketCap,
+    dominance: Number(quote.market_cap_dominance) || 0,
+    circulatingSupply: Number(item.circulating_supply) || 0,
+    totalSupply: Number(item.total_supply) || 0,
+    maxSupply: Number(item.max_supply) || 0,
+    fullyDilutedMarketCap: fdv,
+    numMarketPairs: Number(item.num_market_pairs) || 0,
+    dateAdded: item.date_added || "",
+    ageDays,
+    fdvRatio,
+    radarScore
+  };
+}
+
+function findAssetValueBySymbol(symbol) {
+  const option = [...asset.options].find((item) => item.value.replace("/USDT", "") === symbol);
+  return option?.value || "";
+}
+
+function getMarketRadarAsset(symbol = asset.value) {
+  return state.cmcRadar.assets.find((item) => item.asset === symbol) || null;
+}
+
+function getCmcRadarScanAssets() {
+  const values = state.cmcRadar.assets.map((item) => item.asset).filter(Boolean);
+  return values.length ? values : null;
+}
+
+function renderCmcRadar() {
+  cmcStatus.textContent = state.cmcRadar.status;
+  if (!state.cmcRadar.assets.length) {
+    cmcRadarList.innerHTML = `<span>${escapeHtml(state.cmcRadar.error || "CMC выбирает монеты для наблюдения, входы остаются по Bybit.")}</span>`;
+    return;
+  }
+  cmcRadarList.innerHTML = state.cmcRadar.assets.map((item, index) => `
+    <button type="button" data-cmc-asset="${escapeHtml(item.asset)}">
+      <strong>${index + 1}. ${escapeHtml(item.symbol)}</strong>
+      <span>#${item.rank} · 30д ${item.change30d.toFixed(1)}% · 90д ${item.change90d.toFixed(1)}%</span>
+      <em>${Math.round(item.radarScore)}</em>
+    </button>
+  `).join("");
+  cmcRadarList.querySelectorAll("[data-cmc-asset]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (!button.dataset.cmcAsset) return;
+      asset.value = button.dataset.cmcAsset;
+      renderRsiControls();
+      if (state.live.enabled) restartLiveConnection();
+      generateStrategy(state.lastUserIdea);
+      refreshStrategyIntelligence(true);
+    });
+  });
 }
 
 function renderRules() {
@@ -1244,9 +1449,10 @@ async function refreshSharedLearningMemory(force = false) {
 function buildMarketIntelForContext(context, candles, derivatives = null, sentiment = null) {
   const backtest = candles.length ? runStrategyBacktest(candles, context) : null;
   const marketStructure = candles.length ? analyzeMarketStructure(candles) : null;
+  const marketRadar = getMarketRadarAsset(context.asset);
   const learning = analyzeLearningJournal(context.asset);
   const monthly = calculateMonthlyGoalProgress();
-  const notes = buildIntelNotes(backtest, derivatives, sentiment, learning, monthly, candles.length, marketStructure);
+  const notes = buildIntelNotes(backtest, derivatives, sentiment, learning, monthly, candles.length, marketStructure, marketRadar);
   return {
     loading: false,
     updatedAt: Date.now(),
@@ -1254,6 +1460,7 @@ function buildMarketIntelForContext(context, candles, derivatives = null, sentim
     timeframe: context.timeframe,
     backtest,
     marketStructure,
+    marketRadar,
     derivatives,
     sentiment,
     learning,
@@ -1532,12 +1739,13 @@ function analyzeMarketStructure(candles) {
   };
 }
 
-function buildIntelNotes(backtest, derivatives, sentiment, learning, monthly, candleCount, marketStructure = null) {
+function buildIntelNotes(backtest, derivatives, sentiment, learning, monthly, candleCount, marketStructure = null, marketRadar = null) {
   const notes = [];
   const journalScope = isRemoteJournalConfigured() ? "общий" : "локальный";
   notes.push(candleCount ? `Бэктест рассчитан по ${candleCount} свечам Bybit.` : "Bybit-история временно недоступна, бэктест не обновлен.");
   if (backtest) notes.push(`Бэктест winrate ${backtest.winRate.toFixed(0)}% при цели не ниже ${targetWinRatePct}%, матожидание ${backtest.expectancyPct >= 0 ? "+" : ""}${backtest.expectancyPct.toFixed(2)}% на сделку, просадка ${backtest.maxDrawdownPct.toFixed(2)}%.`);
   if (marketStructure) notes.push(`Структура рынка: ADX ${marketStructure.adx.toFixed(0)}, ATR ${marketStructure.atrPct.toFixed(2)}%, цена ${marketStructure.priceVsVwapPct >= 0 ? "выше" : "ниже"} VWAP на ${Math.abs(marketStructure.priceVsVwapPct).toFixed(2)}%, объем x${marketStructure.volumeRatio.toFixed(2)}.`);
+  if (marketRadar) notes.push(`CMC-радар допускает монету: #${marketRadar.rank}, score ${marketRadar.radarScore.toFixed(0)}, объем ${formatCompact(marketRadar.volume24h)} USDT, 30д ${marketRadar.change30d.toFixed(1)}%, 90д ${marketRadar.change90d.toFixed(1)}%.`);
   if (derivatives) notes.push(`${derivatives.bias}.`);
   else notes.push("Деривативные данные недоступны для этой пары или временно не ответили.");
   if (sentiment) notes.push(`Fear & Greed: ${sentiment.value} (${sentiment.label}).`);
@@ -1548,6 +1756,8 @@ function buildIntelNotes(backtest, derivatives, sentiment, learning, monthly, ca
 }
 
 function getAvailableAutopilotAssets() {
+  const radarAssets = getCmcRadarScanAssets();
+  if (radarAssets) return radarAssets;
   return [...asset.options]
     .map((option) => option.value)
     .filter((value, index, list) => value && list.indexOf(value) === index);
@@ -1629,6 +1839,9 @@ function evaluateAutopilotQualityGate(context, signalQuality, intel) {
   if (backtest.winRate < targetWinRatePct) return { ok: false, reason: `бэктест winrate ${backtest.winRate.toFixed(0)}% ниже ${targetWinRatePct}%`, score: best.score - 50 };
   if (backtest.expectancyPct <= 0) return { ok: false, reason: `матожидание ${backtest.expectancyPct.toFixed(2)}% не положительное`, score: best.score - 45 };
   if (backtest.maxDrawdownPct > 4.5) return { ok: false, reason: `просадка ${backtest.maxDrawdownPct.toFixed(2)}% выше лимита`, score: best.score - 35 };
+  if (state.cmcRadar.assets.length && !getMarketRadarAsset(context.asset)) {
+    return { ok: false, reason: "монета не прошла CMC-радар", score: best.score - 32 };
+  }
   if (intel?.marketStructure?.adx < 18 && (context.mode === "trend" || context.mode === "breakout")) {
     return { ok: false, reason: `ADX ${intel.marketStructure.adx.toFixed(0)} слабый для ${modeLabel(context.mode)}`, score: best.score - 30 };
   }
@@ -1927,6 +2140,8 @@ function evaluateScenarioQuality(context, scenario) {
   addScore(emaResult.delta, emaResult.reason);
   const structureResult = evaluateMarketStructureForScenario(context, scenario);
   addScore(structureResult.delta, structureResult.reason);
+  const radarResult = evaluateMarketRadarForScenario(context);
+  addScore(radarResult.delta, radarResult.reason);
 
   const finalScore = Math.max(0, Math.min(100, Math.round(score)));
   const decision = finalScore >= 80
@@ -2056,6 +2271,27 @@ function evaluateMarketStructureForScenario(context, scenario) {
     reasons.push("ATR достаточный для движения");
   }
 
+  return { delta, reason: reasons.join("; ") };
+}
+
+function evaluateMarketRadarForScenario(context) {
+  if (!state.cmcRadar.assets.length) return { delta: 0, reason: "CMC-радар не подключен" };
+  const radarAsset = getMarketRadarAsset(context.asset);
+  if (!radarAsset) return { delta: -7, reason: "монета не входит в текущий топ CMC-радара" };
+  let delta = 5;
+  const reasons = [`CMC-радар допустил монету #${radarAsset.rank}`];
+  if (radarAsset.radarScore > 80) {
+    delta += 4;
+    reasons.push("сильный momentum/volume score");
+  }
+  if (radarAsset.fdvRatio > 3) {
+    delta -= 4;
+    reasons.push("FDV заметно выше капитализации");
+  }
+  if (radarAsset.volumeChange24h < -25) {
+    delta -= 3;
+    reasons.push("интерес за 24ч падает");
+  }
   return { delta, reason: reasons.join("; ") };
 }
 
@@ -2816,6 +3052,7 @@ function createStrategySnapshot(context, tradePlan, scenario, quality, options =
     intelligence: {
       backtest: context.intel?.backtest || null,
       marketStructure: context.intel?.marketStructure || null,
+      marketRadar: context.intel?.marketRadar || null,
       derivatives: context.intel?.derivatives || null,
       sentiment: context.intel?.sentiment || null,
       learning: context.intel?.learning || null,
@@ -3898,6 +4135,8 @@ intelRefresh.addEventListener("click", () => refreshStrategyIntelligence(true));
 autopilotToggle.addEventListener("click", toggleAutopilot);
 remoteSave.addEventListener("click", saveRemoteJournalConfig);
 remoteSync.addEventListener("click", () => syncRemoteJournal(true));
+cmcSave.addEventListener("click", saveCmcRadarConfig);
+cmcRefresh.addEventListener("click", () => refreshCmcRadar(true));
 paperSide.addEventListener("change", () => {
   resetPaperTrade();
 });
@@ -3964,6 +4203,7 @@ renderSources();
 renderRsiControls();
 renderEmaControls();
 initRemoteJournalControls();
+initCmcRadarControls();
 deposit.value = String(loadDeposit());
 updateRiskLabel();
 renderLiveReadout();
@@ -3972,9 +4212,11 @@ generateStrategy();
 refreshStrategyIntelligence(false);
 refreshOpenPaperTradePrices(true);
 syncRemoteJournal(true);
+refreshCmcRadar(false);
 window.setInterval(() => refreshOpenPaperTradePrices(), 10000);
 window.setInterval(() => runAutopilotScan(), autopilotScanMs);
 window.setInterval(() => syncRemoteJournal(false), 30000);
+window.setInterval(() => refreshCmcRadar(false), 10 * 60 * 1000);
 
 function startLiveConnection() {
   state.live.enabled = true;

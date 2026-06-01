@@ -11,6 +11,7 @@
     <meta name="robots" content="noindex, nofollow">
     <link rel="stylesheet" href="styles.css">
     <script src="remote-journal-config.js"></script>
+    <script src="market-radar-config.js"></script>
     <script src="app.js" defer></script>
   </head>
   <body>
@@ -117,6 +118,42 @@
               <span>short-сценарий</span>
             </label>
           </fieldset>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-title">
+            <span>Радар CMC</span>
+            <span class="mini-counter" data-cmc-status>off</span>
+          </div>
+          <label>
+            CMC API key
+            <input id="cmcApiKey" type="password" placeholder="CoinMarketCap API key">
+          </label>
+          <label>
+            CMC proxy URL
+            <input id="cmcProxyUrl" type="url" placeholder="опционально, если браузер блокирует API">
+          </label>
+          <div class="radar-grid">
+            <label>
+              Топ
+              <select id="cmcLimit">
+                <option value="50">50</option>
+                <option value="100" selected>100</option>
+                <option value="200">200</option>
+              </select>
+            </label>
+            <label>
+              Мин. объем
+              <input id="cmcMinVolume" type="number" min="0" step="1000000" value="50000000">
+            </label>
+          </div>
+          <div class="remote-actions">
+            <button class="primary-action" type="button" data-cmc-save>Сохранить</button>
+            <button class="secondary-action" type="button" data-cmc-refresh>Обновить</button>
+          </div>
+          <div class="radar-list" data-cmc-radar-list>
+            <span>CMC выбирает монеты для наблюдения, входы остаются по Bybit.</span>
+          </div>
         </section>
 
         <section class="panel-section">
