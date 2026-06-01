@@ -11,7 +11,18 @@ const currentSessionId = getCurrentSessionId();
 const currentClientId = getCurrentClientId();
 const autopilotMinScore = 74;
 const autopilotScanMs = 30000;
+const autopilotDuplicateCooldownMs = 60 * 60 * 1000;
+const autopilotMaxActivePerSide = 3;
 const targetWinRatePct = 60;
+const autopilotQuarantineAssets = new Set([
+  "AAVE/USDT",
+  "AVAX/USDT",
+  "BCH/USDT",
+  "ETC/USDT",
+  "LINK/USDT",
+  "OP/USDT",
+  "TWT/USDT"
+]);
 const emaProfiles = [
   { id: "ema-34", label: "EMA 34", period: 34, color: "#c084fc", role: "быстрая EMA из чисел Фибоначчи: фильтр импульса и отката." },
   { id: "ema-89", label: "EMA 89", period: 89, color: "#38bdf8", role: "медленная EMA из чисел Фибоначчи: фильтр старшего направления." }
@@ -1817,7 +1828,7 @@ function scoreAutopilotCandidate(context, tradePlan, signalQuality, intel) {
   if (!best) return -Infinity;
   const backtest = intel?.backtest;
   const monthly = intel?.monthlyGoal;
-  const gate = evaluateAutopilotQualityGate(context, signalQuality, intel);
+  const gate = evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan);
   if (!gate.ok) return gate.score;
   let score = best.score;
   if (backtest?.trades >= 8) score += Math.max(-8, Math.min(16, backtest.expectancyPct * 20));
@@ -1829,11 +1840,24 @@ function scoreAutopilotCandidate(context, tradePlan, signalQuality, intel) {
   return Math.round(score);
 }
 
-function evaluateAutopilotQualityGate(context, signalQuality, intel) {
+function evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan = null) {
   const best = signalQuality?.best;
   const backtest = intel?.backtest;
   const pattern = getLearningPatternStat(context.asset, context.timeframe, best?.side);
   if (!best) return { ok: false, reason: "нет сигнала", score: -Infinity };
+  const scenario = getAutopilotScenario(tradePlan, best.side);
+  if (context.timeframe === "15m" && best.side === "LONG") {
+    return { ok: false, reason: "15m LONG отключен после анализа журнала", score: best.score - 70 };
+  }
+  if (autopilotQuarantineAssets.has(context.asset)) {
+    return { ok: false, reason: `${context.asset} в карантине после серии слабых сделок`, score: best.score - 65 };
+  }
+  if (getActiveAutopilotSideCount(best.side) >= autopilotMaxActivePerSide) {
+    return { ok: false, reason: `лимит ${autopilotMaxActivePerSide} активных ${best.side}`, score: best.score - 45 };
+  }
+  if (scenario && hasRecentSimilarAutopilotSignal(context, scenario)) {
+    return { ok: false, reason: "дубль похожего сигнала в течение 60 минут", score: best.score - 55 };
+  }
   if (best.score < autopilotMinScore) return { ok: false, reason: `score ${best.score}/100 ниже ${autopilotMinScore}`, score: best.score - 100 };
   if (!backtest || backtest.trades < 12) return { ok: false, reason: "недостаточно сделок в бэктесте", score: best.score - 60 };
   if (backtest.winRate < targetWinRatePct) return { ok: false, reason: `бэктест winrate ${backtest.winRate.toFixed(0)}% ниже ${targetWinRatePct}%`, score: best.score - 50 };
@@ -1867,6 +1891,27 @@ function getLearningPatternStat(symbol, interval, side) {
   if (!symbol || !interval || !side) return null;
   const learning = analyzeLearningJournal(symbol);
   return learning.patternStats[getLearningPatternKey(symbol, interval, side)] || null;
+}
+
+function getAutopilotScenario(tradePlan, side) {
+  return tradePlan?.scenarios?.find((scenario) => scenario.side === side) || null;
+}
+
+function getActiveAutopilotSideCount(side) {
+  return state.paperTrades.filter((trade) => trade.autopilot && trade.side === side && isPaperTradeActive(trade)).length;
+}
+
+function hasRecentSimilarAutopilotSignal(context, scenario) {
+  const now = Date.now();
+  return state.paperTrades.some((trade) => {
+    if (!trade.autopilot || trade.asset !== context.asset || trade.timeframe !== context.timeframe || trade.side !== scenario.side) return false;
+    const openedAt = Number(trade.openedAt) || 0;
+    if (!openedAt || now - openedAt > autopilotDuplicateCooldownMs) return false;
+    const entry = Number(trade.entry);
+    const scenarioEntry = Number(scenario.entry);
+    if (!Number.isFinite(entry) || !Number.isFinite(scenarioEntry) || scenarioEntry <= 0) return true;
+    return Math.abs(entry - scenarioEntry) / scenarioEntry <= 0.003;
+  });
 }
 
 function toggleAutopilot() {
@@ -1926,7 +1971,7 @@ async function runAutopilotScan(force = false) {
     state.autopilot.lastEntryAt = Date.now();
     state.autopilot.lastMessage = trade ? `вошел: ${trade.side} ${trade.asset} ${trade.timeframe}` : "сигнал был, вход не создан";
   } else {
-    const gate = bestCandidate ? evaluateAutopilotQualityGate(bestCandidate.context, bestCandidate.signalQuality, bestCandidate.intel) : null;
+    const gate = bestCandidate ? evaluateAutopilotQualityGate(bestCandidate.context, bestCandidate.signalQuality, bestCandidate.intel, bestCandidate.tradePlan) : null;
     state.autopilot.lastMessage = bestCandidate
       ? `лучший: ${bestCandidate.context.asset} ${bestCandidate.context.timeframe} ${bestCandidate.autopilotScore}/100, вход запрещен: ${gate?.reason || "фильтр"}`
       : "нет монет без активной сделки";
