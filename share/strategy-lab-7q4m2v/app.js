@@ -509,6 +509,8 @@ const paperEntry = document.querySelector("[data-paper-entry]");
 const paperCurrent = document.querySelector("[data-paper-current]");
 const paperPnl = document.querySelector("[data-paper-pnl]");
 const paperResult = document.querySelector("[data-paper-result]");
+const walletFree = document.querySelector("[data-wallet-free]");
+const walletReserved = document.querySelector("[data-wallet-reserved]");
 const paperEnter = document.querySelector("[data-paper-enter]");
 const paperReset = document.querySelector("[data-paper-reset]");
 const paperClear = document.querySelector("[data-paper-clear]");
@@ -559,6 +561,7 @@ function normalizePaperTrade(trade) {
   const target = Number(trade.target) || entry;
   const target1 = Number(trade.target1) || target;
   const status = ["pending", "open", "partial", "target", "stop"].includes(trade.status) ? trade.status : "open";
+  const isActiveStatus = ["pending", "open", "partial"].includes(status);
   const initialQuantity = Number(trade.initialQuantity) || Number(trade.quantity) || amount / entry;
   const target1Quantity = Number(trade.target1Quantity) || initialQuantity * 0.5;
   const remainingQuantity = Number.isFinite(Number(trade.remainingQuantity))
@@ -626,6 +629,15 @@ function normalizePaperTrade(trade) {
     exitPrice: normalizedExitPrice,
     pnl: normalizedPnl,
     pnlPct: normalizedPnlPct,
+    reservedAmount: Number.isFinite(Number(trade.reservedAmount))
+      ? Number(trade.reservedAmount)
+      : Number(trade.budgetReserved)
+        ? amount
+        : 0,
+    releasedAmount: Number.isFinite(Number(trade.releasedAmount)) ? Number(trade.releasedAmount) : 0,
+    releasedPnl: Number.isFinite(Number(trade.releasedPnl)) ? Number(trade.releasedPnl) : 0,
+    budgetReserved: Boolean(trade.budgetReserved),
+    walletSettled: Boolean(trade.walletSettled || (!isActiveStatus && trade.budgetReserved)),
     history
   };
   return ensureBybitPaperState(normalizedTrade);
@@ -727,7 +739,7 @@ function persistPaperTrades() {
 
 function loadDeposit() {
   const saved = Number(localStorage.getItem(depositKey));
-  return Number.isFinite(saved) && saved > 0 ? saved : 10000;
+  return Number.isFinite(saved) && saved >= 0 ? saved : 10000;
 }
 
 function persistDeposit() {
@@ -736,7 +748,78 @@ function persistDeposit() {
 
 function getDepositValue() {
   const value = Number(deposit.value);
-  return Number.isFinite(value) && value > 0 ? value : 10000;
+  return Number.isFinite(value) && value >= 0 ? value : 10000;
+}
+
+function setDepositValue(value, options = {}) {
+  const normalized = Math.max(0, Number(value) || 0);
+  deposit.value = normalized.toFixed(2);
+  persistDeposit();
+  if (!options.silent) {
+    renderWalletReadout();
+    renderStrategyIntelligence();
+  }
+}
+
+function adjustDepositValue(delta, options = {}) {
+  setDepositValue(getDepositValue() + (Number(delta) || 0), options);
+}
+
+function getReservedPaperBudget() {
+  return state.paperTrades
+    .filter(isPaperTradeActive)
+    .reduce((sum, trade) => sum + Math.max(0, (Number(trade.reservedAmount) || 0) - (Number(trade.releasedAmount) || 0)), 0);
+}
+
+function renderWalletReadout() {
+  const free = getDepositValue();
+  const reserved = getReservedPaperBudget();
+  if (walletFree) walletFree.textContent = `${free.toFixed(2)} USDT`;
+  if (walletReserved) walletReserved.textContent = `${reserved.toFixed(2)} USDT`;
+  if (paperAmount) {
+    paperAmount.max = String(Math.max(0, Math.floor(free * 100) / 100));
+  }
+}
+
+function reservePaperBudget(amount) {
+  const normalizedAmount = Math.floor((Number(amount) || 0) * 100) / 100;
+  const available = getDepositValue();
+  if (normalizedAmount < 10 || normalizedAmount > available + 0.0001) return false;
+  adjustDepositValue(-normalizedAmount, { silent: true });
+  renderWalletReadout();
+  renderStrategyIntelligence();
+  return true;
+}
+
+function settlePaperBudget(trade, releasedAmount, pnlDelta, options = {}) {
+  const amount = Math.max(0, Number(releasedAmount) || 0);
+  const pnl = Number(pnlDelta) || 0;
+  trade.releasedAmount = (Number(trade.releasedAmount) || 0) + amount;
+  trade.releasedPnl = (Number(trade.releasedPnl) || 0) + pnl;
+  adjustDepositValue(amount + pnl, { silent: true });
+  if (!options.silent) {
+    renderWalletReadout();
+    renderStrategyIntelligence();
+  }
+}
+
+function reconcileLegacyPaperBudget() {
+  let changed = false;
+  state.paperTrades.forEach((trade) => {
+    if (!isPaperTradeActive(trade) || trade.budgetReserved) return;
+    const amount = Math.max(0, Number(trade.amount) || 0);
+    const reserve = Math.min(amount, getDepositValue());
+    trade.reservedAmount = reserve;
+    trade.releasedAmount = 0;
+    trade.releasedPnl = 0;
+    trade.budgetReserved = reserve > 0;
+    changed = true;
+    if (reserve > 0) adjustDepositValue(-reserve, { silent: true });
+  });
+  if (changed) {
+    persistPaperTrades();
+    renderWalletReadout();
+  }
 }
 
 function initRemoteJournalControls() {
@@ -2113,7 +2196,7 @@ async function runAutopilotScan(force = false) {
       strategyHtml: buildAutopilotStrategyHtml(bestCandidate),
       reason: `${bestCandidate.context.asset} ${bestCandidate.context.timeframe}: score ${bestCandidate.signalQuality.best.score}/100, scan ${bestCandidate.autopilotScore}/100`
     });
-    state.autopilot.lastEntryAt = Date.now();
+    if (trade) state.autopilot.lastEntryAt = Date.now();
     state.autopilot.lastMessage = trade ? `вошел: ${trade.side} ${trade.asset} ${trade.timeframe}` : "сигнал был, вход не создан";
   } else {
     const gate = bestCandidate ? evaluateAutopilotQualityGate(bestCandidate.context, bestCandidate.signalQuality, bestCandidate.intel, bestCandidate.tradePlan) : null;
@@ -3173,8 +3256,23 @@ function enterPaperTrade(options = {}) {
   const scenario = tradePlan.scenarios.find((item) => item.side === side) || tradePlan.primary;
   if (!scenario) return;
 
+  const availableBudget = getDepositValue();
+  if (availableBudget < 10) {
+    paperStatus.textContent = "недостаточно бюджета";
+    paperResult.textContent = "Свободный бюджет меньше минимальной суммы сделки 10 USDT";
+    renderWalletReadout();
+    return null;
+  }
+
   const requestedAmount = Math.max(10, Number(paperAmount.value) || 1000);
-  const amount = clampTradeAmountByRisk(requestedAmount, scenario);
+  const amount = clampTradeAmountByRisk(Math.min(requestedAmount, availableBudget), scenario);
+  const riskBudgetAtEntry = getRiskBudget();
+  if (amount < 10 || !reservePaperBudget(amount)) {
+    paperStatus.textContent = "недостаточно бюджета";
+    paperResult.textContent = "Сделка не открыта: сумма превышает свободный бюджет";
+    renderWalletReadout();
+    return null;
+  }
   paperAmount.value = String(amount);
   const entry = scenario.entry;
   const quantity = amount / entry;
@@ -3196,7 +3294,12 @@ function enterPaperTrade(options = {}) {
     side: scenario.side,
     amount,
     deposit: context.deposit,
-    riskBudget: getRiskBudget(),
+    reservedAmount: amount,
+    releasedAmount: 0,
+    releasedPnl: 0,
+    budgetReserved: true,
+    walletSettled: false,
+    riskBudget: riskBudgetAtEntry,
     riskLimitPct: Math.min(Number(risk.value) || 1, 2),
     autopilot: Boolean(options.autopilot),
     autopilotReason: String(options.reason || ""),
@@ -3352,10 +3455,13 @@ function getRiskBudget() {
 }
 
 function clampTradeAmountByRisk(requestedAmount, scenario) {
+  const availableBudget = Math.max(0, getDepositValue());
   const riskPerUnit = Math.abs(scenario.entry - scenario.stop);
-  if (!Number.isFinite(riskPerUnit) || riskPerUnit <= 0) return requestedAmount;
+  if (!Number.isFinite(riskPerUnit) || riskPerUnit <= 0) {
+    return Math.max(0, Math.min(requestedAmount, availableBudget));
+  }
   const maxAmount = (getRiskBudget() / riskPerUnit) * scenario.entry;
-  return Math.max(10, Math.min(requestedAmount, Math.floor(maxAmount * 100) / 100));
+  return Math.max(0, Math.min(requestedAmount, availableBudget, Math.floor(maxAmount * 100) / 100));
 }
 
 function resetPaperTrade(shouldDraw = true) {
@@ -3366,6 +3472,7 @@ function resetPaperTrade(shouldDraw = true) {
   paperPnl.textContent = "0.00 USDT";
   paperPnl.style.color = "";
   paperResult.textContent = "нет сделки";
+  renderWalletReadout();
   if (shouldDraw) drawPaperChart();
 }
 
@@ -3492,6 +3599,7 @@ function toIsoOrNull(timestamp) {
 
 function updatePaperTrades() {
   if (!state.paperTrades.length) {
+    renderWalletReadout();
     renderTradeJournal();
     drawPaperChart();
     return;
@@ -3509,6 +3617,7 @@ function updatePaperTrades() {
     drawPaperChart();
   }
   persistPaperTrades();
+  renderWalletReadout();
   renderTradeJournal();
 }
 
@@ -3730,6 +3839,8 @@ function executePartialTakeProfit(trade) {
   if (closingQuantity <= 0) return;
 
   const partialPnl = calculatePaperPnlForQuantity(trade, trade.target1, closingQuantity);
+  const reservePerUnit = getInitialQuantity(trade) > 0 ? (Number(trade.reservedAmount) || 0) / getInitialQuantity(trade) : 0;
+  const releasedReserve = reservePerUnit * closingQuantity;
   trade.status = "partial";
   trade.target1HitAt = Date.now();
   trade.target1ExitPrice = trade.target1;
@@ -3747,6 +3858,7 @@ function executePartialTakeProfit(trade) {
   trade.tp1Order.leavesQty = 0;
   trade.tp2Order.orderStatus = trade.remainingQuantity > 0 ? "Untriggered" : "Cancelled";
   trade.tpOrder = trade.tp2Order;
+  settlePaperBudget(trade, releasedReserve, partialPnl);
   updateStrategySnapshotOutcome(trade, "partial");
   appendPaperPoint(trade, trade.target1, trade.pnl, trade.pnlPct);
 }
@@ -3758,6 +3870,11 @@ function closePaperPositionByTpsl(trade, closeType) {
   const exitPnl = getRealizedPnl(trade) + calculatePaperPnlForQuantity(trade, exitPrice, closingQuantity);
   const exitPnlPct = (exitPnl / trade.amount) * 100;
   const filledOrder = isTarget ? trade.tp2Order : trade.slOrder;
+  const reservedAmount = Number(trade.reservedAmount) || 0;
+  const alreadyReleasedAmount = Number(trade.releasedAmount) || 0;
+  const alreadyReleasedPnl = Number(trade.releasedPnl) || 0;
+  const remainingReserve = Math.max(0, reservedAmount - alreadyReleasedAmount);
+  const remainingPnl = exitPnl - alreadyReleasedPnl;
 
   trade.status = closeType;
   trade.closedAt = Date.now();
@@ -3785,6 +3902,10 @@ function closePaperPositionByTpsl(trade, closeType) {
     trade.tp2Order.orderStatus = "Cancelled";
   }
   trade.tpOrder = trade.tp2Order;
+  if (!trade.walletSettled) {
+    settlePaperBudget(trade, remainingReserve, remainingPnl);
+    trade.walletSettled = true;
+  }
   updateStrategySnapshotOutcome(trade, closeType);
   appendPaperPoint(trade, exitPrice, exitPnl, exitPnlPct);
 }
@@ -3887,6 +4008,7 @@ function renderPaperReadout(trade, currentPrice, pnl, pnlPct) {
 
 function renderTradeJournal() {
   renderTradeArchive();
+  renderWalletReadout();
   const trades = getVisibleJournalTrades();
   const openTrades = trades.filter(isPaperTradeActive);
   const closedTrades = trades.filter((trade) => !isPaperTradeActive(trade));
@@ -4413,6 +4535,7 @@ risk.addEventListener("input", () => {
 
 deposit.addEventListener("input", () => {
   persistDeposit();
+  renderWalletReadout();
   generateStrategy(state.lastUserIdea);
   renderStrategyIntelligence();
 });
@@ -4424,8 +4547,10 @@ renderEmaControls();
 initRemoteJournalControls();
 initCmcRadarControls();
 deposit.value = String(loadDeposit());
+reconcileLegacyPaperBudget();
 updateRiskLabel();
 renderLiveReadout();
+renderWalletReadout();
 renderTradeJournal();
 generateStrategy();
 refreshStrategyIntelligence(false);
