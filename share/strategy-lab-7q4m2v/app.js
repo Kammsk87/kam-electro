@@ -3,6 +3,7 @@ const paperJournalKey = "crypto-strategy-bot-paper-journal-v1";
 const paperSessionKey = "crypto-strategy-bot-session-id";
 const depositKey = "crypto-strategy-bot-deposit-v1";
 const autopilotKey = "crypto-strategy-bot-autopilot-v1";
+const learningPolicyKey = "crypto-strategy-bot-learning-policy-v1";
 const remoteJournalConfigKey = "crypto-strategy-bot-remote-journal-v1";
 const remoteClientIdKey = "crypto-strategy-bot-client-id";
 const cmcRadarConfigKey = "crypto-strategy-bot-cmc-radar-v1";
@@ -13,8 +14,10 @@ const autopilotMinScore = 74;
 const autopilotScanMs = 30000;
 const autopilotDuplicateCooldownMs = 60 * 60 * 1000;
 const autopilotMaxActivePerSide = 3;
+const learningReviewMs = 10 * 60 * 1000;
+const learningReviewHour = 23;
 const targetWinRatePct = 60;
-const autopilotQuarantineAssets = new Set([
+const baseQuarantineAssets = new Set([
   "AAVE/USDT",
   "AVAX/USDT",
   "BCH/USDT",
@@ -379,6 +382,22 @@ function loadAutopilotState() {
   }
 }
 
+function loadLearningPolicy() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(learningPolicyKey));
+    return {
+      lastReviewDate: String(saved?.lastReviewDate || ""),
+      reviewedAt: Number(saved?.reviewedAt) || 0,
+      blockedAssets: Array.isArray(saved?.blockedAssets) ? saved.blockedAssets : [],
+      blockedPatterns: Array.isArray(saved?.blockedPatterns) ? saved.blockedPatterns : [],
+      preferredPatterns: Array.isArray(saved?.preferredPatterns) ? saved.preferredPatterns : [],
+      notes: Array.isArray(saved?.notes) ? saved.notes : []
+    };
+  } catch (error) {
+    return { lastReviewDate: "", reviewedAt: 0, blockedAssets: [], blockedPatterns: [], preferredPatterns: [], notes: [] };
+  }
+}
+
 const state = {
   rules: loadRules(),
   lastStrategy: "",
@@ -404,6 +423,7 @@ const state = {
   },
   marketIntel: createEmptyMarketIntel(),
   autopilot: loadAutopilotState(),
+  learningPolicy: loadLearningPolicy(),
   emaPreferences: {},
   detectedMode: "trend",
   rsiPreferences: {},
@@ -1446,7 +1466,7 @@ function renderStrategyIntelligence() {
   const learningMode = isRemoteJournalConfigured()
     ? "Обучение общее: опыт подтягивается из Supabase перед анализом и автосделками."
     : "Обучение локальное: для общего опыта подключи Supabase в блоке Общий журнал.";
-  intelDetails.textContent = `${learningMode} ${intel.notes.join(" ")}`;
+  intelDetails.textContent = `${learningMode} ${formatLearningPolicyNote()} ${intel.notes.join(" ")}`;
 }
 
 async function refreshStrategyIntelligence(force = false) {
@@ -1730,6 +1750,103 @@ function getLearningPatternKey(symbol, interval, side) {
   return `${symbol || "unknown"}|${interval || "unknown"}|${side || "unknown"}`;
 }
 
+function persistLearningPolicy() {
+  localStorage.setItem(learningPolicyKey, JSON.stringify(state.learningPolicy));
+}
+
+function getLocalDateKey(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function shouldRunDailyLearningReview(force = false) {
+  if (force) return true;
+  const now = new Date();
+  return now.getHours() >= learningReviewHour && state.learningPolicy.lastReviewDate !== getLocalDateKey(now);
+}
+
+async function runDailyLearningReview(force = false) {
+  if (!shouldRunDailyLearningReview(force)) return false;
+  await refreshSharedLearningMemory(true);
+  const closed = state.paperTrades.filter((trade) => !isPaperTradeActive(trade));
+  const today = getLocalDateKey();
+  if (closed.length < 10) {
+    state.learningPolicy = {
+      ...state.learningPolicy,
+      lastReviewDate: today,
+      reviewedAt: Date.now(),
+      notes: [`Самоанализ: закрытых сделок ${closed.length}, для корректировки нужно минимум 10.`]
+    };
+    persistLearningPolicy();
+    renderStrategyIntelligence();
+    return true;
+  }
+
+  const assetStats = buildLearningGroupStats(closed, (trade) => trade.asset);
+  const patternStats = buildLearningGroupStats(closed, (trade) => getLearningPatternKey(trade.asset, trade.timeframe, trade.side));
+  const blockedAssets = Object.values(assetStats)
+    .filter((item) => item.trades >= 5 && (item.winRate < 45 || item.avgPnl <= 0))
+    .map((item) => item.key);
+  const blockedPatterns = Object.values(patternStats)
+    .filter((item) => item.trades >= 3 && (item.winRate < 50 || item.avgPnl <= 0))
+    .map((item) => item.key);
+  const preferredPatterns = Object.values(patternStats)
+    .filter((item) => item.trades >= 5 && item.winRate >= targetWinRatePct && item.avgPnl > 0)
+    .sort((a, b) => b.avgPnl - a.avgPnl)
+    .slice(0, 12)
+    .map((item) => item.key);
+
+  state.learningPolicy = {
+    lastReviewDate: today,
+    reviewedAt: Date.now(),
+    blockedAssets,
+    blockedPatterns,
+    preferredPatterns,
+    notes: [
+      `Самоанализ: ${closed.length} закрытых сделок.`,
+      `Заблокировано монет: ${blockedAssets.length}.`,
+      `Заблокировано связок: ${blockedPatterns.length}.`,
+      `Приоритетных связок: ${preferredPatterns.length}.`
+    ]
+  };
+  persistLearningPolicy();
+  renderStrategyIntelligence();
+  generateStrategy(state.lastUserIdea);
+  return true;
+}
+
+function buildLearningGroupStats(trades, keyFn) {
+  return trades.reduce((acc, trade) => {
+    const key = keyFn(trade);
+    if (!key) return acc;
+    acc[key] ||= { key, trades: 0, wins: 0, losses: 0, pnl: 0, avgPnl: 0, winRate: 0 };
+    acc[key].trades += 1;
+    acc[key].pnl += Number(trade.pnl) || 0;
+    if ((Number(trade.pnl) || 0) > 0) acc[key].wins += 1;
+    else acc[key].losses += 1;
+    acc[key].avgPnl = acc[key].pnl / acc[key].trades;
+    acc[key].winRate = (acc[key].wins / acc[key].trades) * 100;
+    return acc;
+  }, {});
+}
+
+function formatLearningPolicyNote() {
+  const policy = state.learningPolicy;
+  if (!policy?.reviewedAt) return "Самоанализ еще не проводился.";
+  return `${policy.notes.join(" ")} Последний пересмотр: ${new Date(policy.reviewedAt).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}.`;
+}
+
+function isAssetQuarantined(symbol) {
+  return baseQuarantineAssets.has(symbol) || state.learningPolicy.blockedAssets.includes(symbol);
+}
+
+function isPatternBlocked(symbol, interval, side) {
+  return state.learningPolicy.blockedPatterns.includes(getLearningPatternKey(symbol, interval, side));
+}
+
+function isPatternPreferred(symbol, interval, side) {
+  return state.learningPolicy.preferredPatterns.includes(getLearningPatternKey(symbol, interval, side));
+}
+
 function calculateMonthlyGoalProgress() {
   const since = Date.now() - 30 * 24 * 60 * 60 * 1000;
   const trades = state.paperTrades.filter((trade) => !isPaperTradeActive(trade) && (trade.closedAt || trade.openedAt) >= since);
@@ -1860,6 +1977,7 @@ function scoreAutopilotCandidate(context, tradePlan, signalQuality, intel) {
   if (monthly?.currentPct < -6) score -= 10;
   if (intel?.derivatives?.sideBias === "CAUTION") score -= 6;
   if (intel?.derivatives?.sideBias === best.side) score += 4;
+  if (isPatternPreferred(context.asset, context.timeframe, best.side)) score += 8;
   return Math.round(score);
 }
 
@@ -1872,8 +1990,11 @@ function evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan =
   if (context.timeframe === "15m" && best.side === "LONG") {
     return { ok: false, reason: "15m LONG отключен после анализа журнала", score: best.score - 70 };
   }
-  if (autopilotQuarantineAssets.has(context.asset)) {
+  if (isAssetQuarantined(context.asset)) {
     return { ok: false, reason: `${context.asset} в карантине после серии слабых сделок`, score: best.score - 65 };
+  }
+  if (isPatternBlocked(context.asset, context.timeframe, best.side)) {
+    return { ok: false, reason: "связка заблокирована ежедневным самоанализом", score: best.score - 60 };
   }
   if (getActiveAutopilotSideCount(best.side) >= autopilotMaxActivePerSide) {
     return { ok: false, reason: `лимит ${autopilotMaxActivePerSide} активных ${best.side}`, score: best.score - 45 };
@@ -1961,6 +2082,7 @@ async function runAutopilotScan(force = false) {
   if (!force && now - state.autopilot.lastScanAt < autopilotScanMs) return;
   state.autopilot.lastScanAt = now;
   await refreshSharedLearningMemory(false);
+  await runDailyLearningReview(false);
 
   if (now - state.autopilot.lastEntryAt < 5 * 60 * 1000) {
     state.autopilot.lastMessage = "пауза после входа";
@@ -2380,8 +2502,11 @@ function getManualStrategyRestrictions(context, scenario) {
   if (context.timeframe === "15m" && scenario.side === "LONG") {
     warnings.push("15m LONG не применять для ручного входа: по журналу 1 WIN / 11 LOSS.");
   }
-  if (autopilotQuarantineAssets.has(context.asset)) {
+  if (isAssetQuarantined(context.asset)) {
     warnings.push(`${context.asset} в карантине после анализа журнала: ручной вход только после отдельного подтверждения и минимальным размером.`);
+  }
+  if (isPatternBlocked(context.asset, context.timeframe, scenario.side)) {
+    warnings.push("Эта связка монета/таймфрейм/сторона заблокирована ежедневным самоанализом.");
   }
   if (hasRecentSimilarAutopilotSignal(context, scenario)) {
     warnings.push("Похожий авто-сигнал уже был недавно: не дублировать вход руками без нового сетапа.");
@@ -4307,8 +4432,13 @@ refreshStrategyIntelligence(false);
 refreshOpenPaperTradePrices(true);
 syncRemoteJournal(true);
 refreshCmcRadar(false);
+runDailyLearningReview(false);
+if (state.autopilot.enabled) {
+  runAutopilotScan(true);
+}
 window.setInterval(() => refreshOpenPaperTradePrices(), 10000);
 window.setInterval(() => runAutopilotScan(), autopilotScanMs);
+window.setInterval(() => runDailyLearningReview(false), learningReviewMs);
 window.setInterval(() => syncRemoteJournal(false), 30000);
 window.setInterval(() => refreshCmcRadar(false), 10 * 60 * 1000);
 
