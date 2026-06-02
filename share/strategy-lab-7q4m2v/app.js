@@ -7,6 +7,7 @@ const learningPolicyKey = "crypto-strategy-bot-learning-policy-v1";
 const remoteJournalConfigKey = "crypto-strategy-bot-remote-journal-v1";
 const remoteClientIdKey = "crypto-strategy-bot-client-id";
 const cmcRadarConfigKey = "crypto-strategy-bot-cmc-radar-v1";
+const newsAnalyticsConfigKey = "crypto-strategy-bot-news-analytics-v1";
 
 const currentSessionId = getCurrentSessionId();
 const currentClientId = getCurrentClientId();
@@ -359,6 +360,30 @@ function normalizeCmcRadarConfig(config = {}) {
   };
 }
 
+function loadNewsAnalyticsConfig() {
+  const sharedConfig = normalizeNewsAnalyticsConfig(window.BOTALIN_NEWS_CONFIG);
+  try {
+    const saved = JSON.parse(localStorage.getItem(newsAnalyticsConfigKey));
+    const savedConfig = normalizeNewsAnalyticsConfig(saved);
+    return hasNewsAnalyticsConfig(savedConfig) ? { ...sharedConfig, ...savedConfig } : sharedConfig;
+  } catch (error) {
+    return sharedConfig;
+  }
+}
+
+function normalizeNewsAnalyticsConfig(config = {}) {
+  return {
+    exchangeUrl: String(config?.exchangeUrl || "").trim(),
+    cmcApiKey: String(config?.cmcApiKey || "").trim(),
+    cmcProxyUrl: String(config?.cmcProxyUrl || "").trim().replace(/\/$/, ""),
+    cftcUrl: String(config?.cftcUrl || "https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm").trim()
+  };
+}
+
+function hasNewsAnalyticsConfig(config) {
+  return Boolean(config?.exchangeUrl || config?.cmcApiKey || config?.cmcProxyUrl || config?.cftcUrl);
+}
+
 function createEmptyMarketIntel() {
   return {
     loading: false,
@@ -368,6 +393,7 @@ function createEmptyMarketIntel() {
     sentiment: null,
     learning: null,
     monthlyGoal: null,
+    news: null,
     notes: ["Интеллект-фильтры ждут обновления."]
   };
 }
@@ -425,6 +451,13 @@ const state = {
     status: "off",
     error: ""
   },
+  newsAnalytics: {
+    config: loadNewsAnalyticsConfig(),
+    items: [],
+    updatedAt: 0,
+    status: "off",
+    error: ""
+  },
   marketIntel: createEmptyMarketIntel(),
   autopilot: loadAutopilotState(),
   learningPolicy: loadLearningPolicy(),
@@ -464,6 +497,14 @@ const cmcStatus = document.querySelector("[data-cmc-status]");
 const cmcSave = document.querySelector("[data-cmc-save]");
 const cmcRefresh = document.querySelector("[data-cmc-refresh]");
 const cmcRadarList = document.querySelector("[data-cmc-radar-list]");
+const exchangeNewsUrl = document.querySelector("#exchangeNewsUrl");
+const cmcNewsApiKey = document.querySelector("#cmcNewsApiKey");
+const cmcNewsProxyUrl = document.querySelector("#cmcNewsProxyUrl");
+const cftcNewsUrl = document.querySelector("#cftcNewsUrl");
+const newsStatus = document.querySelector("[data-news-status]");
+const newsSave = document.querySelector("[data-news-save]");
+const newsRefresh = document.querySelector("[data-news-refresh]");
+const newsList = document.querySelector("[data-news-list]");
 const trainingInput = document.querySelector("#trainingInput");
 const rulesContainer = document.querySelector("[data-rules]");
 const sourcesContainer = document.querySelector("[data-sources]");
@@ -1042,6 +1083,227 @@ function renderCmcRadar() {
   });
 }
 
+function initNewsAnalyticsControls() {
+  const config = state.newsAnalytics.config;
+  exchangeNewsUrl.value = config.exchangeUrl;
+  cmcNewsApiKey.value = config.cmcApiKey;
+  cmcNewsProxyUrl.value = config.cmcProxyUrl;
+  cftcNewsUrl.value = config.cftcUrl;
+  renderNewsAnalytics();
+}
+
+function saveNewsAnalyticsConfig() {
+  state.newsAnalytics.config = normalizeNewsAnalyticsConfig({
+    exchangeUrl: exchangeNewsUrl.value,
+    cmcApiKey: cmcNewsApiKey.value,
+    cmcProxyUrl: cmcNewsProxyUrl.value,
+    cftcUrl: cftcNewsUrl.value
+  });
+  localStorage.setItem(newsAnalyticsConfigKey, JSON.stringify(state.newsAnalytics.config));
+  renderNewsAnalytics();
+  refreshNewsAnalytics(true);
+}
+
+function isNewsAnalyticsConfigured() {
+  const config = state.newsAnalytics.config;
+  return Boolean(config.exchangeUrl || config.cmcProxyUrl || config.cmcApiKey || config.cftcUrl);
+}
+
+function setNewsAnalyticsStatus(status, error = "") {
+  state.newsAnalytics.status = status;
+  state.newsAnalytics.error = error;
+  renderNewsAnalytics();
+}
+
+async function refreshNewsAnalytics(force = false) {
+  if (!isNewsAnalyticsConfigured()) {
+    setNewsAnalyticsStatus("off");
+    return;
+  }
+  if (!force && Date.now() - state.newsAnalytics.updatedAt < 15 * 60 * 1000) return;
+  setNewsAnalyticsStatus("sync");
+  try {
+    const items = await fetchNewsAnalyticsItems();
+    state.newsAnalytics.items = items.map(analyzeNewsItem).sort((a, b) => b.publishedAt - a.publishedAt).slice(0, 40);
+    state.newsAnalytics.updatedAt = Date.now();
+    setNewsAnalyticsStatus(`${state.newsAnalytics.items.length}`);
+    generateStrategy(state.lastUserIdea);
+  } catch (error) {
+    setNewsAnalyticsStatus("error", "Новости недоступны: проверь URL, CMC key или proxy");
+  }
+}
+
+async function fetchNewsAnalyticsItems() {
+  const config = state.newsAnalytics.config;
+  const batches = await Promise.allSettled([
+    config.exchangeUrl ? fetchGenericNewsFeed(config.exchangeUrl, "exchange") : Promise.resolve([]),
+    (config.cmcProxyUrl || config.cmcApiKey || state.cmcRadar.config.apiKey) ? fetchCmcNewsFeed(config) : Promise.resolve([]),
+    config.cftcUrl ? fetchGenericNewsFeed(config.cftcUrl, "cftc") : Promise.resolve([])
+  ]);
+  return batches.flatMap((batch) => batch.status === "fulfilled" ? batch.value : []);
+}
+
+async function fetchCmcNewsFeed(config) {
+  const params = new URLSearchParams({ limit: "20" });
+  const url = config.cmcProxyUrl
+    ? `${config.cmcProxyUrl}?${params.toString()}`
+    : `https://pro-api.coinmarketcap.com/v1/content/latest?${params.toString()}`;
+  const apiKey = config.cmcApiKey || state.cmcRadar.config.apiKey;
+  const response = await fetch(url, {
+    headers: config.cmcProxyUrl ? {} : { "X-CMC_PRO_API_KEY": apiKey }
+  });
+  if (!response.ok) throw new Error("CMC news request failed");
+  return normalizeNewsPayload(await response.json(), "cmc");
+}
+
+async function fetchGenericNewsFeed(url, source) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`${source} news request failed`);
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) return normalizeNewsPayload(await response.json(), source);
+  return normalizeNewsText(await response.text(), source, url);
+}
+
+function normalizeNewsPayload(payload, source) {
+  const rawItems = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.data)
+      ? payload.data
+      : Array.isArray(payload?.items)
+        ? payload.items
+        : Array.isArray(payload?.results)
+          ? payload.results
+          : [];
+  return rawItems.map((item) => normalizeNewsItem(item, source)).filter(Boolean);
+}
+
+function normalizeNewsItem(item, source) {
+  if (!item) return null;
+  const title = String(item.title || item.headline || item.name || item.enTitle || "").trim();
+  const body = String(item.description || item.subtitle || item.summary || item.content || item.text || "").trim();
+  if (!title && !body) return null;
+  const symbols = [
+    ...(Array.isArray(item.currencies) ? item.currencies.map((currency) => currency.symbol || currency.name) : []),
+    ...(Array.isArray(item.assets) ? item.assets : []),
+    ...(Array.isArray(item.coins) ? item.coins : []),
+    item.symbol
+  ].filter(Boolean).map((symbol) => String(symbol).toUpperCase().replace("/USDT", ""));
+  return {
+    source,
+    title,
+    body,
+    url: String(item.url || item.link || item.source_url || ""),
+    publishedAt: parseNewsDate(item.published_at || item.publishedAt || item.created_at || item.releaseDate || item.date),
+    rawSentiment: String(item.sentiment || item.marketSentiment || item.direction || item.label || "").toLowerCase(),
+    symbols
+  };
+}
+
+function normalizeNewsText(text, source, url = "") {
+  const clean = stripTags(text).replace(/\s+/g, " ").trim();
+  if (!clean) return [];
+  if (source === "cftc") {
+    return [{
+      source,
+      title: "CFTC Commitments of Traders",
+      body: clean.slice(0, 1200),
+      url,
+      publishedAt: Date.now(),
+      rawSentiment: "",
+      symbols: ["BTC", "ETH"]
+    }];
+  }
+  return clean
+    .split(/(?<=[.!?])\s+/)
+    .filter((line) => line.length > 24)
+    .slice(0, 10)
+    .map((line) => ({
+      source,
+      title: line.slice(0, 120),
+      body: line,
+      url,
+      publishedAt: Date.now(),
+      rawSentiment: "",
+      symbols: extractSymbolsFromText(line)
+    }));
+}
+
+function parseNewsDate(value) {
+  const parsed = value ? new Date(value).getTime() : 0;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : Date.now();
+}
+
+function analyzeNewsItem(item) {
+  const text = `${item.rawSentiment} ${item.title} ${item.body}`.toLowerCase();
+  const bullishWords = ["bull", "bullish", "листинг", "listing", "launch", "approval", "approve", "etf inflow", "partnership", "upgrade", "mainnet", "record inflow", "accumulation", "longs increase"];
+  const bearishWords = ["bear", "bearish", "delist", "delisting", "hack", "exploit", "lawsuit", "fine", "ban", "outflow", "liquidation", "default", "probe", "investigation", "shorts increase"];
+  const regulatoryWords = ["cftc", "sec", "regulator", "commission", "enforcement", "санкц", "регулятор", "расслед"];
+  let score = 0;
+  bullishWords.forEach((word) => { if (text.includes(word)) score += 14; });
+  bearishWords.forEach((word) => { if (text.includes(word)) score -= 16; });
+  if (item.source === "exchange" && /bullish|long|рост|быч/.test(text)) score += 18;
+  if (item.source === "exchange" && /bearish|short|паден|медвеж/.test(text)) score -= 18;
+  if (item.source === "cftc" && /non-commercial|managed money|leveraged/.test(text)) score += text.includes("long") ? 8 : 0;
+  if (regulatoryWords.some((word) => text.includes(word)) && score < 0) score -= 8;
+  const symbols = [...new Set([...(item.symbols || []), ...extractSymbolsFromText(`${item.title} ${item.body}`)])];
+  const boundedScore = Math.max(-100, Math.min(100, score));
+  return {
+    ...item,
+    symbols,
+    score: boundedScore,
+    sentiment: boundedScore >= 18 ? "bullish" : boundedScore <= -18 ? "bearish" : "neutral",
+    isRegulatory: regulatoryWords.some((word) => text.includes(word))
+  };
+}
+
+function extractSymbolsFromText(text) {
+  const upper = String(text || "").toUpperCase();
+  const symbols = [...asset.options].map((option) => option.value.replace("/USDT", ""));
+  return symbols.filter((symbol) => upper.includes(symbol));
+}
+
+function summarizeNewsForAsset(symbol = asset.value) {
+  const assetSymbol = symbol.replace("/USDT", "");
+  const relevant = state.newsAnalytics.items.filter((item) => {
+    if (!item.symbols.length) return item.source === "cftc" && ["BTC", "ETH"].includes(assetSymbol);
+    return item.symbols.includes(assetSymbol) || item.symbols.includes("BTC");
+  }).slice(0, 8);
+  if (!relevant.length) return { score: 0, bias: "NEUTRAL", items: [], regulatoryRisk: false, summary: "новостной фон не подключен или нет релевантных новостей" };
+  const score = relevant.reduce((sum, item) => sum + item.score, 0) / relevant.length;
+  const regulatoryRisk = relevant.some((item) => item.isRegulatory && item.score <= -18);
+  const bias = score >= 14 ? "BULLISH" : score <= -14 ? "BEARISH" : "NEUTRAL";
+  return {
+    score,
+    bias,
+    items: relevant,
+    regulatoryRisk,
+    summary: `${bias} · ${score >= 0 ? "+" : ""}${score.toFixed(0)} · ${relevant.length} нов.`
+  };
+}
+
+function renderNewsAnalytics() {
+  newsStatus.textContent = state.newsAnalytics.status;
+  if (!state.newsAnalytics.items.length) {
+    newsList.innerHTML = `<span>${escapeHtml(state.newsAnalytics.error || "Новости добавят бычий/медвежий фильтр к стратегии и автоботу.")}</span>`;
+    return;
+  }
+  const summary = summarizeNewsForAsset(asset.value);
+  newsList.innerHTML = `
+    <button type="button">
+      <strong>${escapeHtml(summary.summary)}</strong>
+      <span>Биржа + CMC News + CFTC COT влияют на score сделки</span>
+      <em>${summary.bias}</em>
+    </button>
+    ${summary.items.slice(0, 5).map((item) => `
+      <button type="button">
+        <strong>${escapeHtml(item.source.toUpperCase())} · ${escapeHtml(item.sentiment)}</strong>
+        <span>${escapeHtml(item.title || item.body.slice(0, 90))}</span>
+        <em>${item.score >= 0 ? "+" : ""}${item.score}</em>
+      </button>
+    `).join("")}
+  `;
+}
+
 function renderRules() {
   rulesContainer.innerHTML = "";
   state.rules.slice(-6).forEach((rule) => {
@@ -1179,6 +1441,7 @@ function getContext() {
     ema: getSelectedEmaIndicators(),
     deposit: getDepositValue(),
     intel: state.marketIntel,
+    news: summarizeNewsForAsset(asset.value),
     live: getLiveSnapshot()
   };
 }
@@ -1223,6 +1486,7 @@ function buildStrategy(userIdea = "", tradePlan = null, signalQuality = null) {
     .map((source) => source.title)
     .join("; ");
   const liveBlock = buildLiveStrategyBlock(context);
+  const newsBlock = buildNewsStrategyBlock(context);
   const intelligenceBlock = buildIntelligenceStrategyBlock(context);
   const tradePlanBlock = buildTradePlanBlock(tradePlan);
   const rsiBlock = buildRsiStrategyBlock(context);
@@ -1240,6 +1504,7 @@ function buildStrategy(userIdea = "", tradePlan = null, signalQuality = null) {
       <p>Рабочая гипотеза: ${setup}. Направление: ${side}. Таймфрейм исполнения: ${context.timeframe}.</p>
     </section>
     ${liveBlock}
+    ${newsBlock}
     ${intelligenceBlock}
     ${tradePlanBlock}
     ${signalQualityBlock}
@@ -1454,6 +1719,32 @@ function buildLiveStrategyBlock(context) {
   `;
 }
 
+function buildNewsStrategyBlock(context) {
+  const news = context.news || summarizeNewsForAsset(context.asset);
+  const items = news.items?.slice(0, 4) || [];
+  const action = news.bias === "BULLISH"
+    ? "long-сценарии получают подтверждение, short требует сильного графического сигнала"
+    : news.bias === "BEARISH"
+      ? "short-сценарии получают подтверждение, long лучше брать только после разворота"
+      : "новости не дают сильного перекоса, решает график и риск";
+  const regulatory = news.regulatoryRisk
+    ? "<li>Есть регуляторный негатив: автобот снижает score и не должен брать агрессивный long.</li>"
+    : "";
+
+  return `
+    <section>
+      <h3>Новостной фон</h3>
+      <p><strong>${escapeHtml(news.summary)}</strong>. ${escapeHtml(action)}.</p>
+      <ul>
+        ${regulatory}
+        ${items.length
+          ? items.map((item) => `<li>${escapeHtml(item.source.toUpperCase())}: ${escapeHtml(item.sentiment)} (${item.score >= 0 ? "+" : ""}${item.score}) — ${escapeHtml(item.title || item.body.slice(0, 100))}</li>`).join("")
+          : "<li>Ленты не подключены или по монете нет релевантных заголовков.</li>"}
+      </ul>
+    </section>
+  `;
+}
+
 function buildIntelligenceStrategyBlock(context) {
   const intel = context.intel || createEmptyMarketIntel();
   const backtestText = intel.backtest
@@ -1518,8 +1809,9 @@ function generateStrategy(userIdea = "") {
   confidence.textContent = `${context.rules.length + context.sourceRules.length} правил учтено`;
   rr.textContent = context.conservative ? "1 : 2.2" : "1 : 1.7";
   maxRisk.textContent = `${context.risk.toFixed(2)}%`;
-  filterCount.textContent = String((context.conservative ? 4 : 3) + context.rsi.filter((indicator) => indicator.use).length + context.ema.filter((indicator) => indicator.use).length + 3);
+  filterCount.textContent = String((context.conservative ? 4 : 3) + context.rsi.filter((indicator) => indicator.use).length + context.ema.filter((indicator) => indicator.use).length + 4);
   renderSignalQualityReadout(signalQuality);
+  renderNewsAnalytics();
   renderStrategyIntelligence();
   chartLabel.textContent = `${context.asset} · ${context.timeframe}`;
   chartTitle.textContent = context.live.active
@@ -1546,11 +1838,13 @@ function renderSignalQualityReadout(signalQuality) {
 function renderStrategyIntelligence() {
   state.marketIntel.learning = analyzeLearningJournal();
   state.marketIntel.monthlyGoal = calculateMonthlyGoalProgress();
+  state.marketIntel.news = summarizeNewsForAsset(asset.value);
   const intel = state.marketIntel;
   const backtest = intel.backtest;
   const goal = intel.monthlyGoal;
   const derivatives = intel.derivatives;
   const learning = intel.learning;
+  const news = intel.news;
 
   backtestScore.textContent = backtest
     ? `${backtest.winRate.toFixed(0)}% · ${backtest.expectancyPct >= 0 ? "+" : ""}${backtest.expectancyPct.toFixed(2)}%`
@@ -1570,7 +1864,8 @@ function renderStrategyIntelligence() {
   const learningMode = isRemoteJournalConfigured()
     ? "Обучение общее: опыт подтягивается из Supabase перед анализом и автосделками."
     : "Обучение локальное: для общего опыта подключи Supabase в блоке Общий журнал.";
-  intelDetails.textContent = `${learningMode} ${formatLearningPolicyNote()} ${intel.notes.join(" ")}`;
+  const newsText = news ? `Новостной фон: ${news.summary}.` : "";
+  intelDetails.textContent = `${learningMode} ${formatLearningPolicyNote()} ${newsText} ${intel.notes.join(" ")}`;
 }
 
 async function refreshStrategyIntelligence(force = false) {
@@ -2081,6 +2376,10 @@ function scoreAutopilotCandidate(context, tradePlan, signalQuality, intel) {
   if (monthly?.currentPct < -6) score -= 10;
   if (intel?.derivatives?.sideBias === "CAUTION") score -= 6;
   if (intel?.derivatives?.sideBias === best.side) score += 4;
+  const news = context.news || summarizeNewsForAsset(context.asset);
+  if (news.bias === "BULLISH") score += best.side === "LONG" ? 6 : -5;
+  if (news.bias === "BEARISH") score += best.side === "SHORT" ? 6 : -7;
+  if (news.regulatoryRisk) score -= 8;
   if (isPatternPreferred(context.asset, context.timeframe, best.side)) score += 8;
   return Math.round(score);
 }
@@ -2132,6 +2431,10 @@ function evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan =
   if (intel?.derivatives?.sideBias === "CAUTION") return { ok: false, reason: "деривативы показывают перегрев", score: best.score - 25 };
   if (intel?.sentiment?.value >= 82 && best.side === "LONG") return { ok: false, reason: "экстремальная жадность блокирует late long", score: best.score - 20 };
   if (intel?.sentiment?.value <= 18 && best.side === "SHORT") return { ok: false, reason: "экстремальный страх блокирует late short", score: best.score - 20 };
+  const news = context.news || summarizeNewsForAsset(context.asset);
+  if (news.regulatoryRisk && best.side === "LONG") return { ok: false, reason: "регуляторный негатив из новостей блокирует long", score: best.score - 35 };
+  if (news.bias === "BULLISH" && best.side === "SHORT") return { ok: false, reason: "новостной фон против short", score: best.score - 24 };
+  if (news.bias === "BEARISH" && best.side === "LONG") return { ok: false, reason: "новостной фон против long", score: best.score - 28 };
   return { ok: true, reason: "фильтры 60% пройдены", score: best.score };
 }
 
@@ -2436,6 +2739,8 @@ function evaluateScenarioQuality(context, scenario) {
   addScore(structureResult.delta, structureResult.reason);
   const radarResult = evaluateMarketRadarForScenario(context);
   addScore(radarResult.delta, radarResult.reason);
+  const newsResult = evaluateNewsForScenario(context, scenario);
+  addScore(newsResult.delta, newsResult.reason);
   const historyResult = evaluateHistoryRestrictionsForScenario(context, scenario);
   addScore(historyResult.delta, historyResult.reason);
 
@@ -2587,6 +2892,28 @@ function evaluateMarketRadarForScenario(context) {
   if (radarAsset.volumeChange24h < -25) {
     delta -= 3;
     reasons.push("интерес за 24ч падает");
+  }
+  return { delta, reason: reasons.join("; ") };
+}
+
+function evaluateNewsForScenario(context, scenario) {
+  const news = context.news || summarizeNewsForAsset(context.asset);
+  if (!news.items?.length) return { delta: 0, reason: "новостной фон не подключен" };
+  let delta = 0;
+  const reasons = [];
+  if (news.bias === "BULLISH") {
+    delta += scenario.side === "LONG" ? 9 : -7;
+    reasons.push(scenario.side === "LONG" ? "новости поддерживают long" : "новости против short");
+  } else if (news.bias === "BEARISH") {
+    delta += scenario.side === "SHORT" ? 9 : -9;
+    reasons.push(scenario.side === "SHORT" ? "новости поддерживают short" : "новости против long");
+  } else {
+    delta += 1;
+    reasons.push("новостной фон нейтральный");
+  }
+  if (news.regulatoryRisk) {
+    delta -= scenario.side === "LONG" ? 8 : 3;
+    reasons.push("регуляторный риск требует снижения агрессии");
   }
   return { delta, reason: reasons.join("; ") };
 }
@@ -4510,6 +4837,8 @@ remoteSave.addEventListener("click", saveRemoteJournalConfig);
 remoteSync.addEventListener("click", () => syncRemoteJournal(true));
 cmcSave.addEventListener("click", saveCmcRadarConfig);
 cmcRefresh.addEventListener("click", () => refreshCmcRadar(true));
+newsSave.addEventListener("click", saveNewsAnalyticsConfig);
+newsRefresh.addEventListener("click", () => refreshNewsAnalytics(true));
 paperSide.addEventListener("change", () => {
   resetPaperTrade();
 });
@@ -4578,6 +4907,7 @@ renderRsiControls();
 renderEmaControls();
 initRemoteJournalControls();
 initCmcRadarControls();
+initNewsAnalyticsControls();
 deposit.value = String(loadDeposit());
 reconcileLegacyPaperBudget();
 updateRiskLabel();
@@ -4589,6 +4919,7 @@ refreshStrategyIntelligence(false);
 refreshOpenPaperTradePrices(true);
 syncRemoteJournal(true);
 refreshCmcRadar(false);
+refreshNewsAnalytics(false);
 runDailyLearningReview(false);
 if (state.autopilot.enabled) {
   runAutopilotScan(true);
@@ -4598,6 +4929,7 @@ window.setInterval(() => runAutopilotScan(), autopilotScanMs);
 window.setInterval(() => runDailyLearningReview(false), learningReviewMs);
 window.setInterval(() => syncRemoteJournal(false), 30000);
 window.setInterval(() => refreshCmcRadar(false), 10 * 60 * 1000);
+window.setInterval(() => refreshNewsAnalytics(false), 15 * 60 * 1000);
 
 function startLiveConnection() {
   state.live.enabled = true;

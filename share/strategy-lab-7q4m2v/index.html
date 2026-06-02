@@ -158,6 +158,36 @@
 
         <section class="panel-section">
           <div class="section-title">
+            <span>Новостной фон</span>
+            <span class="mini-counter" data-news-status>off</span>
+          </div>
+          <label>
+            Биржевая лента URL
+            <input id="exchangeNewsUrl" type="url" placeholder="Bybit/биржа news proxy URL">
+          </label>
+          <label>
+            CMC News API key
+            <input id="cmcNewsApiKey" type="password" placeholder="если пусто, берется CMC radar key">
+          </label>
+          <label>
+            CMC News proxy URL
+            <input id="cmcNewsProxyUrl" type="url" placeholder="опционально для /v1/content/latest">
+          </label>
+          <label>
+            CFTC COT URL
+            <input id="cftcNewsUrl" type="url" placeholder="https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm">
+          </label>
+          <div class="remote-actions">
+            <button class="primary-action" type="button" data-news-save>Сохранить</button>
+            <button class="secondary-action" type="button" data-news-refresh>Обновить</button>
+          </div>
+          <div class="radar-list news-list" data-news-list>
+            <span>Новости добавят бычий/медвежий фильтр к стратегии и автоботу.</span>
+          </div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-title">
             <span>RSI индикаторы</span>
             <span class="mini-counter" data-rsi-asset>BTC</span>
           </div>
