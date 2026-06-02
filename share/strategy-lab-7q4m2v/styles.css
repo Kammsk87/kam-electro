@@ -508,6 +508,10 @@ canvas {
   margin-bottom: 0;
 }
 
+.scalping-toggle {
+  margin: 8px 0 10px;
+}
+
 .paper-metrics {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

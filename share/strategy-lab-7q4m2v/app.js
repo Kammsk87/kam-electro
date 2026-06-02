@@ -21,6 +21,11 @@ const manualMaxPortfolioPct = 50;
 const autopilotMaxSingleTradePct = 7;
 const autopilotMaxPortfolioPct = 35;
 const strictAutopilotMinScore = 82;
+const scalpingMinScore = 86;
+const scalpingRiskPct = 0.35;
+const scalpingMaxSingleTradePct = 4;
+const scalpingMaxSpreadPct = 0.035;
+const scalpingMinVolumeRatio = 1.25;
 const dailyMaxLossPct = 3;
 const dailyMaxStops = 3;
 const paperFeePct = 0.12;
@@ -409,12 +414,13 @@ function loadAutopilotState() {
     const saved = JSON.parse(localStorage.getItem(autopilotKey));
     return {
       enabled: Boolean(saved?.enabled),
+      scalpingEnabled: Boolean(saved?.scalpingEnabled),
       lastEntryAt: Number(saved?.lastEntryAt) || 0,
       lastScanAt: 0,
       lastMessage: String(saved?.lastMessage || "наблюдает")
     };
   } catch (error) {
-    return { enabled: false, lastEntryAt: 0, lastScanAt: 0, lastMessage: "наблюдает" };
+    return { enabled: false, scalpingEnabled: false, lastEntryAt: 0, lastScanAt: 0, lastMessage: "наблюдает" };
   }
 }
 
@@ -548,6 +554,7 @@ const autopilotStatus = document.querySelector("[data-autopilot-status]");
 const intelDetails = document.querySelector("[data-intel-details]");
 const intelRefresh = document.querySelector("[data-intel-refresh]");
 const autopilotToggle = document.querySelector("[data-autopilot-toggle]");
+const scalpingMode = document.querySelector("#scalpingMode");
 const liveStatus = document.querySelector("[data-live-status]");
 const liveToggle = document.querySelector("[data-live-toggle]");
 const livePrice = document.querySelector("[data-live-price]");
@@ -658,6 +665,7 @@ function normalizePaperTrade(trade) {
     timeframe: String(trade.timeframe || "15m"),
     mode: String(trade.mode || ""),
     modeSource: String(trade.modeSource || ""),
+    strategyMode: String(trade.strategyMode || trade.strategySnapshot?.context?.strategyMode || "standard"),
     side,
     amount,
     deposit: Number(trade.deposit) || loadDeposit(),
@@ -868,6 +876,9 @@ function getReservedPaperBudget() {
 }
 
 function getTradeAllocationLimits(options = {}) {
+  if (options.scalping) {
+    return { singlePct: scalpingMaxSingleTradePct, portfolioPct: autopilotMaxPortfolioPct };
+  }
   return options.autopilot
     ? { singlePct: autopilotMaxSingleTradePct, portfolioPct: autopilotMaxPortfolioPct }
     : { singlePct: manualMaxSingleTradePct, portfolioPct: manualMaxPortfolioPct };
@@ -1482,6 +1493,7 @@ function getContext() {
     timeframe: timeframe.value,
     mode: resolvedMode,
     modeSource: marketMode.value === "auto" ? "auto" : "manual",
+    strategyMode: "standard",
     risk: Number(risk.value),
     conservative: conservative.checked,
     includeLongs: includeLongs.checked,
@@ -1706,6 +1718,9 @@ function buildInvestorDisciplineBlock(context, tradePlan) {
     `Лучшие сетапы: автобот входит только при score не ниже ${strictAutopilotMinScore}/100 и положительной статистике похожей связки.`,
     `Дневной стоп: после ${dailyMaxStops} стопов или убытка ${dailyMaxLossPct}% автобот прекращает входы до следующего дня.`,
     `Реализм демо: каждая сделка учитывает комиссию ${paperFeePct}% и проскальзывание ${paperSlippagePct}% на исполнении.`,
+    state.autopilot.scalpingEnabled
+      ? `Скальпинг-модуль активен: вход только на 5m/15m при EMA9/21 momentum, RSI14, VWAP, ATR и узком спреде.`
+      : "Скальпинг-модуль выключен и не участвует в автоскане.",
     context.live.active
       ? "Квантовый фильтр: live-сигнал должен подтверждаться не одной свечой, а сочетанием цены, объема, спреда и режима рынка."
       : "Квантовый фильтр: без live-данных стратегия остается гипотезой для теста, а не готовым сигналом.",
@@ -1917,13 +1932,17 @@ function renderStrategyIntelligence() {
   autopilotStatus.textContent = state.autopilot.enabled ? state.autopilot.lastMessage : "выключен";
   autopilotToggle.textContent = state.autopilot.enabled ? "Авто-бот: вкл" : "Авто-бот: выкл";
   autopilotToggle.classList.toggle("is-live", state.autopilot.enabled);
+  if (scalpingMode) scalpingMode.checked = Boolean(state.autopilot.scalpingEnabled);
   const learningMode = isRemoteJournalConfigured()
     ? "Обучение общее: опыт подтягивается из Supabase перед анализом и автосделками."
     : "Обучение локальное: для общего опыта подключи Supabase в блоке Общий журнал.";
   const newsText = news ? `Новостной фон: ${news.summary}.` : "";
+  const scalpingText = state.autopilot.scalpingEnabled
+    ? `Скальпинг включен: EMA9/21, RSI14, VWAP, ATR, объем x${scalpingMinVolumeRatio}, спред до ${scalpingMaxSpreadPct}%.`
+    : "Скальпинг выключен.";
   const riskText = `Дневной риск: ${dailyRisk.pnl >= 0 ? "+" : ""}${dailyRisk.pnl.toFixed(2)} USDT, стопов ${dailyRisk.stops}/${dailyMaxStops}, лимит ${dailyMaxLossPct}%.`;
   const rejectText = lastReject ? `Последний отказ: ${lastReject.asset} ${lastReject.timeframe} ${lastReject.side} - ${lastReject.reason}.` : "Отказов автобота пока нет.";
-  intelDetails.textContent = `${learningMode} ${formatLearningPolicyNote()} ${newsText} ${riskText} ${rejectText} ${intel.notes.join(" ")}`;
+  intelDetails.textContent = `${learningMode} ${formatLearningPolicyNote()} ${newsText} ${scalpingText} ${riskText} ${rejectText} ${intel.notes.join(" ")}`;
 }
 
 async function refreshStrategyIntelligence(force = false) {
@@ -2399,7 +2418,11 @@ function getAvailableAutopilotTimeframes() {
     .filter((value, index, list) => value && list.indexOf(value) === index);
 }
 
-function createScanContext(symbol, interval = timeframe.value, candles = [], derivatives = null, sentiment = null) {
+function getAvailableScalpingTimeframes() {
+  return ["5m", "15m"];
+}
+
+function createScanContext(symbol, interval = timeframe.value, candles = [], derivatives = null, sentiment = null, strategyMode = "standard") {
   const base = getContext();
   const live = createRestLiveSnapshot(symbol, candles);
   const mode = marketMode.value === "auto" && candles.length >= 18 ? detectMarketMode(candles) : base.mode;
@@ -2409,6 +2432,8 @@ function createScanContext(symbol, interval = timeframe.value, candles = [], der
     timeframe: interval,
     mode,
     modeSource: marketMode.value === "auto" ? "auto-scan" : base.modeSource,
+    strategyMode,
+    scanCandles: candles,
     rsi: getSelectedRsiIndicators(symbol),
     ema: getSelectedEmaIndicators(),
     news: summarizeNewsForAsset(symbol),
@@ -2451,6 +2476,13 @@ function scoreAutopilotCandidate(context, tradePlan, signalQuality, intel) {
   const gate = evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan);
   if (!gate.ok) return gate.score;
   let score = best.score;
+  if (context.strategyMode === "scalping") {
+    const scalp = tradePlan?.scalpingSignal;
+    score = Math.max(score, scalp?.score || 0);
+    if (scalp?.volumeRatio >= 1.6) score += 5;
+    if (scalp?.spreadPct <= scalpingMaxSpreadPct * 0.7) score += 4;
+    if (scalp?.atrPct >= 0.25 && scalp?.atrPct <= 1.1) score += 4;
+  }
   if (backtest?.trades >= 8) score += Math.max(-8, Math.min(16, backtest.expectancyPct * 20));
   if (backtest?.winRate >= targetWinRatePct) score += 8;
   if (backtest?.maxDrawdownPct > 4.5) score -= 8;
@@ -2479,6 +2511,9 @@ function evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan =
   const qualityPattern = getQualityPatternStat(context, best.side);
   if (dailyRisk.blocked) {
     return { ok: false, reason: `дневной стоп: ${dailyRisk.lossPct.toFixed(2)}% убытка или ${dailyRisk.stops} стопов`, score: best.score - 90 };
+  }
+  if (context.strategyMode === "scalping") {
+    return evaluateScalpingQualityGate(context, signalQuality, intel, tradePlan, dailyRisk);
   }
   if (context.timeframe === "15m" && best.side === "LONG") {
     return { ok: false, reason: "15m LONG отключен после анализа журнала", score: best.score - 70 };
@@ -2539,6 +2574,47 @@ function evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan =
   if (news.bias === "BULLISH" && best.side === "SHORT") return { ok: false, reason: "новостной фон против short", score: best.score - 24 };
   if (news.bias === "BEARISH" && best.side === "LONG") return { ok: false, reason: "новостной фон против long", score: best.score - 28 };
   return { ok: true, reason: "фильтры 60% пройдены", score: best.score };
+}
+
+function evaluateScalpingQualityGate(context, signalQuality, intel, tradePlan, dailyRisk) {
+  const best = signalQuality?.best;
+  const signal = tradePlan?.scalpingSignal || evaluateScalpingSetup(context, context.scanCandles || []);
+  const scenario = getAutopilotScenario(tradePlan, best?.side);
+  if (!best || !scenario) return { ok: false, reason: "скальпинг: нет сценария", score: -Infinity };
+  if (!getAvailableScalpingTimeframes().includes(context.timeframe)) {
+    return { ok: false, reason: "скальпинг разрешен только на 5m/15m", score: best.score - 70 };
+  }
+  if (!signal.side || signal.side !== best.side) {
+    return { ok: false, reason: "скальпинг: EMA/VWAP/RSI не совпали", score: best.score - 62 };
+  }
+  if (signal.score < scalpingMinScore) {
+    return { ok: false, reason: `скальпинг score ${signal.score}/100 ниже ${scalpingMinScore}`, score: best.score - 58 };
+  }
+  if (signal.spreadPct > scalpingMaxSpreadPct) {
+    return { ok: false, reason: `скальпинг: спред ${signal.spreadPct.toFixed(3)}% выше лимита`, score: best.score - 55 };
+  }
+  if (signal.volumeRatio < scalpingMinVolumeRatio) {
+    return { ok: false, reason: `скальпинг: объем x${signal.volumeRatio.toFixed(2)} слабый`, score: best.score - 48 };
+  }
+  if (signal.atrPct < 0.18 || signal.atrPct > 1.8) {
+    return { ok: false, reason: `скальпинг: ATR ${signal.atrPct.toFixed(2)}% вне диапазона`, score: best.score - 42 };
+  }
+  if (intel?.higherTimeframe?.direction && !["NEUTRAL", "UNKNOWN", best.side].includes(intel.higherTimeframe.direction)) {
+    return { ok: false, reason: `скальпинг: старший EMA-фильтр против ${best.side}`, score: best.score - 44 };
+  }
+  const news = context.news || summarizeNewsForAsset(context.asset);
+  if (news.regulatoryRisk) return { ok: false, reason: "скальпинг: регуляторный риск", score: best.score - 40 };
+  if (hasRecentSimilarAutopilotSignal(context, scenario)) {
+    return { ok: false, reason: "скальпинг: дубль похожего входа", score: best.score - 45 };
+  }
+  const pattern = getQualityPatternStat(context, best.side);
+  if (pattern?.trades >= 3 && (pattern.winRate < targetWinRatePct || pattern.avgPnl <= 0)) {
+    return { ok: false, reason: `скальпинг-паттерн слабый: ${pattern.winRate.toFixed(0)}%`, score: best.score - 36 };
+  }
+  if (dailyRisk.stops >= 2) {
+    return { ok: false, reason: "скальпинг выключен после 2 дневных стопов", score: best.score - 45 };
+  }
+  return { ok: true, reason: "скальпинг-фильтры пройдены", score: Math.max(best.score, signal.score) };
 }
 
 function isSuspiciousPumpAsset(radarAsset) {
@@ -2612,9 +2688,21 @@ function toggleAutopilot() {
   }
 }
 
+function toggleScalpingMode() {
+  state.autopilot.scalpingEnabled = scalpingMode.checked;
+  state.autopilot.lastMessage = state.autopilot.scalpingEnabled
+    ? "скальпинг включен, ждет микро-сетап"
+    : "скальпинг выключен";
+  persistAutopilot();
+  renderStrategyIntelligence();
+  generateStrategy(state.lastUserIdea);
+  if (state.autopilot.enabled) runAutopilotScan(true);
+}
+
 function persistAutopilot() {
   localStorage.setItem(autopilotKey, JSON.stringify({
     enabled: state.autopilot.enabled,
+    scalpingEnabled: state.autopilot.scalpingEnabled,
     lastEntryAt: state.autopilot.lastEntryAt,
     lastMessage: state.autopilot.lastMessage
   }));
@@ -2650,15 +2738,16 @@ async function runAutopilotScan(force = false) {
     }
     const trade = enterPaperTrade({
       autopilot: true,
+      scalping: bestCandidate.context.strategyMode === "scalping",
       context: bestCandidate.context,
       tradePlan: bestCandidate.tradePlan,
       signalQuality: bestCandidate.signalQuality,
       side: bestCandidate.signalQuality.best.side,
       strategyHtml: buildAutopilotStrategyHtml(bestCandidate),
-      reason: `${bestCandidate.context.asset} ${bestCandidate.context.timeframe}: score ${bestCandidate.signalQuality.best.score}/100, scan ${bestCandidate.autopilotScore}/100`
+      reason: `${bestCandidate.context.strategyMode === "scalping" ? "SCALP " : ""}${bestCandidate.context.asset} ${bestCandidate.context.timeframe}: score ${bestCandidate.signalQuality.best.score}/100, scan ${bestCandidate.autopilotScore}/100`
     });
     if (trade) state.autopilot.lastEntryAt = Date.now();
-    state.autopilot.lastMessage = trade ? `вошел: ${trade.side} ${trade.asset} ${trade.timeframe}` : "сигнал был, вход не создан";
+    state.autopilot.lastMessage = trade ? `вошел: ${trade.strategyMode === "scalping" ? "SCALP " : ""}${trade.side} ${trade.asset} ${trade.timeframe}` : "сигнал был, вход не создан";
   } else {
     const gate = bestCandidate ? evaluateAutopilotQualityGate(bestCandidate.context, bestCandidate.signalQuality, bestCandidate.intel, bestCandidate.tradePlan) : null;
     if (bestCandidate) {
@@ -2668,7 +2757,7 @@ async function runAutopilotScan(force = false) {
       rememberRejectedSignal(bestCandidate.context, bestCandidate.signalQuality, rejectGate, bestCandidate.tradePlan, "autopilot");
     }
     state.autopilot.lastMessage = bestCandidate
-      ? `лучший: ${bestCandidate.context.asset} ${bestCandidate.context.timeframe} ${bestCandidate.autopilotScore}/100, вход запрещен: ${gate?.reason || "фильтр"}`
+      ? `лучший: ${bestCandidate.context.strategyMode === "scalping" ? "SCALP " : ""}${bestCandidate.context.asset} ${bestCandidate.context.timeframe} ${bestCandidate.autopilotScore}/100, вход запрещен: ${gate?.reason || "фильтр"}`
       : "нет монет без активной сделки";
   }
 
@@ -2683,9 +2772,10 @@ function isPaperTradeActiveForAsset(symbol) {
 async function scanAutopilotCandidates() {
   const symbols = getAvailableAutopilotAssets().filter((symbol) => !isPaperTradeActiveForAsset(symbol));
   const intervals = getAvailableAutopilotTimeframes();
+  const scalpingIntervals = state.autopilot.scalpingEnabled ? getAvailableScalpingTimeframes() : [];
   if (!symbols.length) return [];
 
-  state.autopilot.lastMessage = `сканирую ${symbols.length} монет x ${intervals.length} ТФ`;
+  state.autopilot.lastMessage = `сканирую ${symbols.length} монет x ${intervals.length + scalpingIntervals.length} ТФ${state.autopilot.scalpingEnabled ? " + скальпинг" : ""}`;
   renderStrategyIntelligence();
   const sentiment = await fetchSentimentIntel().catch(() => null);
   const preliminary = [];
@@ -2705,6 +2795,21 @@ async function scanAutopilotCandidates() {
         preliminary.push({ context, candles, intel, tradePlan, signalQuality, autopilotScore });
       } catch (error) {
         preliminary.push({ error, context: { asset: symbol, timeframe: interval }, autopilotScore: -Infinity });
+      }
+    }
+    for (const interval of scalpingIntervals) {
+      if (!state.autopilot.enabled) break;
+      try {
+        const candles = await fetchHistoricalCandlesFor(symbol, interval, 180);
+        const context = createScanContext(symbol, interval, candles, null, sentiment, "scalping");
+        const intel = buildMarketIntelForContext(context, candles, null, sentiment);
+        context.intel = intel;
+        const tradePlan = buildTradePlan(context);
+        const signalQuality = evaluateSignalQuality(context, tradePlan);
+        const autopilotScore = scoreAutopilotCandidate(context, tradePlan, signalQuality, intel);
+        preliminary.push({ context, candles, intel, tradePlan, signalQuality, autopilotScore });
+      } catch (error) {
+        preliminary.push({ error, context: { asset: symbol, timeframe: interval, strategyMode: "scalping" }, autopilotScore: -Infinity });
       }
     }
   }
@@ -3581,6 +3686,9 @@ function describeRsiSignal(value, context) {
 }
 
 function buildTradePlan(context) {
+  if (context.strategyMode === "scalping") {
+    return buildScalpingTradePlan(context);
+  }
   ensureAtLeastOneScenario();
   const basePrice = getPlanBasePrice(context);
   const volatilityPct = getVolatilityPct(context);
@@ -3623,6 +3731,97 @@ function buildTradePlan(context) {
     scenarios,
     primary: scenarios[0] || long
   };
+}
+
+function buildScalpingTradePlan(context) {
+  ensureAtLeastOneScenario();
+  const candles = context.scanCandles || state.live.candles;
+  const basePrice = getPlanBasePrice(context);
+  const signal = evaluateScalpingSetup(context, candles);
+  const atrPct = Number(signal.atrPct) || Math.max(0.18, getVolatilityPct(context) * 100);
+  const riskDistance = basePrice * Math.max(0.0018, Math.min(0.0065, atrPct / 100 * 0.75));
+  const rr1 = 0.8;
+  const rr2 = 1.25;
+  const entryOffset = Math.max(basePrice * 0.0002, riskDistance * 0.12);
+
+  const longEntry = basePrice + entryOffset;
+  const long = {
+    side: "LONG",
+    entry: longEntry,
+    stop: longEntry - riskDistance,
+    target1: longEntry + riskDistance * rr1,
+    target2: longEntry + riskDistance * rr2,
+    confidence: signal.side === "LONG" ? "скальпинг-сигнал" : "условный",
+    comment: `скальпинг EMA9/21 + RSI + VWAP: ${signal.reason}`
+  };
+
+  const shortEntry = basePrice - entryOffset;
+  const short = {
+    side: "SHORT",
+    entry: shortEntry,
+    stop: shortEntry + riskDistance,
+    target1: shortEntry - riskDistance * rr1,
+    target2: shortEntry - riskDistance * rr2,
+    confidence: signal.side === "SHORT" ? "скальпинг-сигнал" : "условный",
+    comment: `скальпинг EMA9/21 + RSI + VWAP: ${signal.reason}`
+  };
+
+  const scenarios = [];
+  if (includeLongs.checked && (!signal.side || signal.side === "LONG")) scenarios.push(long);
+  if (includeShorts.checked && (!signal.side || signal.side === "SHORT")) scenarios.push(short);
+
+  return {
+    source: "scalping",
+    basePrice,
+    scalpingSignal: signal,
+    scenarios: scenarios.length ? scenarios : [long, short].filter((scenario) => scenario.side === signal.side),
+    primary: scenarios[0] || (signal.side === "SHORT" ? short : long)
+  };
+}
+
+function evaluateScalpingSetup(context, candles = []) {
+  const usable = candles.length >= 35 ? candles : getCandlesForRsi(context);
+  const closes = usable.map((candle) => candle.close);
+  const lastIndex = closes.length - 1;
+  if (lastIndex < 30) return { ok: false, side: "", score: 0, reason: "недостаточно свечей для скальпинга" };
+
+  const ema9 = calculateEmaSeries(closes, 9);
+  const ema21 = calculateEmaSeries(closes, 21);
+  const rsi14 = calculateRsiSeries(closes, 14);
+  const atr14 = calculateAtrSeries(usable, 14);
+  const vwap = calculateRollingVwap(usable.slice(-48));
+  const last = usable[lastIndex];
+  const previous = usable[lastIndex - 1];
+  const avgVolume = average(usable.slice(-21, -1).map((candle) => candle.volume));
+  const volumeRatio = avgVolume > 0 ? last.volume / avgVolume : 1;
+  const atrPct = last.close > 0 && Number.isFinite(atr14[lastIndex]) ? (atr14[lastIndex] / last.close) * 100 : 0;
+  const spreadPct = context.live?.spreadPct ?? 0.08;
+  const longMomentum = ema9[lastIndex] > ema21[lastIndex] && previous.close <= ema9[lastIndex - 1] && last.close > ema9[lastIndex] && last.close >= vwap;
+  const shortMomentum = ema9[lastIndex] < ema21[lastIndex] && previous.close >= ema9[lastIndex - 1] && last.close < ema9[lastIndex] && last.close <= vwap;
+  const rsi = rsi14[lastIndex];
+  const longRsi = rsi >= 48 && rsi <= 68;
+  const shortRsi = rsi >= 32 && rsi <= 52;
+  const side = longMomentum && longRsi ? "LONG" : shortMomentum && shortRsi ? "SHORT" : "";
+
+  let score = 40;
+  if (side) score += 28;
+  if (volumeRatio >= scalpingMinVolumeRatio) score += 14;
+  else score -= 12;
+  if (spreadPct <= scalpingMaxSpreadPct) score += 12;
+  else score -= 18;
+  if (atrPct >= 0.18 && atrPct <= 1.8) score += 10;
+  else score -= 10;
+  if (Math.abs(last.close - vwap) / last.close * 100 < 0.9) score += 5;
+  else score -= 6;
+
+  const reasons = [
+    side ? `${side} momentum` : "нет чистого EMA/VWAP momentum",
+    `RSI ${Number.isFinite(rsi) ? rsi.toFixed(1) : "n/a"}`,
+    `volume x${volumeRatio.toFixed(2)}`,
+    `spread ${spreadPct.toFixed(3)}%`,
+    `ATR ${atrPct.toFixed(2)}%`
+  ];
+  return { ok: Boolean(side) && score >= scalpingMinScore, side, score: Math.max(0, Math.min(100, Math.round(score))), rsi, volumeRatio, spreadPct, atrPct, vwap, reason: reasons.join("; ") };
 }
 
 function ensureAtLeastOneScenario() {
@@ -3771,7 +3970,7 @@ function enterPaperTrade(options = {}) {
 
   const requestedAmount = Math.max(10, Number(paperAmount.value) || 1000);
   const amount = clampTradeAmountByRisk(Math.min(requestedAmount, availableBudget, maxWalletAmount), scenario, options);
-  const riskBudgetAtEntry = getRiskBudget();
+  const riskBudgetAtEntry = getRiskBudget(options);
   if (amount < 10 || !reservePaperBudget(amount)) {
     paperStatus.textContent = "недостаточно бюджета";
     paperResult.textContent = "Сделка не открыта: сумма превышает свободный бюджет";
@@ -3805,8 +4004,9 @@ function enterPaperTrade(options = {}) {
     budgetReserved: true,
     walletSettled: false,
     riskBudget: riskBudgetAtEntry,
-    riskLimitPct: Math.min(Number(risk.value) || 1, 2),
+    riskLimitPct: options.scalping ? scalpingRiskPct : Math.min(Number(risk.value) || 1, 2),
     autopilot: Boolean(options.autopilot),
+    strategyMode: options.scalping ? "scalping" : context.strategyMode || "standard",
     autopilotReason: String(options.reason || ""),
     entry,
     quantity,
@@ -3861,6 +4061,7 @@ function createStrategySnapshot(context, tradePlan, scenario, quality, options =
       timeframe: context.timeframe,
       mode: context.mode,
       modeSource: context.modeSource,
+      strategyMode: context.strategyMode || "standard",
       risk: Math.min(Number(context.risk) || 1, 2),
       conservative: context.conservative,
       includeLongs: context.includeLongs,
@@ -3880,6 +4081,7 @@ function createStrategySnapshot(context, tradePlan, scenario, quality, options =
       backtest: context.intel?.backtest || null,
       marketStructure: context.intel?.marketStructure || null,
       marketRadar: context.intel?.marketRadar || null,
+      scalpingSignal: tradePlan?.scalpingSignal || null,
       derivatives: context.intel?.derivatives || null,
       sentiment: context.intel?.sentiment || null,
       learning: context.intel?.learning || null,
@@ -3958,8 +4160,9 @@ function getOpeningOrderType(side, placedPrice, entry) {
   return isLimitEntry ? "Limit" : "Conditional";
 }
 
-function getRiskBudget() {
-  return getDepositValue() * (Math.min(Number(risk.value) || 1, 2) / 100);
+function getRiskBudget(options = {}) {
+  const riskPct = options.scalping ? scalpingRiskPct : Math.min(Number(risk.value) || 1, 2);
+  return getDepositValue() * (riskPct / 100);
 }
 
 function clampTradeAmountByRisk(requestedAmount, scenario, options = {}) {
@@ -3969,7 +4172,7 @@ function clampTradeAmountByRisk(requestedAmount, scenario, options = {}) {
   if (!Number.isFinite(riskPerUnit) || riskPerUnit <= 0) {
     return Math.max(0, Math.min(requestedAmount, availableBudget, maxWalletAmount));
   }
-  const maxAmount = (getRiskBudget() / riskPerUnit) * scenario.entry;
+  const maxAmount = (getRiskBudget(options) / riskPerUnit) * scenario.entry;
   return Math.max(0, Math.min(requestedAmount, availableBudget, maxWalletAmount, Math.floor(maxAmount * 100) / 100));
 }
 
@@ -4992,6 +5195,7 @@ archiveRefresh.addEventListener("click", async () => {
 });
 intelRefresh.addEventListener("click", () => refreshStrategyIntelligence(true));
 autopilotToggle.addEventListener("click", toggleAutopilot);
+scalpingMode.addEventListener("change", toggleScalpingMode);
 remoteSave.addEventListener("click", saveRemoteJournalConfig);
 remoteSync.addEventListener("click", () => syncRemoteJournal(true));
 cmcSave.addEventListener("click", saveCmcRadarConfig);
@@ -5068,6 +5272,7 @@ initRemoteJournalControls();
 initCmcRadarControls();
 initNewsAnalyticsControls();
 deposit.value = String(loadDeposit());
+scalpingMode.checked = Boolean(state.autopilot.scalpingEnabled);
 reconcileLegacyPaperBudget();
 updateRiskLabel();
 renderLiveReadout();
