@@ -14,6 +14,10 @@ const autopilotMinScore = 74;
 const autopilotScanMs = 30000;
 const autopilotDuplicateCooldownMs = 60 * 60 * 1000;
 const autopilotMaxActivePerSide = 3;
+const manualMaxSingleTradePct = 10;
+const manualMaxPortfolioPct = 50;
+const autopilotMaxSingleTradePct = 7;
+const autopilotMaxPortfolioPct = 35;
 const learningReviewMs = 10 * 60 * 1000;
 const learningReviewHour = 23;
 const targetWinRatePct = 60;
@@ -771,13 +775,29 @@ function getReservedPaperBudget() {
     .reduce((sum, trade) => sum + Math.max(0, (Number(trade.reservedAmount) || 0) - (Number(trade.releasedAmount) || 0)), 0);
 }
 
+function getTradeAllocationLimits(options = {}) {
+  return options.autopilot
+    ? { singlePct: autopilotMaxSingleTradePct, portfolioPct: autopilotMaxPortfolioPct }
+    : { singlePct: manualMaxSingleTradePct, portfolioPct: manualMaxPortfolioPct };
+}
+
+function getMaxTradeAmountByWallet(options = {}) {
+  const free = getDepositValue();
+  const reserved = getReservedPaperBudget();
+  const budgetBase = Math.max(free + reserved, free);
+  const limits = getTradeAllocationLimits(options);
+  const singleLimit = budgetBase * (limits.singlePct / 100);
+  const portfolioLimitLeft = Math.max(0, budgetBase * (limits.portfolioPct / 100) - reserved);
+  return Math.max(0, Math.floor(Math.min(free, singleLimit, portfolioLimitLeft) * 100) / 100);
+}
+
 function renderWalletReadout() {
   const free = getDepositValue();
   const reserved = getReservedPaperBudget();
   if (walletFree) walletFree.textContent = `${free.toFixed(2)} USDT`;
   if (walletReserved) walletReserved.textContent = `${reserved.toFixed(2)} USDT`;
   if (paperAmount) {
-    paperAmount.max = String(Math.max(0, Math.floor(free * 100) / 100));
+    paperAmount.max = String(getMaxTradeAmountByWallet());
   }
 }
 
@@ -1235,6 +1255,7 @@ function buildStrategy(userIdea = "", tradePlan = null, signalQuality = null) {
       <h3>Риск и сопровождение</h3>
       <ul>
         <li>Депозит: ${formatPrice(context.deposit)} USDT. Риск на сделку: не более ${Math.min(context.risk, 2).toFixed(2)}% от депозита.</li>
+        <li>Размер позиции: ручной вход до ${manualMaxSingleTradePct}% капитала на сделку, автобот до ${autopilotMaxSingleTradePct}%; суммарно автобот держит в рынке не больше ${autopilotMaxPortfolioPct}% капитала.</li>
         <li>Стоп: за локальный экстремум или за уровень отмены сценария.</li>
         <li>Цель: частичная фиксация на ${rrTarget}, остаток вести по структуре.</li>
         <li>Если цена возвращается под уровень входа без импульса, сделка отменяется.</li>
@@ -3264,8 +3285,18 @@ function enterPaperTrade(options = {}) {
     return null;
   }
 
+  const maxWalletAmount = getMaxTradeAmountByWallet(options);
+  if (maxWalletAmount < 10) {
+    paperStatus.textContent = "лимит бюджета";
+    paperResult.textContent = options.autopilot
+      ? `Автобот не вошел: в рынке уже занято до ${autopilotMaxPortfolioPct}% капитала или свободного бюджета недостаточно`
+      : "Сделка не открыта: превышен лимит открытых позиций";
+    renderWalletReadout();
+    return null;
+  }
+
   const requestedAmount = Math.max(10, Number(paperAmount.value) || 1000);
-  const amount = clampTradeAmountByRisk(Math.min(requestedAmount, availableBudget), scenario);
+  const amount = clampTradeAmountByRisk(Math.min(requestedAmount, availableBudget, maxWalletAmount), scenario, options);
   const riskBudgetAtEntry = getRiskBudget();
   if (amount < 10 || !reservePaperBudget(amount)) {
     paperStatus.textContent = "недостаточно бюджета";
@@ -3454,14 +3485,15 @@ function getRiskBudget() {
   return getDepositValue() * (Math.min(Number(risk.value) || 1, 2) / 100);
 }
 
-function clampTradeAmountByRisk(requestedAmount, scenario) {
+function clampTradeAmountByRisk(requestedAmount, scenario, options = {}) {
   const availableBudget = Math.max(0, getDepositValue());
+  const maxWalletAmount = getMaxTradeAmountByWallet(options);
   const riskPerUnit = Math.abs(scenario.entry - scenario.stop);
   if (!Number.isFinite(riskPerUnit) || riskPerUnit <= 0) {
-    return Math.max(0, Math.min(requestedAmount, availableBudget));
+    return Math.max(0, Math.min(requestedAmount, availableBudget, maxWalletAmount));
   }
   const maxAmount = (getRiskBudget() / riskPerUnit) * scenario.entry;
-  return Math.max(0, Math.min(requestedAmount, availableBudget, Math.floor(maxAmount * 100) / 100));
+  return Math.max(0, Math.min(requestedAmount, availableBudget, maxWalletAmount, Math.floor(maxAmount * 100) / 100));
 }
 
 function resetPaperTrade(shouldDraw = true) {
