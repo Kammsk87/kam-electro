@@ -686,6 +686,8 @@ function normalizePaperTrade(trade) {
     target1ExitPrice: Number(trade.target1ExitPrice) || null,
     placedPrice: Number(trade.placedPrice) || entry,
     triggerDirection: trade.triggerDirection === "below" ? "below" : "above",
+    executionType: String(trade.executionType || ""),
+    immediateFill: Boolean(trade.immediateFill),
     openedAt: Number(trade.openedAt) || Date.now(),
     filledAt: Number(trade.filledAt) || null,
     closedAt: Number(trade.closedAt) || null,
@@ -717,7 +719,7 @@ function ensureBybitPaperState(trade) {
   const orderLinkId = trade.orderLinkId || `paper-${trade.id}`;
   const closeSide = trade.side === "LONG" ? "Sell" : "Buy";
   const openingSide = trade.side === "LONG" ? "Buy" : "Sell";
-  const orderType = getOpeningOrderType(trade.side, trade.placedPrice, trade.entry);
+  const orderType = getOpeningOrderType(trade.side, trade.placedPrice, trade.entry, trade.executionType);
   const isPositionActive = ["open", "partial"].includes(trade.status);
   const tp1Order = trade.tp1Order || buildPaperTpslOrder(trade, "TakeProfit", closeSide, "target1");
   const tp2Order = trade.tp2Order || trade.tpOrder || buildPaperTpslOrder(trade, "TakeProfit", closeSide, "target2");
@@ -3738,16 +3740,19 @@ function buildScalpingTradePlan(context) {
   const candles = context.scanCandles || state.live.candles;
   const basePrice = getPlanBasePrice(context);
   const signal = evaluateScalpingSetup(context, candles);
+  const executable = getScalpingExecutionPrices(context, basePrice, signal.spreadPct);
   const atrPct = Number(signal.atrPct) || Math.max(0.18, getVolatilityPct(context) * 100);
-  const riskDistance = basePrice * Math.max(0.0018, Math.min(0.0065, atrPct / 100 * 0.75));
-  const rr1 = 0.8;
-  const rr2 = 1.25;
-  const entryOffset = Math.max(basePrice * 0.0002, riskDistance * 0.12);
+  const riskDistance = basePrice * Math.max(0.0012, Math.min(0.0048, atrPct / 100 * 0.55));
+  const rr1 = 0.55;
+  const rr2 = 0.9;
 
-  const longEntry = basePrice + entryOffset;
+  const longEntry = executable.longEntry;
   const long = {
     side: "LONG",
     entry: longEntry,
+    executionType: "marketable",
+    orderPrice: executable.longOrderPrice,
+    immediateFill: true,
     stop: longEntry - riskDistance,
     target1: longEntry + riskDistance * rr1,
     target2: longEntry + riskDistance * rr2,
@@ -3755,10 +3760,13 @@ function buildScalpingTradePlan(context) {
     comment: `скальпинг EMA9/21 + RSI + VWAP: ${signal.reason}`
   };
 
-  const shortEntry = basePrice - entryOffset;
+  const shortEntry = executable.shortEntry;
   const short = {
     side: "SHORT",
     entry: shortEntry,
+    executionType: "marketable",
+    orderPrice: executable.shortOrderPrice,
+    immediateFill: true,
     stop: shortEntry + riskDistance,
     target1: shortEntry - riskDistance * rr1,
     target2: shortEntry - riskDistance * rr2,
@@ -3776,6 +3784,21 @@ function buildScalpingTradePlan(context) {
     scalpingSignal: signal,
     scenarios: scenarios.length ? scenarios : [long, short].filter((scenario) => scenario.side === signal.side),
     primary: scenarios[0] || (signal.side === "SHORT" ? short : long)
+  };
+}
+
+function getScalpingExecutionPrices(context, basePrice, signalSpreadPct = 0) {
+  const live = context.live || {};
+  const spreadPct = Math.max(Number(signalSpreadPct) || 0, Number(live.spreadPct) || 0.02);
+  const halfSpread = spreadPct / 200;
+  const slippage = paperSlippagePct / 100;
+  const bid = Number(live.bid) > 0 ? Number(live.bid) : basePrice * (1 - halfSpread);
+  const ask = Number(live.ask) > 0 ? Number(live.ask) : basePrice * (1 + halfSpread);
+  return {
+    longEntry: ask * (1 + slippage),
+    shortEntry: bid * (1 - slippage),
+    longOrderPrice: ask * (1 + slippage * 1.8),
+    shortOrderPrice: bid * (1 - slippage * 1.8)
   };
 }
 
@@ -3983,7 +4006,7 @@ function enterPaperTrade(options = {}) {
   const target1Quantity = quantity * 0.5;
   const id = `trade-${Date.now()}-${Math.round(Math.random() * 1000)}`;
   const quality = signalQuality?.scenarios?.find((item) => item.side === scenario.side);
-  const placedPrice = getExecutableMarketPrice(context.asset) || tradePlan.basePrice || entry;
+  const placedPrice = scenario.orderPrice || getExecutableMarketPrice(context.asset) || tradePlan.basePrice || entry;
   const triggerDirection = getOrderTriggerDirection(scenario.side, placedPrice, entry);
   const strategySnapshot = createStrategySnapshot(context, tradePlan, scenario, quality, { ...options, signalQuality });
 
@@ -4021,11 +4044,13 @@ function enterPaperTrade(options = {}) {
     target1ExitPrice: null,
     placedPrice,
     triggerDirection,
+    executionType: scenario.executionType || "conditional",
+    immediateFill: Boolean(scenario.immediateFill),
     openedAt: Date.now(),
     filledAt: null,
     closedAt: null,
-    status: "pending",
-    result: "ордер ожидает вход",
+    status: scenario.immediateFill ? "open" : "pending",
+    result: scenario.immediateFill ? "позиция открыта моментально" : "ордер ожидает вход",
     decision: quality?.decision || "",
     score: quality?.score || null,
     strategySnapshot,
@@ -4033,10 +4058,14 @@ function enterPaperTrade(options = {}) {
     exitPrice: null,
     pnl: 0,
     pnlPct: 0,
-    history: [{ time: Date.now(), price: placedPrice, pnl: 0, pnlPct: 0 }]
+    history: [{ time: Date.now(), price: scenario.immediateFill ? entry : placedPrice, pnl: 0, pnlPct: 0 }]
   };
 
-  state.paperTrades.push(ensureBybitPaperState(trade));
+  const normalizedTrade = ensureBybitPaperState(trade);
+  if (scenario.immediateFill) {
+    markPaperOpeningOrderFilled(normalizedTrade);
+  }
+  state.paperTrades.push(normalizedTrade);
   state.activePaperTradeId = id;
   persistPaperTrades();
   updatePaperTrades();
@@ -4126,6 +4155,9 @@ function snapshotScenario(scenario) {
     stop: scenario.stop,
     target1: scenario.target1,
     target2: scenario.target2,
+    executionType: scenario.executionType || "",
+    orderPrice: scenario.orderPrice || null,
+    immediateFill: Boolean(scenario.immediateFill),
     risk: Math.abs(scenario.entry - scenario.stop),
     reward1: Math.abs(scenario.target1 - scenario.entry),
     reward2: Math.abs(scenario.target2 - scenario.entry)
@@ -4155,7 +4187,8 @@ function getOrderTriggerDirection(side, placedPrice, entry) {
   return entry <= placedPrice ? "below" : "above";
 }
 
-function getOpeningOrderType(side, placedPrice, entry) {
+function getOpeningOrderType(side, placedPrice, entry, executionType = "") {
+  if (executionType === "marketable") return "Market";
   const isLimitEntry = side === "LONG" ? entry <= placedPrice : entry >= placedPrice;
   return isLimitEntry ? "Limit" : "Conditional";
 }
@@ -4529,6 +4562,13 @@ function fillPaperOpeningOrder(trade) {
   trade.status = "open";
   trade.filledAt = Date.now();
   trade.result = "позиция открыта";
+  markPaperOpeningOrderFilled(trade);
+  appendPaperPoint(trade, trade.entry, 0, 0);
+}
+
+function markPaperOpeningOrderFilled(trade) {
+  trade.status = "open";
+  trade.filledAt = trade.filledAt || Date.now();
   trade.openingOrder.orderStatus = "Filled";
   trade.openingOrder.avgPrice = trade.entry;
   trade.openingOrder.cumExecQty = trade.quantity;
@@ -4542,7 +4582,6 @@ function fillPaperOpeningOrder(trade) {
   trade.tp2Order.orderStatus = "Untriggered";
   trade.tpOrder = trade.tp2Order;
   trade.slOrder.orderStatus = "Untriggered";
-  appendPaperPoint(trade, trade.entry, 0, 0);
 }
 
 function executePartialTakeProfit(trade) {
