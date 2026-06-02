@@ -8,6 +8,7 @@ const remoteJournalConfigKey = "crypto-strategy-bot-remote-journal-v1";
 const remoteClientIdKey = "crypto-strategy-bot-client-id";
 const cmcRadarConfigKey = "crypto-strategy-bot-cmc-radar-v1";
 const newsAnalyticsConfigKey = "crypto-strategy-bot-news-analytics-v1";
+const rejectedSignalsKey = "crypto-strategy-bot-rejected-signals-v1";
 
 const currentSessionId = getCurrentSessionId();
 const currentClientId = getCurrentClientId();
@@ -19,6 +20,11 @@ const manualMaxSingleTradePct = 10;
 const manualMaxPortfolioPct = 50;
 const autopilotMaxSingleTradePct = 7;
 const autopilotMaxPortfolioPct = 35;
+const strictAutopilotMinScore = 82;
+const dailyMaxLossPct = 3;
+const dailyMaxStops = 3;
+const paperFeePct = 0.12;
+const paperSlippagePct = 0.04;
 const learningReviewMs = 10 * 60 * 1000;
 const learningReviewHour = 23;
 const targetWinRatePct = 60;
@@ -428,6 +434,15 @@ function loadLearningPolicy() {
   }
 }
 
+function loadRejectedSignals() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(rejectedSignalsKey));
+    return Array.isArray(saved?.items) ? saved.items.slice(-300) : [];
+  } catch (error) {
+    return [];
+  }
+}
+
 const state = {
   rules: loadRules(),
   lastStrategy: "",
@@ -435,6 +450,7 @@ const state = {
   tradePlan: null,
   signalQuality: null,
   paperTrades: loadPaperTrades(),
+  rejectedSignals: loadRejectedSignals(),
   activePaperTradeId: null,
   paperPriceCache: {},
   paperPriceLastFetch: 0,
@@ -780,6 +796,41 @@ function persist() {
 function persistPaperTrades() {
   localStorage.setItem(paperJournalKey, JSON.stringify({ trades: state.paperTrades }));
   scheduleRemoteJournalSync();
+}
+
+function persistRejectedSignals() {
+  localStorage.setItem(rejectedSignalsKey, JSON.stringify({ items: state.rejectedSignals.slice(-300) }));
+}
+
+function rememberRejectedSignal(context, signalQuality, gate, tradePlan = null, source = "autopilot") {
+  const best = signalQuality?.best || {};
+  const item = {
+    id: `reject-${Date.now()}-${Math.round(Math.random() * 1000)}`,
+    time: Date.now(),
+    source,
+    asset: context.asset,
+    timeframe: context.timeframe,
+    mode: context.mode,
+    side: best.side || "",
+    score: Number(best.score) || 0,
+    reason: String(gate?.reason || "фильтр"),
+    patternKey: getQualityPatternKey(context, best.side),
+    marketStructure: context.intel?.marketStructure || null,
+    news: context.news || summarizeNewsForAsset(context.asset),
+    scenarios: tradePlan?.scenarios?.map(snapshotScenario) || []
+  };
+  const duplicate = state.rejectedSignals.some((signal) =>
+    signal.asset === item.asset &&
+    signal.timeframe === item.timeframe &&
+    signal.side === item.side &&
+    signal.reason === item.reason &&
+    Date.now() - Number(signal.time) < 10 * 60 * 1000
+  );
+  if (!duplicate) {
+    state.rejectedSignals.push(item);
+    state.rejectedSignals = state.rejectedSignals.slice(-300);
+    persistRejectedSignals();
+  }
 }
 
 function loadDeposit() {
@@ -1652,6 +1703,9 @@ function buildInvestorDisciplineBlock(context, tradePlan) {
     : "риск/цель еще не рассчитаны";
   const edgeChecks = [
     "Запас прочности: вход разрешен только если стоп заранее известен, а цель дает асимметрию не хуже выбранного risk/reward.",
+    `Лучшие сетапы: автобот входит только при score не ниже ${strictAutopilotMinScore}/100 и положительной статистике похожей связки.`,
+    `Дневной стоп: после ${dailyMaxStops} стопов или убытка ${dailyMaxLossPct}% автобот прекращает входы до следующего дня.`,
+    `Реализм демо: каждая сделка учитывает комиссию ${paperFeePct}% и проскальзывание ${paperSlippagePct}% на исполнении.`,
     context.live.active
       ? "Квантовый фильтр: live-сигнал должен подтверждаться не одной свечой, а сочетанием цены, объема, спреда и режима рынка."
       : "Квантовый фильтр: без live-данных стратегия остается гипотезой для теста, а не готовым сигналом.",
@@ -1845,6 +1899,8 @@ function renderStrategyIntelligence() {
   const derivatives = intel.derivatives;
   const learning = intel.learning;
   const news = intel.news;
+  const dailyRisk = getDailyRiskState();
+  const lastReject = state.rejectedSignals[state.rejectedSignals.length - 1];
 
   backtestScore.textContent = backtest
     ? `${backtest.winRate.toFixed(0)}% · ${backtest.expectancyPct >= 0 ? "+" : ""}${backtest.expectancyPct.toFixed(2)}%`
@@ -1865,7 +1921,9 @@ function renderStrategyIntelligence() {
     ? "Обучение общее: опыт подтягивается из Supabase перед анализом и автосделками."
     : "Обучение локальное: для общего опыта подключи Supabase в блоке Общий журнал.";
   const newsText = news ? `Новостной фон: ${news.summary}.` : "";
-  intelDetails.textContent = `${learningMode} ${formatLearningPolicyNote()} ${newsText} ${intel.notes.join(" ")}`;
+  const riskText = `Дневной риск: ${dailyRisk.pnl >= 0 ? "+" : ""}${dailyRisk.pnl.toFixed(2)} USDT, стопов ${dailyRisk.stops}/${dailyMaxStops}, лимит ${dailyMaxLossPct}%.`;
+  const rejectText = lastReject ? `Последний отказ: ${lastReject.asset} ${lastReject.timeframe} ${lastReject.side} - ${lastReject.reason}.` : "Отказов автобота пока нет.";
+  intelDetails.textContent = `${learningMode} ${formatLearningPolicyNote()} ${newsText} ${riskText} ${rejectText} ${intel.notes.join(" ")}`;
 }
 
 async function refreshStrategyIntelligence(force = false) {
@@ -1902,10 +1960,11 @@ async function refreshSharedLearningMemory(force = false) {
 function buildMarketIntelForContext(context, candles, derivatives = null, sentiment = null) {
   const backtest = candles.length ? runStrategyBacktest(candles, context) : null;
   const marketStructure = candles.length ? analyzeMarketStructure(candles) : null;
+  const higherTimeframe = candles.length ? analyzeHigherTimeframeProxy(candles) : null;
   const marketRadar = getMarketRadarAsset(context.asset);
   const learning = analyzeLearningJournal(context.asset);
   const monthly = calculateMonthlyGoalProgress();
-  const notes = buildIntelNotes(backtest, derivatives, sentiment, learning, monthly, candles.length, marketStructure, marketRadar);
+  const notes = buildIntelNotes(backtest, derivatives, sentiment, learning, monthly, candles.length, marketStructure, marketRadar, higherTimeframe);
   return {
     loading: false,
     updatedAt: Date.now(),
@@ -1913,12 +1972,32 @@ function buildMarketIntelForContext(context, candles, derivatives = null, sentim
     timeframe: context.timeframe,
     backtest,
     marketStructure,
+    higherTimeframe,
     marketRadar,
     derivatives,
     sentiment,
     learning,
     monthlyGoal: monthly,
     notes
+  };
+}
+
+function analyzeHigherTimeframeProxy(candles) {
+  const closes = candles.map((candle) => candle.close);
+  const ema34 = calculateEmaSeries(closes, 34);
+  const ema89 = calculateEmaSeries(closes, 89);
+  const last = closes.length - 1;
+  if (last < 90) return { direction: "UNKNOWN", strength: 0, note: "нужно больше свечей для старшего фильтра" };
+  const slope = ema34[last] - ema34[Math.max(0, last - 12)];
+  const direction = ema34[last] > ema89[last] && slope > 0
+    ? "LONG"
+    : ema34[last] < ema89[last] && slope < 0
+      ? "SHORT"
+      : "NEUTRAL";
+  return {
+    direction,
+    strength: Math.abs(slope / closes[last]) * 100,
+    note: `старший фильтр по EMA34/89: ${direction}`
   };
 }
 
@@ -2054,7 +2133,7 @@ function simulateBacktestTrade(plan, futureCandles) {
 
     if (hitStop) {
       pnlPct += partial ? -riskPct * 0.5 : -riskPct;
-      return { side: plan.side, status: "stop", pnlPct };
+      return { side: plan.side, status: "stop", pnlPct: pnlPct - (paperFeePct + paperSlippagePct) * (partial ? 1.5 : 2) };
     }
     if (!partial && hitT1) {
       pnlPct += Math.abs(plan.target1 - plan.entry) / plan.entry * 100 * 0.5;
@@ -2062,10 +2141,10 @@ function simulateBacktestTrade(plan, futureCandles) {
     }
     if (hitT2) {
       pnlPct += Math.abs(plan.target2 - plan.entry) / plan.entry * 100 * (partial ? 0.5 : 1);
-      return { side: plan.side, status: "target", pnlPct };
+      return { side: plan.side, status: "target", pnlPct: pnlPct - (paperFeePct + paperSlippagePct) * (partial ? 2 : 2) };
     }
   }
-  return { side: plan.side, status: partial ? "partial" : "timeout", pnlPct };
+  return { side: plan.side, status: partial ? "partial" : "timeout", pnlPct: pnlPct - (paperFeePct + paperSlippagePct) };
 }
 
 function getBacktestStructureAt(candles, atrSeries, adxBundle, index) {
@@ -2289,12 +2368,13 @@ function analyzeMarketStructure(candles) {
   };
 }
 
-function buildIntelNotes(backtest, derivatives, sentiment, learning, monthly, candleCount, marketStructure = null, marketRadar = null) {
+function buildIntelNotes(backtest, derivatives, sentiment, learning, monthly, candleCount, marketStructure = null, marketRadar = null, higherTimeframe = null) {
   const notes = [];
   const journalScope = isRemoteJournalConfigured() ? "общий" : "локальный";
   notes.push(candleCount ? `Бэктест рассчитан по ${candleCount} свечам Bybit.` : "Bybit-история временно недоступна, бэктест не обновлен.");
   if (backtest) notes.push(`Бэктест winrate ${backtest.winRate.toFixed(0)}% при цели не ниже ${targetWinRatePct}%, матожидание ${backtest.expectancyPct >= 0 ? "+" : ""}${backtest.expectancyPct.toFixed(2)}% на сделку, просадка ${backtest.maxDrawdownPct.toFixed(2)}%.`);
   if (marketStructure) notes.push(`Структура рынка: ADX ${marketStructure.adx.toFixed(0)}, ATR ${marketStructure.atrPct.toFixed(2)}%, цена ${marketStructure.priceVsVwapPct >= 0 ? "выше" : "ниже"} VWAP на ${Math.abs(marketStructure.priceVsVwapPct).toFixed(2)}%, объем x${marketStructure.volumeRatio.toFixed(2)}.`);
+  if (higherTimeframe?.note) notes.push(higherTimeframe.note);
   if (marketRadar) notes.push(`CMC-радар допускает монету: #${marketRadar.rank}, score ${marketRadar.radarScore.toFixed(0)}, объем ${formatCompact(marketRadar.volume24h)} USDT, 30д ${marketRadar.change30d.toFixed(1)}%, 90д ${marketRadar.change90d.toFixed(1)}%.`);
   if (derivatives) notes.push(`${derivatives.bias}.`);
   else notes.push("Деривативные данные недоступны для этой пары или временно не ответили.");
@@ -2331,6 +2411,7 @@ function createScanContext(symbol, interval = timeframe.value, candles = [], der
     modeSource: marketMode.value === "auto" ? "auto-scan" : base.modeSource,
     rsi: getSelectedRsiIndicators(symbol),
     ema: getSelectedEmaIndicators(),
+    news: summarizeNewsForAsset(symbol),
     live,
     intel: null,
     scan: true
@@ -2380,6 +2461,10 @@ function scoreAutopilotCandidate(context, tradePlan, signalQuality, intel) {
   if (news.bias === "BULLISH") score += best.side === "LONG" ? 6 : -5;
   if (news.bias === "BEARISH") score += best.side === "SHORT" ? 6 : -7;
   if (news.regulatoryRisk) score -= 8;
+  const qualityPattern = getQualityPatternStat(context, best.side);
+  if (qualityPattern?.trades >= 3) score += qualityPattern.winRate >= targetWinRatePct && qualityPattern.avgPnl > 0 ? 8 : -12;
+  if (intel?.higherTimeframe?.direction === best.side) score += 6;
+  if (intel?.higherTimeframe?.direction && !["NEUTRAL", "UNKNOWN", best.side].includes(intel.higherTimeframe.direction)) score -= 12;
   if (isPatternPreferred(context.asset, context.timeframe, best.side)) score += 8;
   return Math.round(score);
 }
@@ -2390,6 +2475,11 @@ function evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan =
   const pattern = getLearningPatternStat(context.asset, context.timeframe, best?.side);
   if (!best) return { ok: false, reason: "нет сигнала", score: -Infinity };
   const scenario = getAutopilotScenario(tradePlan, best.side);
+  const dailyRisk = getDailyRiskState();
+  const qualityPattern = getQualityPatternStat(context, best.side);
+  if (dailyRisk.blocked) {
+    return { ok: false, reason: `дневной стоп: ${dailyRisk.lossPct.toFixed(2)}% убытка или ${dailyRisk.stops} стопов`, score: best.score - 90 };
+  }
   if (context.timeframe === "15m" && best.side === "LONG") {
     return { ok: false, reason: "15m LONG отключен после анализа журнала", score: best.score - 70 };
   }
@@ -2405,7 +2495,7 @@ function evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan =
   if (scenario && hasRecentSimilarAutopilotSignal(context, scenario)) {
     return { ok: false, reason: "дубль похожего сигнала в течение 60 минут", score: best.score - 55 };
   }
-  if (best.score < autopilotMinScore) return { ok: false, reason: `score ${best.score}/100 ниже ${autopilotMinScore}`, score: best.score - 100 };
+  if (best.score < strictAutopilotMinScore) return { ok: false, reason: `режим лучших сетапов: score ${best.score}/100 ниже ${strictAutopilotMinScore}`, score: best.score - 100 };
   if (!backtest || backtest.trades < 12) return { ok: false, reason: "недостаточно сделок в бэктесте", score: best.score - 60 };
   if (backtest.winRate < targetWinRatePct) return { ok: false, reason: `бэктест winrate ${backtest.winRate.toFixed(0)}% ниже ${targetWinRatePct}%`, score: best.score - 50 };
   if (backtest.expectancyPct <= 0) return { ok: false, reason: `матожидание ${backtest.expectancyPct.toFixed(2)}% не положительное`, score: best.score - 45 };
@@ -2413,8 +2503,15 @@ function evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan =
   if (state.cmcRadar.assets.length && !getMarketRadarAsset(context.asset)) {
     return { ok: false, reason: "монета не прошла CMC-радар", score: best.score - 32 };
   }
+  const radarAsset = getMarketRadarAsset(context.asset);
+  if (radarAsset && isSuspiciousPumpAsset(radarAsset)) {
+    return { ok: false, reason: "анти-памп фильтр: резкий рост без комфортной базы", score: best.score - 36 };
+  }
   if (intel?.marketStructure?.adx < 18 && (context.mode === "trend" || context.mode === "breakout")) {
     return { ok: false, reason: `ADX ${intel.marketStructure.adx.toFixed(0)} слабый для ${modeLabel(context.mode)}`, score: best.score - 30 };
+  }
+  if (intel?.marketStructure?.adx < 15 || intel?.marketStructure?.atrPct < 0.25 || intel?.marketStructure?.volumeRatio < 0.7) {
+    return { ok: false, reason: "рыночный шум: слабый ADX/ATR/объем", score: best.score - 34 };
   }
   if (intel?.marketStructure?.volumeRatio < 1 && context.mode === "breakout") {
     return { ok: false, reason: "пробой без повышенного объема", score: best.score - 28 };
@@ -2422,11 +2519,17 @@ function evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan =
   if (intel?.marketStructure?.atrPct > 4.5) {
     return { ok: false, reason: `ATR ${intel.marketStructure.atrPct.toFixed(2)}% выше лимита умеренного риска`, score: best.score - 30 };
   }
+  if (intel?.higherTimeframe?.direction && !["NEUTRAL", "UNKNOWN", best.side].includes(intel.higherTimeframe.direction)) {
+    return { ok: false, reason: `старший таймфрейм против ${best.side}`, score: best.score - 42 };
+  }
   if (pattern?.trades >= 3 && pattern.winRate < targetWinRatePct) {
     return { ok: false, reason: `журнал связки ${pattern.winRate.toFixed(0)}% ниже ${targetWinRatePct}%`, score: best.score - 40 };
   }
   if (pattern?.trades >= 3 && pattern.avgPnl <= 0) {
     return { ok: false, reason: "журнал связки имеет отрицательный средний PnL", score: best.score - 35 };
+  }
+  if (qualityPattern?.trades >= 3 && (qualityPattern.winRate < targetWinRatePct || qualityPattern.avgPnl <= 0)) {
+    return { ok: false, reason: `детальный паттерн ${qualityPattern.winRate.toFixed(0)}% и ${qualityPattern.avgPnl.toFixed(2)}% avg`, score: best.score - 38 };
   }
   if (intel?.derivatives?.sideBias === "CAUTION") return { ok: false, reason: "деривативы показывают перегрев", score: best.score - 25 };
   if (intel?.sentiment?.value >= 82 && best.side === "LONG") return { ok: false, reason: "экстремальная жадность блокирует late long", score: best.score - 20 };
@@ -2438,10 +2541,44 @@ function evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan =
   return { ok: true, reason: "фильтры 60% пройдены", score: best.score };
 }
 
+function isSuspiciousPumpAsset(radarAsset) {
+  if (!radarAsset) return false;
+  const tooFast = radarAsset.change1h > 8 || radarAsset.change24h > 28;
+  const weakBase = radarAsset.volume24h < state.cmcRadar.config.minVolume24h * 1.4 || radarAsset.ageDays < 365 || radarAsset.fdvRatio > 3;
+  return tooFast && weakBase;
+}
+
 function getLearningPatternStat(symbol, interval, side) {
   if (!symbol || !interval || !side) return null;
   const learning = analyzeLearningJournal(symbol);
   return learning.patternStats[getLearningPatternKey(symbol, interval, side)] || null;
+}
+
+function getQualityPatternKey(context, side) {
+  const rsi = context.rsi?.filter((item) => item.use).map((item) => item.period).join("-") || "no-rsi";
+  const ema = context.ema?.filter((item) => item.use).map((item) => item.period).join("-") || "no-ema";
+  const atrBand = context.intel?.marketStructure?.atrPct > 4.5 ? "atr-high" : context.intel?.marketStructure?.atrPct < 0.35 ? "atr-low" : "atr-ok";
+  return [context.asset, context.timeframe, side, context.mode, rsi, ema, atrBand].join("|");
+}
+
+function getQualityPatternStat(context, side) {
+  const key = getQualityPatternKey(context, side);
+  const closed = state.paperTrades.filter((trade) => !isPaperTradeActive(trade) && trade.strategySnapshot?.qualityPatternKey === key);
+  if (!closed.length) return null;
+  const wins = closed.filter((trade) => Number(trade.pnl) > 0).length;
+  const avgPnl = average(closed.map((trade) => Number(trade.pnlPct) || 0));
+  return { key, trades: closed.length, winRate: (wins / closed.length) * 100, avgPnl };
+}
+
+function getDailyRiskState() {
+  const dayStart = new Date();
+  dayStart.setHours(0, 0, 0, 0);
+  const trades = state.paperTrades.filter((trade) => !isPaperTradeActive(trade) && (Number(trade.closedAt) || Number(trade.openedAt) || 0) >= dayStart.getTime());
+  const pnl = trades.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0);
+  const budgetBase = Math.max(1, getDepositValue() + getReservedPaperBudget());
+  const lossPct = pnl < 0 ? Math.abs(pnl) / budgetBase * 100 : 0;
+  const stops = trades.filter((trade) => trade.status === "stop" || Number(trade.pnl) < 0).length;
+  return { trades: trades.length, pnl, lossPct, stops, blocked: lossPct >= dailyMaxLossPct || stops >= dailyMaxStops };
 }
 
 function getAutopilotScenario(tradePlan, side) {
@@ -2524,6 +2661,12 @@ async function runAutopilotScan(force = false) {
     state.autopilot.lastMessage = trade ? `вошел: ${trade.side} ${trade.asset} ${trade.timeframe}` : "сигнал был, вход не создан";
   } else {
     const gate = bestCandidate ? evaluateAutopilotQualityGate(bestCandidate.context, bestCandidate.signalQuality, bestCandidate.intel, bestCandidate.tradePlan) : null;
+    if (bestCandidate) {
+      const rejectGate = gate?.ok
+        ? { ok: false, reason: `итоговый score ${bestCandidate.autopilotScore}/100 ниже ${autopilotMinScore}`, score: bestCandidate.autopilotScore }
+        : gate;
+      rememberRejectedSignal(bestCandidate.context, bestCandidate.signalQuality, rejectGate, bestCandidate.tradePlan, "autopilot");
+    }
     state.autopilot.lastMessage = bestCandidate
       ? `лучший: ${bestCandidate.context.asset} ${bestCandidate.context.timeframe} ${bestCandidate.autopilotScore}/100, вход запрещен: ${gate?.reason || "фильтр"}`
       : "нет монет без активной сделки";
@@ -2941,6 +3084,10 @@ function getManualStrategyRestrictions(context, scenario) {
   }
   if (hasRecentSimilarAutopilotSignal(context, scenario)) {
     warnings.push("Похожий авто-сигнал уже был недавно: не дублировать вход руками без нового сетапа.");
+  }
+  const qualityPattern = getQualityPatternStat(context, scenario.side);
+  if (qualityPattern?.trades >= 3 && (qualityPattern.winRate < targetWinRatePct || qualityPattern.avgPnl <= 0)) {
+    warnings.push(`Детальная связка индикаторов слабая: ${qualityPattern.trades} сделок, winrate ${qualityPattern.winRate.toFixed(0)}%, avg ${qualityPattern.avgPnl.toFixed(2)}%.`);
   }
   return warnings;
 }
@@ -3750,8 +3897,11 @@ function createStrategySnapshot(context, tradePlan, scenario, quality, options =
     execution: {
       autopilot: Boolean(options.autopilot),
       reason: String(options.reason || ""),
-      minScore: autopilotMinScore
+      minScore: strictAutopilotMinScore,
+      feePct: paperFeePct,
+      slippagePct: paperSlippagePct
     },
+    qualityPatternKey: getQualityPatternKey(context, scenario.side),
     rules: [...context.rules],
     sourceRules: [...context.sourceRules],
     knowledgeSources: knowledgeSources.map((source) => ({
@@ -4334,11 +4484,20 @@ function getRealizedPnl(trade) {
 
 function calculatePaperPnlForQuantity(trade, price, quantity) {
   const direction = trade.side === "LONG" ? 1 : -1;
-  return (price - trade.entry) * quantity * direction;
+  const gross = (price - trade.entry) * quantity * direction;
+  return gross - calculatePaperTradingCosts(trade, price, quantity);
 }
 
 function calculatePaperPnl(trade, price) {
   return getRealizedPnl(trade) + calculatePaperPnlForQuantity(trade, price, getRemainingQuantity(trade));
+}
+
+function calculatePaperTradingCosts(trade, price, quantity) {
+  const entryNotional = Number(trade.entry) * quantity;
+  const exitNotional = Number(price) * quantity;
+  const fee = (entryNotional + exitNotional) * (paperFeePct / 100);
+  const slippage = (entryNotional + exitNotional) * (paperSlippagePct / 100);
+  return fee + slippage;
 }
 
 function getActivePaperTrade() {
