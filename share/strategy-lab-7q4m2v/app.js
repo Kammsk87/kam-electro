@@ -387,12 +387,13 @@ function normalizeNewsAnalyticsConfig(config = {}) {
     exchangeUrl: String(config?.exchangeUrl || "").trim(),
     cmcApiKey: String(config?.cmcApiKey || "").trim(),
     cmcProxyUrl: String(config?.cmcProxyUrl || "").trim().replace(/\/$/, ""),
-    cftcUrl: String(config?.cftcUrl || "https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm").trim()
+    cftcUrl: String(config?.cftcUrl || "https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm").trim(),
+    manualText: String(config?.manualText || "").trim()
   };
 }
 
 function hasNewsAnalyticsConfig(config) {
-  return Boolean(config?.exchangeUrl || config?.cmcApiKey || config?.cmcProxyUrl || config?.cftcUrl);
+  return Boolean(config?.exchangeUrl || config?.cmcApiKey || config?.cmcProxyUrl || config?.cftcUrl || config?.manualText);
 }
 
 function createEmptyMarketIntel() {
@@ -478,7 +479,8 @@ const state = {
     items: [],
     updatedAt: 0,
     status: "off",
-    error: ""
+    error: "",
+    sourceStatus: []
   },
   marketIntel: createEmptyMarketIntel(),
   autopilot: loadAutopilotState(),
@@ -523,6 +525,7 @@ const exchangeNewsUrl = document.querySelector("#exchangeNewsUrl");
 const cmcNewsApiKey = document.querySelector("#cmcNewsApiKey");
 const cmcNewsProxyUrl = document.querySelector("#cmcNewsProxyUrl");
 const cftcNewsUrl = document.querySelector("#cftcNewsUrl");
+const manualNewsInput = document.querySelector("#manualNewsInput");
 const newsStatus = document.querySelector("[data-news-status]");
 const newsSave = document.querySelector("[data-news-save]");
 const newsRefresh = document.querySelector("[data-news-refresh]");
@@ -1153,6 +1156,7 @@ function initNewsAnalyticsControls() {
   cmcNewsApiKey.value = config.cmcApiKey;
   cmcNewsProxyUrl.value = config.cmcProxyUrl;
   cftcNewsUrl.value = config.cftcUrl;
+  manualNewsInput.value = config.manualText;
   renderNewsAnalytics();
 }
 
@@ -1161,7 +1165,8 @@ function saveNewsAnalyticsConfig() {
     exchangeUrl: exchangeNewsUrl.value,
     cmcApiKey: cmcNewsApiKey.value,
     cmcProxyUrl: cmcNewsProxyUrl.value,
-    cftcUrl: cftcNewsUrl.value
+    cftcUrl: cftcNewsUrl.value,
+    manualText: manualNewsInput.value
   });
   localStorage.setItem(newsAnalyticsConfigKey, JSON.stringify(state.newsAnalytics.config));
   renderNewsAnalytics();
@@ -1190,7 +1195,8 @@ async function refreshNewsAnalytics(force = false) {
     const items = await fetchNewsAnalyticsItems();
     state.newsAnalytics.items = items.map(analyzeNewsItem).sort((a, b) => b.publishedAt - a.publishedAt).slice(0, 40);
     state.newsAnalytics.updatedAt = Date.now();
-    setNewsAnalyticsStatus(`${state.newsAnalytics.items.length}`);
+    const failed = state.newsAnalytics.sourceStatus.filter((source) => !source.ok).length;
+    setNewsAnalyticsStatus(failed ? `${state.newsAnalytics.items.length} / ${failed} err` : `${state.newsAnalytics.items.length}`);
     generateStrategy(state.lastUserIdea);
   } catch (error) {
     setNewsAnalyticsStatus("error", "Новости недоступны: проверь URL, CMC key или proxy");
@@ -1199,12 +1205,48 @@ async function refreshNewsAnalytics(force = false) {
 
 async function fetchNewsAnalyticsItems() {
   const config = state.newsAnalytics.config;
-  const batches = await Promise.allSettled([
-    config.exchangeUrl ? fetchGenericNewsFeed(config.exchangeUrl, "exchange") : Promise.resolve([]),
-    (config.cmcProxyUrl || config.cmcApiKey || state.cmcRadar.config.apiKey) ? fetchCmcNewsFeed(config) : Promise.resolve([]),
-    config.cftcUrl ? fetchGenericNewsFeed(config.cftcUrl, "cftc") : Promise.resolve([])
-  ]);
-  return batches.flatMap((batch) => batch.status === "fulfilled" ? batch.value : []);
+  const sources = [
+    { id: "manual", enabled: Boolean(config.manualText), run: () => Promise.resolve(parseManualNewsFeed(config.manualText)) },
+    { id: "exchange", enabled: Boolean(config.exchangeUrl), run: () => fetchGenericNewsFeed(config.exchangeUrl, "exchange") },
+    { id: "cmc", enabled: Boolean(config.cmcProxyUrl || config.cmcApiKey || state.cmcRadar.config.apiKey), run: () => fetchCmcNewsFeed(config) },
+    { id: "cftc", enabled: Boolean(config.cftcUrl), run: () => fetchGenericNewsFeed(config.cftcUrl, "cftc") }
+  ];
+  const enabledSources = sources.filter((source) => source.enabled);
+  const results = await Promise.all(enabledSources.map(async (source) => {
+    try {
+      const items = await source.run();
+      return { id: source.id, ok: true, count: items.length, items };
+    } catch (error) {
+      return { id: source.id, ok: false, count: 0, error: getNewsErrorText(error) };
+    }
+  }));
+  state.newsAnalytics.sourceStatus = results.map(({ id, ok, count, error }) => ({ id, ok, count, error: error || "" }));
+  return results.flatMap((result) => result.items || []);
+}
+
+function parseManualNewsFeed(text) {
+  return String(text || "")
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const parts = line.split("|").map((part) => part.trim());
+      const hasStructured = parts.length >= 3;
+      return normalizeNewsItem({
+        title: hasStructured ? parts.slice(2).join(" | ") : line,
+        sentiment: hasStructured ? parts[1] : "",
+        symbol: hasStructured ? parts[0] : "",
+        date: Date.now()
+      }, "manual");
+    })
+    .filter(Boolean);
+}
+
+function getNewsErrorText(error) {
+  const text = String(error?.message || error || "ошибка").toLowerCase();
+  if (text.includes("failed to fetch") || text.includes("cors")) return "CORS/proxy";
+  if (text.includes("401") || text.includes("403") || text.includes("key")) return "API key";
+  return text.slice(0, 80);
 }
 
 async function fetchCmcNewsFeed(config) {
@@ -1216,13 +1258,13 @@ async function fetchCmcNewsFeed(config) {
   const response = await fetch(url, {
     headers: config.cmcProxyUrl ? {} : { "X-CMC_PRO_API_KEY": apiKey }
   });
-  if (!response.ok) throw new Error("CMC news request failed");
+  if (!response.ok) throw new Error(`CMC news request failed ${response.status}`);
   return normalizeNewsPayload(await response.json(), "cmc");
 }
 
 async function fetchGenericNewsFeed(url, source) {
   const response = await fetch(url);
-  if (!response.ok) throw new Error(`${source} news request failed`);
+  if (!response.ok) throw new Error(`${source} news request failed ${response.status}`);
   const contentType = response.headers.get("content-type") || "";
   if (contentType.includes("application/json")) return normalizeNewsPayload(await response.json(), source);
   return normalizeNewsText(await response.text(), source, url);
@@ -1347,8 +1389,12 @@ function summarizeNewsForAsset(symbol = asset.value) {
 
 function renderNewsAnalytics() {
   newsStatus.textContent = state.newsAnalytics.status;
+  const sourceText = renderNewsSourceStatus();
   if (!state.newsAnalytics.items.length) {
-    newsList.innerHTML = `<span>${escapeHtml(state.newsAnalytics.error || "Новости добавят бычий/медвежий фильтр к стратегии и автоботу.")}</span>`;
+    newsList.innerHTML = `
+      <span>${escapeHtml(state.newsAnalytics.error || "Новостей пока нет. Для CMC/CFTC часто нужен proxy URL или ручные новости.")}</span>
+      ${sourceText}
+    `;
     return;
   }
   const summary = summarizeNewsForAsset(asset.value);
@@ -1365,7 +1411,19 @@ function renderNewsAnalytics() {
         <em>${item.score >= 0 ? "+" : ""}${item.score}</em>
       </button>
     `).join("")}
+    ${sourceText}
   `;
+}
+
+function renderNewsSourceStatus() {
+  if (!state.newsAnalytics.sourceStatus.length) return "";
+  return state.newsAnalytics.sourceStatus.map((source) => `
+    <button type="button">
+      <strong>${escapeHtml(source.id.toUpperCase())} · ${source.ok ? "ok" : "error"}</strong>
+      <span>${source.ok ? `${source.count} новостей` : source.error || "нет данных"}</span>
+      <em>${source.ok ? source.count : "!"}</em>
+    </button>
+  `).join("");
 }
 
 function renderRules() {
