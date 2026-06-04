@@ -622,6 +622,13 @@ const walletReserved = document.querySelector("[data-wallet-reserved]");
 const paperEnter = document.querySelector("[data-paper-enter]");
 const paperReset = document.querySelector("[data-paper-reset]");
 const paperClear = document.querySelector("[data-paper-clear]");
+const exchangeSimStatus = document.querySelector("[data-exchange-sim-status]");
+const preflightCheck = document.querySelector("[data-preflight-check]");
+const dryRunOrder = document.querySelector("[data-dry-run-order]");
+const killSwitch = document.querySelector("[data-kill-switch]");
+const preflightScore = document.querySelector("[data-preflight-score]");
+const preflightAction = document.querySelector("[data-preflight-action]");
+const preflightReport = document.querySelector("[data-preflight-report]");
 const exportJournal = document.querySelector("[data-export-journal]");
 const journalRows = document.querySelector("[data-journal-rows]");
 const journalOpen = document.querySelector("[data-journal-open]");
@@ -4249,6 +4256,148 @@ function syncPaperSideOptions(tradePlan) {
   }
 }
 
+function runExchangePreflight(options = {}) {
+  const context = options.context || getContext();
+  const tradePlan = options.tradePlan || state.tradePlan || buildTradePlan(context);
+  const signalQuality = options.signalQuality || state.signalQuality;
+  const side = options.side || signalQuality?.best?.side || getBestScenarioSide(tradePlan) || paperSide.value;
+  const scenario = tradePlan.scenarios.find((item) => item.side === side) || tradePlan.primary;
+  const requestedAmount = Math.max(10, Number(paperAmount.value) || 1000);
+  const amount = scenario ? clampTradeAmountByRisk(Math.min(requestedAmount, getDepositValue(), getMaxTradeAmountByWallet(options)), scenario, options) : 0;
+  const checks = [];
+  const add = (ok, label, detail, severity = "block") => checks.push({ ok: Boolean(ok), label, detail, severity });
+
+  if (!scenario) {
+    add(false, "Сценарий", "нет LONG/SHORT сценария для отправки ордера");
+  } else {
+    const live = context.live || getLiveSnapshot();
+    const entry = Number(scenario.entry);
+    const stop = Number(scenario.stop);
+    const target1 = Number(scenario.target1);
+    const target2 = Number(scenario.target2);
+    const tickSize = estimateBybitTickSize(entry);
+    const qty = amount > 0 && entry > 0 ? amount / entry : 0;
+    const rr = Math.abs(target2 - entry) / Math.max(0.00000001, Math.abs(entry - stop));
+    const duplicate = state.paperTrades.some((trade) => isPaperTradeActive(trade) && trade.asset === context.asset && trade.side === scenario.side);
+    const orderValue = qty * entry;
+
+    add(getDepositValue() >= 10, "Баланс", `свободно ${getDepositValue().toFixed(2)} USDT`);
+    add(amount >= 10, "Размер", `после лимитов ${amount.toFixed(2)} USDT`);
+    add(orderValue >= 10, "Min notional", `${orderValue.toFixed(2)} USDT >= 10`);
+    add(Number.isFinite(entry) && entry > 0 && Number.isFinite(stop) && stop > 0, "Entry/Stop", `${formatPrice(entry)} / ${formatPrice(stop)}`);
+    add(Number.isFinite(target1) && target1 > 0 && Number.isFinite(target2) && target2 > 0, "TP/SL", `T1 ${formatPrice(target1)}, T2 ${formatPrice(target2)}`);
+    add(rr >= 1.2, "Risk/Reward", `RR ${rr.toFixed(2)}`);
+    add(!duplicate, "Дубли", duplicate ? "уже есть активная сделка по этой монете и стороне" : "дублей нет");
+    add(live.active, "Bybit market data", live.active ? `${live.exchange} ${formatPrice(live.lastPrice)}` : "live-данные выключены или еще не пришли", "warn");
+    add(!live.active || live.spreadPct <= 0.12, "Spread", live.active ? `${live.spreadPct.toFixed(3)}%` : "нет live-spread", "warn");
+    add(isPriceAlignedToTick(entry, tickSize), "Tick size", `${formatPrice(entry)} / шаг ~${formatPrice(tickSize)}`, "warn");
+    add(!context.intel?.marketCrash?.severe, "Crash-guard", context.intel?.marketCrash?.summary || "норма");
+    add(!(context.intel?.marketCrash?.riskOff && scenario.side === "LONG"), "Risk-off LONG", context.intel?.marketCrash?.riskOff ? "LONG запрещен при просадке" : "нет запрета");
+  }
+
+  const blockers = checks.filter((item) => !item.ok && item.severity !== "warn");
+  const warnings = checks.filter((item) => !item.ok && item.severity === "warn");
+  const passed = checks.length - blockers.length - warnings.length;
+  const score = checks.length ? Math.round((passed / checks.length) * 100) : 0;
+  const allowed = blockers.length === 0;
+  const order = allowed && scenario ? buildDryRunOrderPayload(context, scenario, amount) : null;
+  return { allowed, score, blockers, warnings, checks, context, scenario, amount, order };
+}
+
+function buildDryRunOrderPayload(context, scenario, amount) {
+  const qty = amount / scenario.entry;
+  return {
+    category: "spot/testnet-dry-run",
+    symbol: toBinanceSymbol(context.asset),
+    side: scenario.side === "LONG" ? "Buy" : "Sell",
+    orderType: scenario.executionType === "marketable" ? "Market" : getOpeningOrderType(scenario.side, scenario.orderPrice || scenario.entry, scenario.entry, scenario.executionType),
+    qty: roundQty(qty),
+    price: roundPrice(scenario.orderPrice || scenario.entry),
+    timeInForce: scenario.executionType === "marketable" ? "IOC" : "GTC",
+    takeProfit1: roundPrice(scenario.target1),
+    takeProfit2: roundPrice(scenario.target2),
+    stopLoss: roundPrice(scenario.stop),
+    reduceOnly: false,
+    orderLinkId: `dry-${Date.now()}`
+  };
+}
+
+function estimateBybitTickSize(price) {
+  const value = Number(price) || 0;
+  if (value >= 1000) return 0.1;
+  if (value >= 100) return 0.01;
+  if (value >= 10) return 0.001;
+  if (value >= 1) return 0.0001;
+  return 0.00001;
+}
+
+function isPriceAlignedToTick(price, tickSize) {
+  if (!Number.isFinite(price) || !Number.isFinite(tickSize) || tickSize <= 0) return false;
+  const ratio = price / tickSize;
+  return Math.abs(ratio - Math.round(ratio)) < 0.0001;
+}
+
+function roundPrice(value) {
+  const tick = estimateBybitTickSize(value);
+  return Math.round((Number(value) || 0) / tick) * tick;
+}
+
+function roundQty(value) {
+  return Math.max(0, Math.floor((Number(value) || 0) * 1000000) / 1000000);
+}
+
+function renderExchangePreflight(result, mode = "preflight") {
+  if (!result) return;
+  const status = result.allowed ? mode === "dry-run" ? "dry-run ok" : "ready" : "blocked";
+  exchangeSimStatus.textContent = status;
+  preflightScore.textContent = `${result.score}/100`;
+  preflightScore.style.color = result.allowed ? "#55c7a2" : "#ef6b5b";
+  preflightAction.textContent = result.allowed
+    ? mode === "dry-run" ? "ордер не отправлен, payload готов" : "можно тестировать в testnet"
+    : `блокеров: ${result.blockers.length}`;
+  const rows = result.checks.map((item) => {
+    const mark = item.ok ? "OK" : item.severity === "warn" ? "WARN" : "BLOCK";
+    return `${mark}: ${item.label} - ${item.detail}`;
+  });
+  const payload = result.order && mode === "dry-run"
+    ? `\nDry-run payload: ${JSON.stringify(result.order)}`
+    : "";
+  preflightReport.textContent = `${rows.join("\n")}${payload}`;
+}
+
+function handlePreflightCheck() {
+  const result = runExchangePreflight();
+  renderExchangePreflight(result, "preflight");
+  return result;
+}
+
+function handleDryRunOrder() {
+  const result = runExchangePreflight();
+  renderExchangePreflight(result, "dry-run");
+  if (!result.allowed) return null;
+  return result.order;
+}
+
+function activateKillSwitch() {
+  const now = Date.now();
+  let cancelled = 0;
+  state.autopilot.enabled = false;
+  state.autopilot.lastMessage = "kill switch: новые входы остановлены";
+  persistAutopilot();
+  state.paperTrades.forEach((trade) => {
+    if (trade.status !== "pending") return;
+    cancelPaperPendingOrder(trade, "kill switch: pending-ордер отменен перед реальной интеграцией", getPaperTradePrice(trade), now);
+    cancelled += 1;
+  });
+  persistPaperTrades();
+  updatePaperTrades();
+  exchangeSimStatus.textContent = "kill switch";
+  preflightScore.textContent = "STOP";
+  preflightScore.style.color = "#ef6b5b";
+  preflightAction.textContent = "автобот выключен";
+  preflightReport.textContent = `Kill switch выполнен: автобот выключен, pending-ордеров отменено ${cancelled}. Открытые позиции не закрывались автоматически в dry-run режиме.`;
+}
+
 function enterPaperTrade(options = {}) {
   const context = options.context || getContext();
   const tradePlan = options.tradePlan || state.tradePlan || buildTradePlan(context);
@@ -4256,6 +4405,13 @@ function enterPaperTrade(options = {}) {
   const side = options.side || signalQuality?.best?.side || getBestScenarioSide(tradePlan) || paperSide.value;
   const scenario = tradePlan.scenarios.find((item) => item.side === side) || tradePlan.primary;
   if (!scenario) return;
+  const preflight = runExchangePreflight({ ...options, context, tradePlan, signalQuality, side });
+  renderExchangePreflight(preflight, "preflight");
+  if (!preflight.allowed) {
+    paperStatus.textContent = "pre-flight block";
+    paperResult.textContent = `Сделка не открыта: ${preflight.blockers[0]?.detail || "есть блокирующие проверки"}`;
+    return null;
+  }
 
   const availableBudget = getDepositValue();
   if (availableBudget < 10) {
@@ -4315,6 +4471,7 @@ function enterPaperTrade(options = {}) {
     riskLimitPct: options.scalping ? scalpingRiskPct : Math.min(Number(risk.value) || 1, 2),
     autopilot: Boolean(options.autopilot),
     autopilotProfile: autopilotProfileId,
+    exchangePreflight: preflight,
     strategyMode: options.scalping ? "scalping" : context.strategyMode || "standard",
     autopilotReason: String(options.reason || ""),
     entry,
@@ -5655,6 +5812,9 @@ liveToggle.addEventListener("click", () => {
 paperEnter.addEventListener("click", () => enterPaperTrade());
 paperReset.addEventListener("click", () => resetPaperTrade());
 paperClear.addEventListener("click", clearPaperJournal);
+preflightCheck.addEventListener("click", handlePreflightCheck);
+dryRunOrder.addEventListener("click", handleDryRunOrder);
+killSwitch.addEventListener("click", activateKillSwitch);
 exportJournal.addEventListener("click", exportJournalToExcel);
 archiveToggle.addEventListener("click", toggleTradeArchive);
 archiveRefresh.addEventListener("click", async () => {

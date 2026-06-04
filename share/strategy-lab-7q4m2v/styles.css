@@ -558,6 +558,69 @@ canvas {
   font-size: 12px;
 }
 
+.exchange-sim {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(23, 27, 31, 0.88);
+  box-shadow: var(--shadow);
+}
+
+.sim-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.danger-action {
+  min-height: 34px;
+  border: 0;
+  border-radius: 8px;
+  color: #1b0a07;
+  background: var(--danger);
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.sim-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.sim-grid div {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 7px;
+  background: rgba(32, 38, 44, 0.84);
+}
+
+.sim-grid span,
+.sim-grid strong {
+  display: block;
+}
+
+.sim-grid span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.sim-grid strong {
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.sim-report {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
 .trade-journal,
 .trade-archive {
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -1062,7 +1125,9 @@ canvas {
 
   .metrics,
   .trade-plan-strip,
-  .intel-grid {
+  .intel-grid,
+  .sim-grid,
+  .sim-actions {
     gap: 6px;
   }
 
@@ -1196,8 +1261,13 @@ canvas {
 
   .trade-plan-strip,
   .intel-grid,
+  .sim-grid,
   .journal-summary {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .sim-actions {
+    grid-template-columns: 1fr;
   }
 
   .paper-panel {

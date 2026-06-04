@@ -456,6 +456,35 @@
               </div>
             </div>
 
+            <div class="exchange-sim">
+              <div class="output-header">
+                <span>Боевой симулятор Bybit</span>
+                <span class="status-pill" data-exchange-sim-status>dry-run</span>
+              </div>
+              <div class="sim-actions">
+                <button class="secondary-action" type="button" data-preflight-check>Pre-flight</button>
+                <button class="secondary-action" type="button" data-dry-run-order>Dry-run ордер</button>
+                <button class="danger-action" type="button" data-kill-switch>Kill switch</button>
+              </div>
+              <div class="sim-grid">
+                <div>
+                  <span>Готовность</span>
+                  <strong data-preflight-score>не проверено</strong>
+                </div>
+                <div>
+                  <span>Режим</span>
+                  <strong>без реальных ключей</strong>
+                </div>
+                <div>
+                  <span>Действие</span>
+                  <strong data-preflight-action>ожидает проверки</strong>
+                </div>
+              </div>
+              <div class="sim-report" data-preflight-report>
+                Pre-flight проверит баланс, размер ордера, spread, tick size, TP/SL, risk limits, дубли и готовность к testnet.
+              </div>
+            </div>
+
             <div class="trade-journal">
               <div class="output-header">
                 <span>Журнал операций</span>
