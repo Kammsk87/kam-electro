@@ -20,12 +20,12 @@ const manualMaxSingleTradePct = 10;
 const manualMaxPortfolioPct = 50;
 const autopilotMaxSingleTradePct = 7;
 const autopilotMaxPortfolioPct = 35;
-const strictAutopilotMinScore = 82;
-const scalpingMinScore = 86;
+const strictAutopilotMinScore = 78;
+const scalpingMinScore = 80;
 const scalpingRiskPct = 0.35;
 const scalpingMaxSingleTradePct = 4;
-const scalpingMaxSpreadPct = 0.035;
-const scalpingMinVolumeRatio = 1.25;
+const scalpingMaxSpreadPct = 0.08;
+const scalpingMinVolumeRatio = 1.05;
 const dailyMaxLossPct = 3;
 const dailyMaxStops = 3;
 const paperFeePct = 0.12;
@@ -2591,8 +2591,8 @@ function evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan =
     return { ok: false, reason: "дубль похожего сигнала в течение 60 минут", score: best.score - 55 };
   }
   if (best.score < strictAutopilotMinScore) return { ok: false, reason: `режим лучших сетапов: score ${best.score}/100 ниже ${strictAutopilotMinScore}`, score: best.score - 100 };
-  if (!backtest || backtest.trades < 12) return { ok: false, reason: "недостаточно сделок в бэктесте", score: best.score - 60 };
-  if (backtest.winRate < targetWinRatePct) return { ok: false, reason: `бэктест winrate ${backtest.winRate.toFixed(0)}% ниже ${targetWinRatePct}%`, score: best.score - 50 };
+  if (!backtest || backtest.trades < 8) return { ok: false, reason: "недостаточно сделок в бэктесте", score: best.score - 55 };
+  if (backtest.winRate < 55) return { ok: false, reason: `бэктест winrate ${backtest.winRate.toFixed(0)}% ниже 55%`, score: best.score - 45 };
   if (backtest.expectancyPct <= 0) return { ok: false, reason: `матожидание ${backtest.expectancyPct.toFixed(2)}% не положительное`, score: best.score - 45 };
   if (backtest.maxDrawdownPct > 4.5) return { ok: false, reason: `просадка ${backtest.maxDrawdownPct.toFixed(2)}% выше лимита`, score: best.score - 35 };
   if (state.cmcRadar.assets.length && !getMarketRadarAsset(context.asset)) {
@@ -3877,8 +3877,12 @@ function evaluateScalpingSetup(context, candles = []) {
   const volumeRatio = avgVolume > 0 ? last.volume / avgVolume : 1;
   const atrPct = last.close > 0 && Number.isFinite(atr14[lastIndex]) ? (atr14[lastIndex] / last.close) * 100 : 0;
   const spreadPct = context.live?.spreadPct ?? 0.08;
-  const longMomentum = ema9[lastIndex] > ema21[lastIndex] && previous.close <= ema9[lastIndex - 1] && last.close > ema9[lastIndex] && last.close >= vwap;
-  const shortMomentum = ema9[lastIndex] < ema21[lastIndex] && previous.close >= ema9[lastIndex - 1] && last.close < ema9[lastIndex] && last.close <= vwap;
+  const longCross = previous.close <= ema9[lastIndex - 1] && last.close > ema9[lastIndex];
+  const shortCross = previous.close >= ema9[lastIndex - 1] && last.close < ema9[lastIndex];
+  const longContinuation = last.close > ema9[lastIndex] && ema9[lastIndex] > ema21[lastIndex] && ema9[lastIndex] >= ema9[lastIndex - 3];
+  const shortContinuation = last.close < ema9[lastIndex] && ema9[lastIndex] < ema21[lastIndex] && ema9[lastIndex] <= ema9[lastIndex - 3];
+  const longMomentum = ema9[lastIndex] > ema21[lastIndex] && (longCross || longContinuation) && last.close >= vwap * 0.999;
+  const shortMomentum = ema9[lastIndex] < ema21[lastIndex] && (shortCross || shortContinuation) && last.close <= vwap * 1.001;
   const rsi = rsi14[lastIndex];
   const longRsi = rsi >= 48 && rsi <= 68;
   const shortRsi = rsi >= 32 && rsi <= 52;
