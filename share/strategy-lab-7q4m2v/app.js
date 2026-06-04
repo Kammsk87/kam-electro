@@ -38,6 +38,29 @@ const paperSlippagePct = 0.04;
 const learningReviewMs = 10 * 60 * 1000;
 const learningReviewHour = 23;
 const targetWinRatePct = 60;
+const autopilotProfiles = {
+  protective: {
+    label: "Защитный",
+    minScore: 74,
+    strictScore: 78,
+    penaltyMultiplier: 1,
+    note: "максимум защиты, входы только по лучшим сетапам"
+  },
+  balanced: {
+    label: "Баланс",
+    minScore: 70,
+    strictScore: 74,
+    penaltyMultiplier: 0.7,
+    note: "часть фильтров снижает score вместо полного запрета"
+  },
+  active: {
+    label: "Активный",
+    minScore: 66,
+    strictScore: 70,
+    penaltyMultiplier: 0.5,
+    note: "больше тестовых входов, обязательные лимиты капитала остаются"
+  }
+};
 const baseQuarantineAssets = new Set([
   "AAVE/USDT",
   "AVAX/USDT",
@@ -421,12 +444,13 @@ function loadAutopilotState() {
     return {
       enabled: Boolean(saved?.enabled),
       scalpingEnabled: Boolean(saved?.scalpingEnabled),
+      profile: autopilotProfiles[saved?.profile] ? saved.profile : "protective",
       lastEntryAt: Number(saved?.lastEntryAt) || 0,
       lastScanAt: 0,
       lastMessage: String(saved?.lastMessage || "наблюдает")
     };
   } catch (error) {
-    return { enabled: false, scalpingEnabled: false, lastEntryAt: 0, lastScanAt: 0, lastMessage: "наблюдает" };
+    return { enabled: false, scalpingEnabled: false, profile: "protective", lastEntryAt: 0, lastScanAt: 0, lastMessage: "наблюдает" };
   }
 }
 
@@ -563,6 +587,7 @@ const intelDetails = document.querySelector("[data-intel-details]");
 const intelRefresh = document.querySelector("[data-intel-refresh]");
 const autopilotToggle = document.querySelector("[data-autopilot-toggle]");
 const scalpingMode = document.querySelector("#scalpingMode");
+const autopilotProfile = document.querySelector("#autopilotProfile");
 const liveStatus = document.querySelector("[data-live-status]");
 const liveToggle = document.querySelector("[data-live-toggle]");
 const livePrice = document.querySelector("[data-live-price]");
@@ -1981,6 +2006,7 @@ function renderStrategyIntelligence() {
   const news = intel.news;
   const dailyRisk = getDailyRiskState();
   const lastReject = state.rejectedSignals[state.rejectedSignals.length - 1];
+  const profile = getAutopilotProfileSettings();
 
   backtestScore.textContent = backtest
     ? `${backtest.winRate.toFixed(0)}% · ${backtest.expectancyPct >= 0 ? "+" : ""}${backtest.expectancyPct.toFixed(2)}%`
@@ -1998,6 +2024,7 @@ function renderStrategyIntelligence() {
   autopilotToggle.textContent = state.autopilot.enabled ? "Авто-бот: вкл" : "Авто-бот: выкл";
   autopilotToggle.classList.toggle("is-live", state.autopilot.enabled);
   if (scalpingMode) scalpingMode.checked = Boolean(state.autopilot.scalpingEnabled);
+  if (autopilotProfile) autopilotProfile.value = profile.id;
   const learningMode = isRemoteJournalConfigured()
     ? "Обучение общее: опыт подтягивается из Supabase перед анализом и автосделками."
     : "Обучение локальное: для общего опыта подключи Supabase в блоке Общий журнал.";
@@ -2006,8 +2033,9 @@ function renderStrategyIntelligence() {
     ? `Скальпинг включен: EMA9/21, RSI14, VWAP, ATR, объем x${scalpingMinVolumeRatio}, спред до ${scalpingMaxSpreadPct}%.`
     : "Скальпинг выключен.";
   const riskText = `Дневной риск: ${dailyRisk.pnl >= 0 ? "+" : ""}${dailyRisk.pnl.toFixed(2)} USDT, стопов ${dailyRisk.stops}/${dailyMaxStops}, лимит ${dailyMaxLossPct}%.`;
+  const profileText = `Профиль автобота: ${profile.label}, вход от ${profile.minScore}/100; ${profile.note}.`;
   const rejectText = lastReject ? `Последний отказ: ${lastReject.asset} ${lastReject.timeframe} ${lastReject.side} - ${lastReject.reason}.` : "Отказов автобота пока нет.";
-  intelDetails.textContent = `${learningMode} ${formatLearningPolicyNote()} ${newsText} ${scalpingText} ${riskText} ${rejectText} ${intel.notes.join(" ")}`;
+  intelDetails.textContent = `${learningMode} ${formatLearningPolicyNote()} ${profileText} ${newsText} ${scalpingText} ${riskText} ${rejectText} ${intel.notes.join(" ")}`;
 }
 
 async function refreshStrategyIntelligence(force = false) {
@@ -2576,7 +2604,7 @@ function scoreAutopilotCandidate(context, tradePlan, signalQuality, intel) {
   const monthly = intel?.monthlyGoal;
   const gate = evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan);
   if (!gate.ok) return gate.score;
-  let score = best.score;
+  let score = Number.isFinite(gate.score) ? gate.score : best.score;
   if (context.strategyMode === "scalping") {
     const scalp = tradePlan?.scalpingSignal;
     score = Math.max(score, scalp?.score || 0);
@@ -2610,6 +2638,12 @@ function evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan =
   const scenario = getAutopilotScenario(tradePlan, best.side);
   const dailyRisk = getDailyRiskState();
   const qualityPattern = getQualityPatternStat(context, best.side);
+  const profile = getAutopilotProfileSettings();
+  const softGate = (reason, penalty, hard = false) => {
+    const adjusted = best.score - Math.round(penalty * profile.penaltyMultiplier);
+    if (profile.id === "protective" || hard) return { ok: false, reason, score: adjusted };
+    return { ok: true, reason: `${reason} (учтено как штраф к score)`, score: adjusted };
+  };
   if (dailyRisk.blocked) {
     return { ok: false, reason: `дневной стоп: ${dailyRisk.lossPct.toFixed(2)}% убытка или ${dailyRisk.stops} стопов`, score: best.score - 90 };
   }
@@ -2624,13 +2658,13 @@ function evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan =
     return evaluateScalpingQualityGate(context, signalQuality, intel, tradePlan, dailyRisk);
   }
   if (context.timeframe === "15m" && best.side === "LONG") {
-    return { ok: false, reason: "15m LONG отключен после анализа журнала", score: best.score - 70 };
+    return softGate("15m LONG отключен после анализа журнала", 70);
   }
   if (isAssetQuarantined(context.asset)) {
-    return { ok: false, reason: `${context.asset} в карантине после серии слабых сделок`, score: best.score - 65 };
+    return softGate(`${context.asset} в карантине после серии слабых сделок`, 65);
   }
   if (isPatternBlocked(context.asset, context.timeframe, best.side)) {
-    return { ok: false, reason: "связка заблокирована ежедневным самоанализом", score: best.score - 60 };
+    return softGate("связка заблокирована ежедневным самоанализом", 60);
   }
   if (getActiveAutopilotSideCount(best.side) >= autopilotMaxActivePerSide) {
     return { ok: false, reason: `лимит ${autopilotMaxActivePerSide} активных ${best.side}`, score: best.score - 45 };
@@ -2638,49 +2672,49 @@ function evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan =
   if (scenario && hasRecentSimilarAutopilotSignal(context, scenario)) {
     return { ok: false, reason: "дубль похожего сигнала в течение 60 минут", score: best.score - 55 };
   }
-  if (best.score < strictAutopilotMinScore) return { ok: false, reason: `режим лучших сетапов: score ${best.score}/100 ниже ${strictAutopilotMinScore}`, score: best.score - 100 };
-  if (!backtest || backtest.trades < 8) return { ok: false, reason: "недостаточно сделок в бэктесте", score: best.score - 55 };
-  if (backtest.winRate < 55) return { ok: false, reason: `бэктест winrate ${backtest.winRate.toFixed(0)}% ниже 55%`, score: best.score - 45 };
-  if (backtest.expectancyPct <= 0) return { ok: false, reason: `матожидание ${backtest.expectancyPct.toFixed(2)}% не положительное`, score: best.score - 45 };
-  if (backtest.maxDrawdownPct > 4.5) return { ok: false, reason: `просадка ${backtest.maxDrawdownPct.toFixed(2)}% выше лимита`, score: best.score - 35 };
+  if (best.score < profile.strictScore) return { ok: false, reason: `профиль ${profile.label}: score ${best.score}/100 ниже ${profile.strictScore}`, score: best.score - 100 };
+  if (!backtest || backtest.trades < 8) return softGate("недостаточно сделок в бэктесте", 55);
+  if (backtest.winRate < 55) return softGate(`бэктест winrate ${backtest.winRate.toFixed(0)}% ниже 55%`, 45);
+  if (backtest.expectancyPct <= 0) return softGate(`матожидание ${backtest.expectancyPct.toFixed(2)}% не положительное`, 45);
+  if (backtest.maxDrawdownPct > 4.5) return softGate(`просадка ${backtest.maxDrawdownPct.toFixed(2)}% выше лимита`, 35);
   if (state.cmcRadar.assets.length && !getMarketRadarAsset(context.asset)) {
-    return { ok: false, reason: "монета не прошла CMC-радар", score: best.score - 32 };
+    return softGate("монета не прошла CMC-радар", 32);
   }
   const radarAsset = getMarketRadarAsset(context.asset);
   if (radarAsset && isSuspiciousPumpAsset(radarAsset)) {
     return { ok: false, reason: "анти-памп фильтр: резкий рост без комфортной базы", score: best.score - 36 };
   }
   if (intel?.marketStructure?.adx < 18 && (context.mode === "trend" || context.mode === "breakout")) {
-    return { ok: false, reason: `ADX ${intel.marketStructure.adx.toFixed(0)} слабый для ${modeLabel(context.mode)}`, score: best.score - 30 };
+    return softGate(`ADX ${intel.marketStructure.adx.toFixed(0)} слабый для ${modeLabel(context.mode)}`, 30);
   }
   if (intel?.marketStructure?.adx < 15 || intel?.marketStructure?.atrPct < 0.25 || intel?.marketStructure?.volumeRatio < 0.7) {
-    return { ok: false, reason: "рыночный шум: слабый ADX/ATR/объем", score: best.score - 34 };
+    return softGate("рыночный шум: слабый ADX/ATR/объем", 34);
   }
   if (intel?.marketStructure?.volumeRatio < 1 && context.mode === "breakout") {
-    return { ok: false, reason: "пробой без повышенного объема", score: best.score - 28 };
+    return softGate("пробой без повышенного объема", 28);
   }
   if (intel?.marketStructure?.atrPct > 4.5) {
     return { ok: false, reason: `ATR ${intel.marketStructure.atrPct.toFixed(2)}% выше лимита умеренного риска`, score: best.score - 30 };
   }
   if (intel?.higherTimeframe?.direction && !["NEUTRAL", "UNKNOWN", best.side].includes(intel.higherTimeframe.direction)) {
-    return { ok: false, reason: `старший таймфрейм против ${best.side}`, score: best.score - 42 };
+    return softGate(`старший таймфрейм против ${best.side}`, 42);
   }
   if (pattern?.trades >= 3 && pattern.winRate < targetWinRatePct) {
-    return { ok: false, reason: `журнал связки ${pattern.winRate.toFixed(0)}% ниже ${targetWinRatePct}%`, score: best.score - 40 };
+    return softGate(`журнал связки ${pattern.winRate.toFixed(0)}% ниже ${targetWinRatePct}%`, 40);
   }
   if (pattern?.trades >= 3 && pattern.avgPnl <= 0) {
-    return { ok: false, reason: "журнал связки имеет отрицательный средний PnL", score: best.score - 35 };
+    return softGate("журнал связки имеет отрицательный средний PnL", 35);
   }
   if (qualityPattern?.trades >= 3 && (qualityPattern.winRate < targetWinRatePct || qualityPattern.avgPnl <= 0)) {
-    return { ok: false, reason: `детальный паттерн ${qualityPattern.winRate.toFixed(0)}% и ${qualityPattern.avgPnl.toFixed(2)}% avg`, score: best.score - 38 };
+    return softGate(`детальный паттерн ${qualityPattern.winRate.toFixed(0)}% и ${qualityPattern.avgPnl.toFixed(2)}% avg`, 38);
   }
-  if (intel?.derivatives?.sideBias === "CAUTION") return { ok: false, reason: "деривативы показывают перегрев", score: best.score - 25 };
-  if (intel?.sentiment?.value >= 82 && best.side === "LONG") return { ok: false, reason: "экстремальная жадность блокирует late long", score: best.score - 20 };
-  if (intel?.sentiment?.value <= 18 && best.side === "SHORT") return { ok: false, reason: "экстремальный страх блокирует late short", score: best.score - 20 };
+  if (intel?.derivatives?.sideBias === "CAUTION") return softGate("деривативы показывают перегрев", 25);
+  if (intel?.sentiment?.value >= 82 && best.side === "LONG") return softGate("экстремальная жадность блокирует late long", 20);
+  if (intel?.sentiment?.value <= 18 && best.side === "SHORT") return softGate("экстремальный страх блокирует late short", 20);
   const news = context.news || summarizeNewsForAsset(context.asset);
   if (news.regulatoryRisk && best.side === "LONG") return { ok: false, reason: "регуляторный негатив из новостей блокирует long", score: best.score - 35 };
-  if (news.bias === "BULLISH" && best.side === "SHORT") return { ok: false, reason: "новостной фон против short", score: best.score - 24 };
-  if (news.bias === "BEARISH" && best.side === "LONG") return { ok: false, reason: "новостной фон против long", score: best.score - 28 };
+  if (news.bias === "BULLISH" && best.side === "SHORT") return softGate("новостной фон против short", 24);
+  if (news.bias === "BEARISH" && best.side === "LONG") return softGate("новостной фон против long", 28);
   return { ok: true, reason: "фильтры 60% пройдены", score: best.score };
 }
 
@@ -2810,10 +2844,25 @@ function toggleScalpingMode() {
   if (state.autopilot.enabled) runAutopilotScan(true);
 }
 
+function updateAutopilotProfile() {
+  state.autopilot.profile = autopilotProfiles[autopilotProfile.value] ? autopilotProfile.value : "protective";
+  const profile = getAutopilotProfileSettings();
+  state.autopilot.lastMessage = `профиль: ${profile.label}`;
+  persistAutopilot();
+  renderStrategyIntelligence();
+  if (state.autopilot.enabled) runAutopilotScan(true);
+}
+
+function getAutopilotProfileSettings() {
+  const id = autopilotProfiles[state.autopilot.profile] ? state.autopilot.profile : "protective";
+  return { id, ...autopilotProfiles[id] };
+}
+
 function persistAutopilot() {
   localStorage.setItem(autopilotKey, JSON.stringify({
     enabled: state.autopilot.enabled,
     scalpingEnabled: state.autopilot.scalpingEnabled,
+    profile: state.autopilot.profile || "protective",
     lastEntryAt: state.autopilot.lastEntryAt,
     lastMessage: state.autopilot.lastMessage
   }));
@@ -2840,7 +2889,8 @@ async function runAutopilotScan(force = false) {
   }
   const bestCandidate = candidates[0] || null;
 
-  if (bestCandidate && bestCandidate.autopilotScore >= autopilotMinScore) {
+  const profile = getAutopilotProfileSettings();
+  if (bestCandidate && bestCandidate.autopilotScore >= profile.minScore) {
     if (bestCandidate.context.asset === asset.value) {
       state.marketIntel = bestCandidate.intel;
       state.tradePlan = bestCandidate.tradePlan;
@@ -2863,7 +2913,7 @@ async function runAutopilotScan(force = false) {
     const gate = bestCandidate ? evaluateAutopilotQualityGate(bestCandidate.context, bestCandidate.signalQuality, bestCandidate.intel, bestCandidate.tradePlan) : null;
     if (bestCandidate) {
       const rejectGate = gate?.ok
-        ? { ok: false, reason: `итоговый score ${bestCandidate.autopilotScore}/100 ниже ${autopilotMinScore}`, score: bestCandidate.autopilotScore }
+        ? { ok: false, reason: `итоговый score ${bestCandidate.autopilotScore}/100 ниже ${profile.minScore} для профиля ${profile.label}`, score: bestCandidate.autopilotScore }
         : gate;
       rememberRejectedSignal(bestCandidate.context, bestCandidate.signalQuality, rejectGate, bestCandidate.tradePlan, "autopilot");
     }
@@ -5377,6 +5427,7 @@ archiveRefresh.addEventListener("click", async () => {
 intelRefresh.addEventListener("click", () => refreshStrategyIntelligence(true));
 autopilotToggle.addEventListener("click", toggleAutopilot);
 scalpingMode.addEventListener("change", toggleScalpingMode);
+autopilotProfile.addEventListener("change", updateAutopilotProfile);
 remoteSave.addEventListener("click", saveRemoteJournalConfig);
 remoteSync.addEventListener("click", () => syncRemoteJournal(true));
 cmcSave.addEventListener("click", saveCmcRadarConfig);
@@ -5454,6 +5505,7 @@ initCmcRadarControls();
 initNewsAnalyticsControls();
 deposit.value = String(loadDeposit());
 scalpingMode.checked = Boolean(state.autopilot.scalpingEnabled);
+autopilotProfile.value = getAutopilotProfileSettings().id;
 reconcileLegacyPaperBudget();
 updateRiskLabel();
 renderLiveReadout();
