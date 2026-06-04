@@ -1804,12 +1804,14 @@ function buildEmaStrategyBlock(context) {
 
 function buildInvestorDisciplineBlock(context, tradePlan) {
   const primary = tradePlan?.primary;
+  const profile = getAutopilotProfileSettings();
+  const profileName = state.autopilot.profile === "auto" ? `Авто-тест, сейчас ${profile.label}` : profile.label;
   const rrText = primary
     ? `${primary.side}: риск ${formatPrice(Math.abs(primary.entry - primary.stop))}, цель до ${formatPrice(primary.target2)}`
     : "риск/цель еще не рассчитаны";
   const edgeChecks = [
     "Запас прочности: вход разрешен только если стоп заранее известен, а цель дает асимметрию не хуже выбранного risk/reward.",
-    `Лучшие сетапы: автобот входит только при score не ниже ${strictAutopilotMinScore}/100 и положительной статистике похожей связки.`,
+    `Профиль автобота: ${profileName}, вход от ${profile.minScore}/100; часть фильтров может снижать score, а не полностью запрещать вход.`,
     `Дневной стоп: после ${dailyMaxStops} стопов или убытка ${dailyMaxLossPct}% автобот прекращает входы до следующего дня.`,
     `Реализм демо: каждая сделка учитывает комиссию ${paperFeePct}% и проскальзывание ${paperSlippagePct}% на исполнении.`,
     state.autopilot.scalpingEnabled
