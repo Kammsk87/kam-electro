@@ -31,6 +31,10 @@ const crashRiskOffDrop24Pct = -5.5;
 const crashSevereDrop12Pct = -6;
 const crashSevereDrop24Pct = -10;
 const crashEmergencyLongLossPct = 1.8;
+const pendingOrderMaxAgeMs = 30 * 60 * 1000;
+const pendingScalpingMaxAgeMs = 5 * 60 * 1000;
+const pendingOrderMaxAwayPct = 0.9;
+const pendingCrashLongAwayPct = 1.2;
 const dailyMaxLossPct = 3;
 const dailyMaxStops = 3;
 const paperFeePct = 0.12;
@@ -664,13 +668,13 @@ function normalizePaperTrade(trade) {
   const stop = Number(trade.stop) || entry;
   const target = Number(trade.target) || entry;
   const target1 = Number(trade.target1) || target;
-  const status = ["pending", "open", "partial", "target", "stop"].includes(trade.status) ? trade.status : "open";
+  const status = ["pending", "open", "partial", "target", "stop", "cancelled"].includes(trade.status) ? trade.status : "open";
   const isActiveStatus = ["pending", "open", "partial"].includes(status);
   const initialQuantity = Number(trade.initialQuantity) || Number(trade.quantity) || amount / entry;
   const target1Quantity = Number(trade.target1Quantity) || initialQuantity * 0.5;
   const remainingQuantity = Number.isFinite(Number(trade.remainingQuantity))
     ? Number(trade.remainingQuantity)
-    : ["target", "stop"].includes(status)
+    : ["target", "stop", "cancelled"].includes(status)
       ? 0
       : status === "partial"
         ? Math.max(0, initialQuantity - target1Quantity)
@@ -728,6 +732,8 @@ function normalizePaperTrade(trade) {
     openedAt: Number(trade.openedAt) || Date.now(),
     filledAt: Number(trade.filledAt) || null,
     closedAt: Number(trade.closedAt) || null,
+    cancelledAt: Number(trade.cancelledAt) || null,
+    cancelReason: String(trade.cancelReason || ""),
     status,
     result: String(trade.result || "в работе"),
     decision: String(trade.decision || ""),
@@ -758,6 +764,7 @@ function ensureBybitPaperState(trade) {
   const openingSide = trade.side === "LONG" ? "Buy" : "Sell";
   const orderType = getOpeningOrderType(trade.side, trade.placedPrice, trade.entry, trade.executionType);
   const isPositionActive = ["open", "partial"].includes(trade.status);
+  const openingOrderStatus = trade.status === "pending" ? "New" : trade.status === "cancelled" ? "Cancelled" : "Filled";
   const tp1Order = trade.tp1Order || buildPaperTpslOrder(trade, "TakeProfit", closeSide, "target1");
   const tp2Order = trade.tp2Order || trade.tpOrder || buildPaperTpslOrder(trade, "TakeProfit", closeSide, "target2");
 
@@ -778,17 +785,18 @@ function ensureBybitPaperState(trade) {
       qty: trade.quantity,
       timeInForce: "GTC",
       reduceOnly: false,
-      orderStatus: trade.status === "pending" ? "New" : "Filled",
+      orderStatus: openingOrderStatus,
       triggerPrice: orderType === "Conditional" ? trade.entry : null,
       triggerDirection: trade.triggerDirection === "above" ? 1 : 2,
-      lastPriceOnCreated: trade.placedPrice
+      lastPriceOnCreated: trade.placedPrice,
+      cancelType: trade.status === "cancelled" ? "CancelByUser" : null
     },
     position: trade.position || {
       symbol: bybitSymbol,
       side: trade.side === "LONG" ? "Buy" : "Sell",
       size: isPositionActive ? getRemainingQuantity(trade) : 0,
       avgPrice: isPositionActive ? trade.entry : null,
-      positionStatus: isPositionActive ? "Normal" : trade.status === "pending" ? "None" : "Closed",
+      positionStatus: isPositionActive ? "Normal" : trade.status === "pending" || trade.status === "cancelled" ? "None" : "Closed",
       closedPnl: ["target", "stop"].includes(trade.status) ? trade.pnl : 0
     },
     tp1Order,
@@ -2332,7 +2340,7 @@ function calculateMaxDrawdown(equity) {
 }
 
 function analyzeLearningJournal(symbol = null) {
-  const closed = state.paperTrades.filter((trade) => !isPaperTradeActive(trade) && (!symbol || trade.asset === symbol));
+  const closed = state.paperTrades.filter((trade) => isPaperTradeClosedForStats(trade) && (!symbol || trade.asset === symbol));
   const wins = closed.filter((trade) => trade.pnl > 0).length;
   const sideStats = ["LONG", "SHORT"].reduce((acc, side) => {
     const trades = closed.filter((trade) => trade.side === side);
@@ -2373,6 +2381,7 @@ function buildAutopilotProfileStats(trades = state.paperTrades.filter((trade) =>
   });
 
   trades
+    .filter(isPaperTradeClosedForStats)
     .filter((trade) => trade.autopilot)
     .forEach((trade) => {
       const id = getTradeAutopilotProfileId(trade);
@@ -2450,7 +2459,7 @@ function shouldRunDailyLearningReview(force = false) {
 async function runDailyLearningReview(force = false) {
   if (!shouldRunDailyLearningReview(force)) return false;
   await refreshSharedLearningMemory(true);
-  const closed = state.paperTrades.filter((trade) => !isPaperTradeActive(trade));
+  const closed = state.paperTrades.filter(isPaperTradeClosedForStats);
   const today = getLocalDateKey();
   if (closed.length < 10) {
     state.learningPolicy = {
@@ -2849,7 +2858,7 @@ function getQualityPatternKey(context, side) {
 
 function getQualityPatternStat(context, side) {
   const key = getQualityPatternKey(context, side);
-  const closed = state.paperTrades.filter((trade) => !isPaperTradeActive(trade) && trade.strategySnapshot?.qualityPatternKey === key);
+  const closed = state.paperTrades.filter((trade) => isPaperTradeClosedForStats(trade) && trade.strategySnapshot?.qualityPatternKey === key);
   if (!closed.length) return null;
   const wins = closed.filter((trade) => Number(trade.pnl) > 0).length;
   const avgPnl = average(closed.map((trade) => Number(trade.pnlPct) || 0));
@@ -2859,7 +2868,7 @@ function getQualityPatternStat(context, side) {
 function getDailyRiskState() {
   const dayStart = new Date();
   dayStart.setHours(0, 0, 0, 0);
-  const trades = state.paperTrades.filter((trade) => !isPaperTradeActive(trade) && (Number(trade.closedAt) || Number(trade.openedAt) || 0) >= dayStart.getTime());
+  const trades = state.paperTrades.filter((trade) => isPaperTradeClosedForStats(trade) && (Number(trade.closedAt) || Number(trade.openedAt) || 0) >= dayStart.getTime());
   const pnl = trades.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0);
   const budgetBase = Math.max(1, getDepositValue() + getReservedPaperBudget());
   const lossPct = pnl < 0 ? Math.abs(pnl) / budgetBase * 100 : 0;
@@ -4762,12 +4771,18 @@ function replayPaperTradeCandle(trade, candle) {
 
   if (trade.status === "pending") {
     const triggered = trade.triggerDirection === "above" ? candle.high >= trade.entry : candle.low <= trade.entry;
-    if (!triggered) {
+    if (triggered) {
+      fillPaperOpeningOrder(trade);
+      changed = true;
+    } else {
+      const cancelReason = getPendingOrderCancelReason(trade, candle.close, candle.closeTime);
+      if (cancelReason) {
+        cancelPaperPendingOrder(trade, cancelReason, candle.close, candle.closeTime);
+        return true;
+      }
       appendPaperPoint(trade, candle.close, 0, 0);
       return true;
     }
-    fillPaperOpeningOrder(trade);
-    changed = true;
   }
 
   if (!["open", "partial"].includes(trade.status)) return changed;
@@ -4807,6 +4822,11 @@ function updateSinglePaperTrade(trade) {
     if (currentPrice > 0) appendPaperPoint(trade, currentPrice, 0, 0);
     if (currentPrice > 0 && isPaperOrderTriggered(trade, currentPrice)) {
       fillPaperOpeningOrder(trade);
+      return;
+    }
+    const cancelReason = getPendingOrderCancelReason(trade, currentPrice, Date.now());
+    if (cancelReason) {
+      cancelPaperPendingOrder(trade, cancelReason, currentPrice);
       return;
     } else {
       return;
@@ -4956,6 +4976,8 @@ function updateStrategySnapshotOutcome(trade, eventType) {
     openedAt: trade.openedAt,
     filledAt: trade.filledAt,
     closedAt: trade.closedAt,
+    cancelledAt: trade.cancelledAt,
+    cancelReason: trade.cancelReason,
     target1HitAt: trade.target1HitAt,
     entry: trade.entry,
     stop: trade.stop,
@@ -4978,6 +5000,78 @@ function isPaperOrderTriggered(trade, currentPrice) {
     : currentPrice <= trade.entry;
 }
 
+function getPendingOrderCancelReason(trade, currentPrice, checkedAt = Date.now()) {
+  if (trade.status !== "pending") return "";
+  const price = Number(currentPrice);
+  const entry = Number(trade.entry);
+  const openedAt = Number(trade.openedAt) || checkedAt;
+  const ageMs = Math.max(0, checkedAt - openedAt);
+  const maxAgeMs = getPendingOrderMaxAgeMs(trade);
+  if (ageMs >= maxAgeMs) return `ордер отменен: не исполнился за ${formatPendingLifetime(maxAgeMs)}`;
+
+  if (Number.isFinite(price) && price > 0 && Number.isFinite(entry) && entry > 0) {
+    const awayPct = Math.abs(price - entry) / entry * 100;
+    if (awayPct >= pendingOrderMaxAwayPct) {
+      return `ордер отменен: цена ушла от entry на ${awayPct.toFixed(2)}%`;
+    }
+
+    if (trade.side === "LONG") {
+      const placedPrice = Number(trade.placedPrice) || entry;
+      const crashAwayPct = (placedPrice - price) / placedPrice * 100;
+      if (crashAwayPct >= pendingCrashLongAwayPct) {
+        return `ордер отменен: risk-off для LONG, цена упала на ${crashAwayPct.toFixed(2)}%`;
+      }
+    }
+  }
+
+  return "";
+}
+
+function getPendingOrderMaxAgeMs(trade) {
+  if (trade.strategyMode === "scalping" || trade.strategySnapshot?.context?.strategyMode === "scalping") {
+    return pendingScalpingMaxAgeMs;
+  }
+  const intervalMs = intervalToMs(trade.timeframe);
+  const candleLimit = Number.isFinite(intervalMs) && intervalMs > 0 ? intervalMs * 2 : pendingOrderMaxAgeMs;
+  return Math.max(60 * 1000, Math.min(pendingOrderMaxAgeMs, candleLimit));
+}
+
+function formatPendingLifetime(ms) {
+  const minutes = Math.max(1, Math.round(ms / 60000));
+  return `${minutes} мин`;
+}
+
+function cancelPaperPendingOrder(trade, reason, currentPrice = null, cancelledAt = Date.now()) {
+  if (trade.status !== "pending") return;
+  const releaseAmount = Math.max(0, (Number(trade.reservedAmount) || 0) - (Number(trade.releasedAmount) || 0));
+  trade.status = "cancelled";
+  trade.cancelledAt = cancelledAt;
+  trade.closedAt = cancelledAt;
+  trade.cancelReason = reason;
+  trade.result = reason || "ордер отменен";
+  trade.exitPrice = Number(currentPrice) > 0 ? Number(currentPrice) : null;
+  trade.remainingQuantity = 0;
+  trade.pnl = 0;
+  trade.pnlPct = 0;
+  trade.realizedPnl = 0;
+  trade.openingOrder.orderStatus = "Cancelled";
+  trade.openingOrder.cancelType = "AutoCancel";
+  trade.openingOrder.leavesQty = trade.quantity;
+  trade.position.size = 0;
+  trade.position.avgPrice = null;
+  trade.position.positionStatus = "None";
+  trade.tp1Order.orderStatus = "Cancelled";
+  trade.tp2Order.orderStatus = "Cancelled";
+  trade.tpOrder = trade.tp2Order;
+  trade.slOrder.orderStatus = "Cancelled";
+  if (!trade.walletSettled) {
+    settlePaperBudget(trade, releaseAmount, 0);
+    trade.walletSettled = true;
+  }
+  updateStrategySnapshotOutcome(trade, "cancelled");
+  appendPaperPoint(trade, Number(currentPrice) > 0 ? Number(currentPrice) : trade.placedPrice || trade.entry, 0, 0);
+}
+
 function appendPaperPoint(trade, price, pnl, pnlPct) {
   const lastPoint = trade.history[trade.history.length - 1];
   if (lastPoint && Math.abs(lastPoint.price - price) < price * 0.000001 && Date.now() - lastPoint.time < 1000) {
@@ -4994,13 +5088,21 @@ function isPaperTradeActive(trade) {
   return ["pending", "open", "partial"].includes(trade.status);
 }
 
+function isPaperTradeCancelled(trade) {
+  return trade.status === "cancelled";
+}
+
+function isPaperTradeClosedForStats(trade) {
+  return !isPaperTradeActive(trade) && !isPaperTradeCancelled(trade);
+}
+
 function getInitialQuantity(trade) {
   return Number(trade.initialQuantity) || Number(trade.quantity) || Number(trade.amount) / Number(trade.entry) || 0;
 }
 
 function getRemainingQuantity(trade) {
   if (Number.isFinite(Number(trade.remainingQuantity))) return Number(trade.remainingQuantity);
-  if (["target", "stop"].includes(trade.status)) return 0;
+  if (["target", "stop", "cancelled"].includes(trade.status)) return 0;
   if (trade.status === "partial") return Math.max(0, getInitialQuantity(trade) - (Number(trade.target1Quantity) || getInitialQuantity(trade) * 0.5));
   return getInitialQuantity(trade);
 }
@@ -5062,7 +5164,8 @@ function renderPaperReadout(trade, currentPrice, pnl, pnlPct) {
     open: "сделка открыта",
     partial: "T1 зафиксирован",
     target: "цель достигнута",
-    stop: "стоп сработал"
+    stop: "стоп сработал",
+    cancelled: "ордер отменен"
   };
   paperStatus.textContent = statusLabels[trade.status] || "в работе";
   paperEntry.textContent = `${trade.side} · ${formatPrice(trade.entry)}`;
@@ -5078,8 +5181,8 @@ function renderTradeJournal() {
   const trades = getVisibleJournalTrades();
   const openTrades = trades.filter(isPaperTradeActive);
   const closedTrades = trades.filter((trade) => !isPaperTradeActive(trade));
-  const wins = closedTrades.filter((trade) => trade.pnl >= 0);
-  const losses = closedTrades.filter((trade) => trade.pnl < 0);
+  const wins = closedTrades.filter((trade) => trade.pnl >= 0 && !isPaperTradeCancelled(trade));
+  const losses = closedTrades.filter((trade) => trade.pnl < 0 && !isPaperTradeCancelled(trade));
   const totalPnl = trades.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0);
 
   journalOpen.textContent = String(openTrades.length);
@@ -5096,8 +5199,8 @@ function renderTradeJournal() {
   journalRows.innerHTML = trades.map((trade, index) => {
     const currentPrice = getPaperTradePrice(trade);
     const isActive = getActivePaperTrade()?.id === trade.id;
-    const statusClass = trade.status === "pending" ? "pending" : trade.status === "open" ? "open" : trade.status === "partial" ? "partial" : trade.pnl >= 0 ? "win" : "loss";
-    const statusLabel = trade.status === "pending" ? "PENDING" : trade.status === "open" ? "OPEN" : trade.status === "partial" ? "T1 50%" : trade.pnl >= 0 ? "WIN" : "LOSS";
+    const statusClass = getPaperStatusClass(trade);
+    const statusLabel = getPaperStatusLabel(trade);
     const sideClass = trade.side === "SHORT" ? "short" : "long";
     return `
       <tr class="${isActive ? "is-active" : ""}">
@@ -5127,6 +5230,22 @@ function getVisibleJournalTrades() {
   return state.paperTrades.filter((trade) => trade.sessionId === currentSessionId || isPaperTradeActive(trade));
 }
 
+function getPaperStatusClass(trade) {
+  if (trade.status === "pending") return "pending";
+  if (trade.status === "open") return "open";
+  if (trade.status === "partial") return "partial";
+  if (trade.status === "cancelled") return "cancelled";
+  return trade.pnl >= 0 ? "win" : "loss";
+}
+
+function getPaperStatusLabel(trade) {
+  if (trade.status === "pending") return "PENDING";
+  if (trade.status === "open") return "OPEN";
+  if (trade.status === "partial") return "T1 50%";
+  if (trade.status === "cancelled") return "CANCELLED";
+  return trade.pnl >= 0 ? "WIN" : "LOSS";
+}
+
 function renderTradeArchive() {
   if (!archiveRows) return;
   const trades = [...state.paperTrades].sort((a, b) => getTradeSortTime(b) - getTradeSortTime(a));
@@ -5147,8 +5266,8 @@ function renderTradeArchive() {
 
   archiveRows.innerHTML = trades.map((trade, index) => {
     const currentPrice = getPaperTradePrice(trade);
-    const statusClass = trade.status === "pending" ? "pending" : trade.status === "open" ? "open" : trade.status === "partial" ? "partial" : trade.pnl >= 0 ? "win" : "loss";
-    const statusLabel = trade.status === "pending" ? "PENDING" : trade.status === "open" ? "OPEN" : trade.status === "partial" ? "T1 50%" : trade.pnl >= 0 ? "WIN" : "LOSS";
+    const statusClass = getPaperStatusClass(trade);
+    const statusLabel = getPaperStatusLabel(trade);
     const sideClass = trade.side === "SHORT" ? "short" : "long";
     const sourceClass = trade.autopilot ? "auto" : "manual";
     const profileLabel = autopilotProfiles[getTradeAutopilotProfileId(trade)]?.label || "";
@@ -5220,7 +5339,8 @@ function exportJournalToExcel() {
     "Цена выхода": trade.exitPrice || "",
     "PnL USDT": trade.pnl,
     "PnL %": trade.pnlPct,
-    "Win/Loss": Number(trade.pnl) > 0 ? "WIN" : !isPaperTradeActive(trade) ? "LOSS" : "",
+    "Win/Loss": isPaperTradeCancelled(trade) ? "CANCELLED" : Number(trade.pnl) > 0 ? "WIN" : !isPaperTradeActive(trade) ? "LOSS" : "",
+    "Причина отмены": trade.cancelReason || "",
     "Pattern": getLearningPatternKey(trade.asset, trade.timeframe, trade.side),
     "Стратегия сохранена": trade.strategySnapshot ? "да" : "нет",
     "Стратегия текст": trade.strategySnapshot?.strategyText || "",

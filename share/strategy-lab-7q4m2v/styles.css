@@ -734,6 +734,11 @@ canvas {
   background: var(--accent-2);
 }
 
+.status-badge.cancelled {
+  color: #dce3ea;
+  background: rgba(132, 143, 155, 0.28);
+}
+
 .status-badge.partial {
   color: #07111e;
   background: var(--accent);
