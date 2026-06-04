@@ -629,6 +629,12 @@ const killSwitch = document.querySelector("[data-kill-switch]");
 const preflightScore = document.querySelector("[data-preflight-score]");
 const preflightAction = document.querySelector("[data-preflight-action]");
 const preflightReport = document.querySelector("[data-preflight-report]");
+const battleStatus = document.querySelector("[data-battle-status]");
+const battleScore = document.querySelector("[data-battle-score]");
+const battleWinrate = document.querySelector("[data-battle-winrate]");
+const battleProfitFactor = document.querySelector("[data-battle-profit-factor]");
+const battleWalkForward = document.querySelector("[data-battle-walk-forward]");
+const battleReport = document.querySelector("[data-battle-report]");
 const exportJournal = document.querySelector("[data-export-journal]");
 const journalRows = document.querySelector("[data-journal-rows]");
 const journalOpen = document.querySelector("[data-journal-open]");
@@ -2060,6 +2066,7 @@ function renderStrategyIntelligence() {
     : `Профиль автобота: ${profile.label}, вход от ${profile.minScore}/100; ${profile.note}.`;
   const rejectText = lastReject ? `Последний отказ: ${lastReject.asset} ${lastReject.timeframe} ${lastReject.side} - ${lastReject.reason}.` : "Отказов автобота пока нет.";
   intelDetails.textContent = `${learningMode} ${formatLearningPolicyNote()} ${profileText} ${newsText} ${scalpingText} ${riskText} ${rejectText} ${intel.notes.join(" ")}`;
+  renderBattleReadiness();
 }
 
 async function refreshStrategyIntelligence(force = false) {
@@ -4365,6 +4372,102 @@ function renderExchangePreflight(result, mode = "preflight") {
   preflightReport.textContent = `${rows.join("\n")}${payload}`;
 }
 
+function analyzeBattleReadiness() {
+  const closed = state.paperTrades
+    .filter(isPaperTradeClosedForStats)
+    .sort((a, b) => getTradeSortTime(a) - getTradeSortTime(b));
+  const wins = closed.filter((trade) => Number(trade.pnl) > 0);
+  const losses = closed.filter((trade) => Number(trade.pnl) < 0);
+  const grossProfit = wins.reduce((sum, trade) => sum + Number(trade.pnl), 0);
+  const grossLoss = Math.abs(losses.reduce((sum, trade) => sum + Number(trade.pnl), 0));
+  const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? 99 : 0;
+  const winRate = closed.length ? (wins.length / closed.length) * 100 : 0;
+  const avgPnl = closed.length ? closed.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0) / closed.length : 0;
+  const days = buildDailyTradeStats(closed);
+  const profitableDays = days.filter((day) => day.pnl > 0).length;
+  const last5Days = days.slice(-5);
+  const profitableLast5 = last5Days.filter((day) => day.pnl > 0).length;
+  const maxDailyDrawdownPct = days.reduce((max, day) => Math.max(max, Math.abs(Math.min(0, day.pnlPct))), 0);
+  const walkForward = analyzeWalkForward(closed);
+  const mismatches = countPreflightMismatches(closed);
+  const bestProfile = getBestAutopilotProfileStat();
+
+  const checks = [
+    { id: "trades", ok: closed.length >= 100, label: "100 закрытых сделок", value: `${closed.length}/100` },
+    { id: "days", ok: days.length >= 14, label: "14 торговых дней", value: `${days.length}/14` },
+    { id: "winrate", ok: winRate >= 60, label: "Winrate не ниже 60%", value: `${winRate.toFixed(0)}%` },
+    { id: "avg", ok: avgPnl > 0, label: "Средний PnL положительный", value: `${avgPnl >= 0 ? "+" : ""}${avgPnl.toFixed(2)} USDT` },
+    { id: "pf", ok: profitFactor >= 1.3, label: "Profit factor выше 1.3", value: profitFactor >= 90 ? "∞" : profitFactor.toFixed(2) },
+    { id: "drawdown", ok: maxDailyDrawdownPct <= dailyMaxLossPct, label: "Дневная просадка не хуже лимита", value: `${maxDailyDrawdownPct.toFixed(2)}%` },
+    { id: "days5", ok: last5Days.length >= 5 && profitableLast5 >= 3, label: "3 прибыльных дня из последних 5", value: `${profitableLast5}/${Math.min(5, last5Days.length)}` },
+    { id: "walk", ok: walkForward.ok, label: "Walk-forward в плюсе", value: walkForward.label },
+    { id: "dryrun", ok: mismatches === 0, label: "Нет pre-flight расхождений", value: `${mismatches}` },
+    { id: "profile", ok: Boolean(bestProfile && bestProfile.trades >= autopilotProfileMinSamples && bestProfile.avgPnlPct > 0), label: "Есть прибыльный профиль автобота", value: bestProfile ? `${bestProfile.label} ${bestProfile.trades} сделок` : "нет данных" }
+  ];
+  const passed = checks.filter((item) => item.ok).length;
+  const score = Math.round((passed / checks.length) * 100);
+  const ready = checks.every((item) => item.ok);
+  return { ready, score, checks, closed, winRate, profitFactor, walkForward, bestProfile, days, avgPnl, maxDailyDrawdownPct };
+}
+
+function buildDailyTradeStats(trades) {
+  const byDate = new Map();
+  trades.forEach((trade) => {
+    const date = new Date(Number(trade.closedAt) || Number(trade.openedAt) || Date.now());
+    const key = getLocalDateKey(date);
+    const depositBase = Math.max(1, Number(trade.deposit) || loadDeposit());
+    if (!byDate.has(key)) byDate.set(key, { key, trades: 0, pnl: 0, pnlPct: 0 });
+    const item = byDate.get(key);
+    item.trades += 1;
+    item.pnl += Number(trade.pnl) || 0;
+    item.pnlPct += ((Number(trade.pnl) || 0) / depositBase) * 100;
+  });
+  return [...byDate.values()].sort((a, b) => a.key.localeCompare(b.key));
+}
+
+function analyzeWalkForward(trades) {
+  if (trades.length < 30) return { ok: false, label: `${trades.length}/30` };
+  const split = Math.max(1, Math.floor(trades.length * 0.7));
+  const validation = trades.slice(split);
+  const pnl = validation.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0);
+  const wins = validation.filter((trade) => Number(trade.pnl) > 0).length;
+  const winRate = validation.length ? (wins / validation.length) * 100 : 0;
+  return {
+    ok: pnl > 0 && winRate >= 55,
+    label: `${validation.length} сделок, ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USDT, ${winRate.toFixed(0)}%`
+  };
+}
+
+function countPreflightMismatches(trades) {
+  return trades.filter((trade) => trade.strategySnapshot?.execution?.autopilot && !trade.exchangePreflight?.allowed).length;
+}
+
+function getBestAutopilotProfileStat() {
+  return Object.values(buildAutopilotProfileStats())
+    .filter((item) => item.trades > 0)
+    .sort((a, b) => b.score - a.score || b.avgPnlPct - a.avgPnlPct)[0] || null;
+}
+
+function renderBattleReadiness() {
+  if (!battleStatus) return;
+  const result = analyzeBattleReadiness();
+  battleStatus.textContent = result.ready ? "готов к testnet" : "не готов";
+  battleStatus.classList.toggle("is-live", result.ready);
+  battleScore.textContent = `${result.score}/100`;
+  battleScore.style.color = result.ready ? "#55c7a2" : result.score >= 60 ? "#e4b86a" : "#ef6b5b";
+  battleWinrate.textContent = `${result.winRate.toFixed(0)}%`;
+  battleProfitFactor.textContent = result.profitFactor >= 90 ? "∞" : result.profitFactor.toFixed(2);
+  battleWalkForward.textContent = result.walkForward.label;
+  const blockers = result.checks.filter((item) => !item.ok);
+  const passed = result.checks.filter((item) => item.ok);
+  const bestProfile = result.bestProfile ? `Лучший профиль: ${result.bestProfile.label}, ${result.bestProfile.trades} сделок, ${result.bestProfile.winRate.toFixed(0)}%, ${result.bestProfile.avgPnlPct >= 0 ? "+" : ""}${result.bestProfile.avgPnlPct.toFixed(2)}% avg.` : "Лучший профиль: еще нет статистики.";
+  battleReport.textContent = [
+    result.ready ? "Допуск: можно переходить к testnet, но не к real без отдельного лимита ключей." : "Допуск: боевой режим заблокирован до выполнения условий.",
+    `Выполнено: ${passed.length}/${result.checks.length}. ${bestProfile}`,
+    ...blockers.map((item) => `BLOCK: ${item.label} - ${item.value}`)
+  ].join("\n");
+}
+
 function handlePreflightCheck() {
   const result = runExchangePreflight();
   renderExchangePreflight(result, "preflight");
@@ -5908,6 +6011,7 @@ updateRiskLabel();
 renderLiveReadout();
 renderWalletReadout();
 renderTradeJournal();
+renderBattleReadiness();
 generateStrategy();
 refreshStrategyIntelligence(false);
 refreshOpenPaperTradePrices(true);

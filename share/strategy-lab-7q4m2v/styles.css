@@ -558,7 +558,8 @@ canvas {
   font-size: 12px;
 }
 
-.exchange-sim {
+.exchange-sim,
+.battle-gate {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   padding: 10px;
@@ -583,13 +584,20 @@ canvas {
   font-weight: 900;
 }
 
-.sim-grid {
+.sim-grid,
+.gate-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
 }
 
-.sim-grid div {
+.gate-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 8px;
+}
+
+.sim-grid div,
+.gate-grid div {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   padding: 7px;
@@ -597,28 +605,34 @@ canvas {
 }
 
 .sim-grid span,
-.sim-grid strong {
+.sim-grid strong,
+.gate-grid span,
+.gate-grid strong {
   display: block;
 }
 
-.sim-grid span {
+.sim-grid span,
+.gate-grid span {
   color: var(--muted);
   font-size: 11px;
   font-weight: 800;
 }
 
-.sim-grid strong {
+.sim-grid strong,
+.gate-grid strong {
   margin-top: 2px;
   overflow-wrap: anywhere;
   font-size: 12px;
 }
 
-.sim-report {
+.sim-report,
+.gate-report {
   margin-top: 8px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
   line-height: 1.45;
+  white-space: pre-line;
 }
 
 .trade-journal,
