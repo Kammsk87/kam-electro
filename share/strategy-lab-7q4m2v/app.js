@@ -26,6 +26,11 @@ const scalpingRiskPct = 0.35;
 const scalpingMaxSingleTradePct = 4;
 const scalpingMaxSpreadPct = 0.08;
 const scalpingMinVolumeRatio = 1.05;
+const crashRiskOffDrop12Pct = -3;
+const crashRiskOffDrop24Pct = -5.5;
+const crashSevereDrop12Pct = -6;
+const crashSevereDrop24Pct = -10;
+const crashEmergencyLongLossPct = 1.8;
 const dailyMaxLossPct = 3;
 const dailyMaxStops = 3;
 const paperFeePct = 0.12;
@@ -2040,10 +2045,11 @@ function buildMarketIntelForContext(context, candles, derivatives = null, sentim
   const backtest = candles.length ? runStrategyBacktest(candles, context) : null;
   const marketStructure = candles.length ? analyzeMarketStructure(candles) : null;
   const higherTimeframe = candles.length ? analyzeHigherTimeframeProxy(candles) : null;
+  const marketCrash = candles.length ? analyzeMarketCrashRisk(candles) : null;
   const marketRadar = getMarketRadarAsset(context.asset);
   const learning = analyzeLearningJournal(context.asset);
   const monthly = calculateMonthlyGoalProgress();
-  const notes = buildIntelNotes(backtest, derivatives, sentiment, learning, monthly, candles.length, marketStructure, marketRadar, higherTimeframe);
+  const notes = buildIntelNotes(backtest, derivatives, sentiment, learning, monthly, candles.length, marketStructure, marketRadar, higherTimeframe, marketCrash);
   return {
     loading: false,
     updatedAt: Date.now(),
@@ -2052,12 +2058,46 @@ function buildMarketIntelForContext(context, candles, derivatives = null, sentim
     backtest,
     marketStructure,
     higherTimeframe,
+    marketCrash,
     marketRadar,
     derivatives,
     sentiment,
     learning,
     monthlyGoal: monthly,
     notes
+  };
+}
+
+function analyzeMarketCrashRisk(candles) {
+  const last = candles[candles.length - 1];
+  if (!last || candles.length < 30) return { level: "UNKNOWN", riskOff: false, severe: false, summary: "нужно больше свечей для crash-guard" };
+  const close = last.close;
+  const change = (lookback) => {
+    const base = candles[Math.max(0, candles.length - 1 - lookback)]?.close;
+    return base > 0 ? ((close - base) / base) * 100 : 0;
+  };
+  const drop12 = change(12);
+  const drop24 = change(24);
+  const drop48 = change(48);
+  const recent = candles.slice(-8);
+  const redStreak = [...recent].reverse().findIndex((candle) => candle.close >= candle.open);
+  const redCount = redStreak === -1 ? recent.length : redStreak;
+  const previousVolume = average(candles.slice(-40, -8).map((candle) => candle.volume));
+  const recentVolume = average(recent.map((candle) => candle.volume));
+  const volumeSpike = previousVolume > 0 ? recentVolume / previousVolume : 1;
+  const severe = drop12 <= crashSevereDrop12Pct || drop24 <= crashSevereDrop24Pct || (drop12 <= -4.5 && redCount >= 5 && volumeSpike >= 1.4);
+  const riskOff = severe || drop12 <= crashRiskOffDrop12Pct || drop24 <= crashRiskOffDrop24Pct || drop48 <= -8 || (redCount >= 4 && volumeSpike >= 1.25);
+  const level = severe ? "CRASH" : riskOff ? "RISK_OFF" : "NORMAL";
+  return {
+    level,
+    riskOff,
+    severe,
+    drop12,
+    drop24,
+    drop48,
+    redCount,
+    volumeSpike,
+    summary: `${level}: 12св ${drop12.toFixed(2)}%, 24св ${drop24.toFixed(2)}%, volume x${volumeSpike.toFixed(2)}`
   };
 }
 
@@ -2447,13 +2487,14 @@ function analyzeMarketStructure(candles) {
   };
 }
 
-function buildIntelNotes(backtest, derivatives, sentiment, learning, monthly, candleCount, marketStructure = null, marketRadar = null, higherTimeframe = null) {
+function buildIntelNotes(backtest, derivatives, sentiment, learning, monthly, candleCount, marketStructure = null, marketRadar = null, higherTimeframe = null, marketCrash = null) {
   const notes = [];
   const journalScope = isRemoteJournalConfigured() ? "общий" : "локальный";
   notes.push(candleCount ? `Бэктест рассчитан по ${candleCount} свечам Bybit.` : "Bybit-история временно недоступна, бэктест не обновлен.");
   if (backtest) notes.push(`Бэктест winrate ${backtest.winRate.toFixed(0)}% при цели не ниже ${targetWinRatePct}%, матожидание ${backtest.expectancyPct >= 0 ? "+" : ""}${backtest.expectancyPct.toFixed(2)}% на сделку, просадка ${backtest.maxDrawdownPct.toFixed(2)}%.`);
   if (marketStructure) notes.push(`Структура рынка: ADX ${marketStructure.adx.toFixed(0)}, ATR ${marketStructure.atrPct.toFixed(2)}%, цена ${marketStructure.priceVsVwapPct >= 0 ? "выше" : "ниже"} VWAP на ${Math.abs(marketStructure.priceVsVwapPct).toFixed(2)}%, объем x${marketStructure.volumeRatio.toFixed(2)}.`);
   if (higherTimeframe?.note) notes.push(higherTimeframe.note);
+  if (marketCrash?.summary) notes.push(`Crash-guard: ${marketCrash.summary}.`);
   if (marketRadar) notes.push(`CMC-радар допускает монету: #${marketRadar.rank}, score ${marketRadar.radarScore.toFixed(0)}, объем ${formatCompact(marketRadar.volume24h)} USDT, 30д ${marketRadar.change30d.toFixed(1)}%, 90д ${marketRadar.change90d.toFixed(1)}%.`);
   if (derivatives) notes.push(`${derivatives.bias}.`);
   else notes.push("Деривативные данные недоступны для этой пары или временно не ответили.");
@@ -2572,6 +2613,13 @@ function evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan =
   if (dailyRisk.blocked) {
     return { ok: false, reason: `дневной стоп: ${dailyRisk.lossPct.toFixed(2)}% убытка или ${dailyRisk.stops} стопов`, score: best.score - 90 };
   }
+  const crash = intel?.marketCrash;
+  if (crash?.severe) {
+    return { ok: false, reason: `crash-guard ${crash.level}: новые входы заблокированы`, score: best.score - 95 };
+  }
+  if (crash?.riskOff && best.side === "LONG") {
+    return { ok: false, reason: `risk-off: рынок просел, LONG запрещен (${crash.drop12.toFixed(2)}% / 12св)`, score: best.score - 75 };
+  }
   if (context.strategyMode === "scalping") {
     return evaluateScalpingQualityGate(context, signalQuality, intel, tradePlan, dailyRisk);
   }
@@ -2641,6 +2689,9 @@ function evaluateScalpingQualityGate(context, signalQuality, intel, tradePlan, d
   const signal = tradePlan?.scalpingSignal || evaluateScalpingSetup(context, context.scanCandles || []);
   const scenario = getAutopilotScenario(tradePlan, best?.side);
   if (!best || !scenario) return { ok: false, reason: "скальпинг: нет сценария", score: -Infinity };
+  const crash = intel?.marketCrash;
+  if (crash?.severe) return { ok: false, reason: "скальпинг: CRASH режим, входы запрещены", score: best.score - 80 };
+  if (crash?.riskOff && best.side === "LONG") return { ok: false, reason: "скальпинг: risk-off запрещает long", score: best.score - 65 };
   if (!getAvailableScalpingTimeframes().includes(context.timeframe)) {
     return { ok: false, reason: "скальпинг разрешен только на 5m/15m", score: best.score - 70 };
   }
@@ -3240,6 +3291,9 @@ function getManualStrategyRestrictions(context, scenario) {
   const warnings = [];
   if (context.timeframe === "15m" && scenario.side === "LONG") {
     warnings.push("15m LONG не применять для ручного входа: по журналу 1 WIN / 11 LOSS.");
+  }
+  if (context.intel?.marketCrash?.riskOff && scenario.side === "LONG") {
+    warnings.push(`Crash-guard ${context.intel.marketCrash.level}: ручной LONG запрещен до стабилизации рынка.`);
   }
   if (isAssetQuarantined(context.asset)) {
     warnings.push(`${context.asset} в карантине после анализа журнала: ручной вход только после отдельного подтверждения и минимальным размером.`);
@@ -4171,6 +4225,7 @@ function createStrategySnapshot(context, tradePlan, scenario, quality, options =
     intelligence: {
       backtest: context.intel?.backtest || null,
       marketStructure: context.intel?.marketStructure || null,
+      marketCrash: context.intel?.marketCrash || null,
       marketRadar: context.intel?.marketRadar || null,
       scalpingSignal: tradePlan?.scalpingSignal || null,
       derivatives: context.intel?.derivatives || null,
@@ -4604,9 +4659,10 @@ function updateSinglePaperTrade(trade) {
     const hitTarget1 = trade.side === "LONG" ? currentPrice >= trade.target1 : currentPrice <= trade.target1;
     const hitTarget2 = trade.side === "LONG" ? currentPrice >= trade.target : currentPrice <= trade.target;
     const hitStop = trade.side === "LONG" ? currentPrice <= trade.stop : currentPrice >= trade.stop;
+    const emergencyStop = isEmergencyCrashStop(trade, currentPrice);
 
-    if (hitStop) {
-      closePaperPositionByTpsl(trade, "stop");
+    if (hitStop || emergencyStop) {
+      closePaperPositionByTpsl(trade, "stop", emergencyStop ? currentPrice : null);
       return;
     }
 
@@ -4676,9 +4732,9 @@ function executePartialTakeProfit(trade) {
   appendPaperPoint(trade, trade.target1, trade.pnl, trade.pnlPct);
 }
 
-function closePaperPositionByTpsl(trade, closeType) {
+function closePaperPositionByTpsl(trade, closeType, overrideExitPrice = null) {
   const isTarget = closeType === "target";
-  const exitPrice = isTarget ? trade.target : trade.stop;
+  const exitPrice = Number(overrideExitPrice) > 0 ? Number(overrideExitPrice) : isTarget ? trade.target : trade.stop;
   const closingQuantity = getRemainingQuantity(trade);
   const exitPnl = getRealizedPnl(trade) + calculatePaperPnlForQuantity(trade, exitPrice, closingQuantity);
   const exitPnlPct = (exitPnl / trade.amount) * 100;
@@ -4688,6 +4744,7 @@ function closePaperPositionByTpsl(trade, closeType) {
   const alreadyReleasedPnl = Number(trade.releasedPnl) || 0;
   const remainingReserve = Math.max(0, reservedAmount - alreadyReleasedAmount);
   const remainingPnl = exitPnl - alreadyReleasedPnl;
+  const presetResult = String(trade.result || "");
 
   trade.status = closeType;
   trade.closedAt = Date.now();
@@ -4696,11 +4753,13 @@ function closePaperPositionByTpsl(trade, closeType) {
   trade.remainingQuantity = 0;
   trade.pnl = exitPnl;
   trade.pnlPct = exitPnlPct;
-  trade.result = isTarget
-    ? `${trade.side} отработал: T1 50% + T2 остаток`
-    : trade.target1HitAt
-      ? `${trade.side}: T1 зафиксирован, остаток закрыт по стопу`
-      : `${trade.side} не отработал`;
+  trade.result = presetResult.includes("аварийный crash-stop")
+    ? presetResult
+    : isTarget
+      ? `${trade.side} отработал: T1 50% + T2 остаток`
+      : trade.target1HitAt
+        ? `${trade.side}: T1 зафиксирован, остаток закрыт по стопу`
+        : `${trade.side} не отработал`;
   trade.position.size = 0;
   trade.position.positionStatus = "Closed";
   trade.position.closedPnl = exitPnl;
@@ -4780,6 +4839,27 @@ function getRemainingQuantity(trade) {
   if (["target", "stop"].includes(trade.status)) return 0;
   if (trade.status === "partial") return Math.max(0, getInitialQuantity(trade) - (Number(trade.target1Quantity) || getInitialQuantity(trade) * 0.5));
   return getInitialQuantity(trade);
+}
+
+function isEmergencyCrashStop(trade, currentPrice) {
+  if (trade.side !== "LONG" || !["open", "partial"].includes(trade.status)) return false;
+  const entry = Number(trade.entry);
+  if (!entry || !currentPrice) return false;
+  const lossPct = ((currentPrice - entry) / entry) * 100;
+  if (lossPct <= -crashEmergencyLongLossPct) {
+    trade.result = `аварийный crash-stop: LONG закрыт при ${lossPct.toFixed(2)}%`;
+    return true;
+  }
+  const history = Array.isArray(trade.history) ? trade.history.slice(-6) : [];
+  const first = history[0]?.price;
+  if (first > 0) {
+    const fastDropPct = ((currentPrice - first) / first) * 100;
+    if (fastDropPct <= -1.2 && lossPct < -0.5) {
+      trade.result = `аварийный crash-stop: быстрое падение ${fastDropPct.toFixed(2)}%`;
+      return true;
+    }
+  }
+  return false;
 }
 
 function getRealizedPnl(trade) {
