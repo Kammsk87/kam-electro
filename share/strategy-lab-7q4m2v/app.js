@@ -38,6 +38,7 @@ const paperSlippagePct = 0.04;
 const learningReviewMs = 10 * 60 * 1000;
 const learningReviewHour = 23;
 const targetWinRatePct = 60;
+const autopilotProfileMinSamples = 5;
 const autopilotProfiles = {
   protective: {
     label: "Защитный",
@@ -444,13 +445,15 @@ function loadAutopilotState() {
     return {
       enabled: Boolean(saved?.enabled),
       scalpingEnabled: Boolean(saved?.scalpingEnabled),
-      profile: autopilotProfiles[saved?.profile] ? saved.profile : "protective",
+      profile: isValidAutopilotProfileChoice(saved?.profile) ? saved.profile : "auto",
+      activeProfile: autopilotProfiles[saved?.activeProfile] ? saved.activeProfile : "balanced",
+      profileTestIndex: Number(saved?.profileTestIndex) || 0,
       lastEntryAt: Number(saved?.lastEntryAt) || 0,
       lastScanAt: 0,
       lastMessage: String(saved?.lastMessage || "наблюдает")
     };
   } catch (error) {
-    return { enabled: false, scalpingEnabled: false, profile: "protective", lastEntryAt: 0, lastScanAt: 0, lastMessage: "наблюдает" };
+    return { enabled: false, scalpingEnabled: false, profile: "auto", activeProfile: "balanced", profileTestIndex: 0, lastEntryAt: 0, lastScanAt: 0, lastMessage: "наблюдает" };
   }
 }
 
@@ -705,6 +708,7 @@ function normalizePaperTrade(trade) {
     riskBudget: Number(trade.riskBudget) || (Number(trade.deposit) || loadDeposit()) * 0.02,
     riskLimitPct: Number(trade.riskLimitPct) || 2,
     autopilot: Boolean(trade.autopilot),
+    autopilotProfile: getTradeAutopilotProfileId(trade),
     autopilotReason: String(trade.autopilotReason || ""),
     entry,
     quantity: Number(trade.quantity) || amount / entry,
@@ -2007,6 +2011,7 @@ function renderStrategyIntelligence() {
   const dailyRisk = getDailyRiskState();
   const lastReject = state.rejectedSignals[state.rejectedSignals.length - 1];
   const profile = getAutopilotProfileSettings();
+  const profileStats = buildAutopilotProfileStats();
 
   backtestScore.textContent = backtest
     ? `${backtest.winRate.toFixed(0)}% · ${backtest.expectancyPct >= 0 ? "+" : ""}${backtest.expectancyPct.toFixed(2)}%`
@@ -2024,7 +2029,7 @@ function renderStrategyIntelligence() {
   autopilotToggle.textContent = state.autopilot.enabled ? "Авто-бот: вкл" : "Авто-бот: выкл";
   autopilotToggle.classList.toggle("is-live", state.autopilot.enabled);
   if (scalpingMode) scalpingMode.checked = Boolean(state.autopilot.scalpingEnabled);
-  if (autopilotProfile) autopilotProfile.value = profile.id;
+  if (autopilotProfile) autopilotProfile.value = isValidAutopilotProfileChoice(state.autopilot.profile) ? state.autopilot.profile : "auto";
   const learningMode = isRemoteJournalConfigured()
     ? "Обучение общее: опыт подтягивается из Supabase перед анализом и автосделками."
     : "Обучение локальное: для общего опыта подключи Supabase в блоке Общий журнал.";
@@ -2033,7 +2038,9 @@ function renderStrategyIntelligence() {
     ? `Скальпинг включен: EMA9/21, RSI14, VWAP, ATR, объем x${scalpingMinVolumeRatio}, спред до ${scalpingMaxSpreadPct}%.`
     : "Скальпинг выключен.";
   const riskText = `Дневной риск: ${dailyRisk.pnl >= 0 ? "+" : ""}${dailyRisk.pnl.toFixed(2)} USDT, стопов ${dailyRisk.stops}/${dailyMaxStops}, лимит ${dailyMaxLossPct}%.`;
-  const profileText = `Профиль автобота: ${profile.label}, вход от ${profile.minScore}/100; ${profile.note}.`;
+  const profileText = state.autopilot.profile === "auto"
+    ? `Профиль автобота: Авто-тест, сейчас тестирует ${profile.label}, вход от ${profile.minScore}/100; ${profile.note}. ${formatAutopilotProfileStats(profileStats)}`
+    : `Профиль автобота: ${profile.label}, вход от ${profile.minScore}/100; ${profile.note}.`;
   const rejectText = lastReject ? `Последний отказ: ${lastReject.asset} ${lastReject.timeframe} ${lastReject.side} - ${lastReject.reason}.` : "Отказов автобота пока нет.";
   intelDetails.textContent = `${learningMode} ${formatLearningPolicyNote()} ${profileText} ${newsText} ${scalpingText} ${riskText} ${rejectText} ${intel.notes.join(" ")}`;
 }
@@ -2340,8 +2347,57 @@ function analyzeLearningJournal(symbol = null) {
     winRate: closed.length ? (wins / closed.length) * 100 : 0,
     sideStats,
     patternStats: buildLearningPatternStats(closed),
+    profileStats: buildAutopilotProfileStats(closed),
     bestPattern
   };
+}
+
+function buildAutopilotProfileStats(trades = state.paperTrades.filter((trade) => !isPaperTradeActive(trade))) {
+  const stats = {};
+  Object.keys(autopilotProfiles).forEach((id) => {
+    stats[id] = {
+      id,
+      label: autopilotProfiles[id].label,
+      trades: 0,
+      wins: 0,
+      losses: 0,
+      pnl: 0,
+      pnlPct: 0,
+      avgPnl: 0,
+      avgPnlPct: 0,
+      winRate: 0,
+      score: 0
+    };
+  });
+
+  trades
+    .filter((trade) => trade.autopilot)
+    .forEach((trade) => {
+      const id = getTradeAutopilotProfileId(trade);
+      const item = stats[id];
+      if (!item) return;
+      item.trades += 1;
+      item.pnl += Number(trade.pnl) || 0;
+      item.pnlPct += Number(trade.pnlPct) || 0;
+      if ((Number(trade.pnl) || 0) > 0) item.wins += 1;
+      else item.losses += 1;
+    });
+
+  Object.values(stats).forEach((item) => {
+    item.avgPnl = item.trades ? item.pnl / item.trades : 0;
+    item.avgPnlPct = item.trades ? item.pnlPct / item.trades : 0;
+    item.winRate = item.trades ? (item.wins / item.trades) * 100 : 0;
+    item.score = item.trades
+      ? item.winRate + item.avgPnlPct * 10 - Math.max(0, 5 - item.trades) * 4
+      : -20;
+  });
+
+  return stats;
+}
+
+function getTradeAutopilotProfileId(trade) {
+  const id = trade.autopilotProfile || trade.strategySnapshot?.execution?.profileId || trade.strategySnapshot?.execution?.profile;
+  return autopilotProfiles[id] ? id : "protective";
 }
 
 function buildLearningPatternStats(trades) {
@@ -2408,6 +2464,10 @@ async function runDailyLearningReview(force = false) {
 
   const assetStats = buildLearningGroupStats(closed, (trade) => trade.asset);
   const patternStats = buildLearningGroupStats(closed, (trade) => getLearningPatternKey(trade.asset, trade.timeframe, trade.side));
+  const profileStats = buildAutopilotProfileStats(closed);
+  const bestProfile = Object.values(profileStats)
+    .filter((item) => item.trades >= autopilotProfileMinSamples)
+    .sort((a, b) => b.score - a.score)[0];
   const blockedAssets = Object.values(assetStats)
     .filter((item) => item.trades >= 5 && (item.winRate < 45 || item.avgPnl <= 0))
     .map((item) => item.key);
@@ -2430,7 +2490,10 @@ async function runDailyLearningReview(force = false) {
       `Самоанализ: ${closed.length} закрытых сделок.`,
       `Заблокировано монет: ${blockedAssets.length}.`,
       `Заблокировано связок: ${blockedPatterns.length}.`,
-      `Приоритетных связок: ${preferredPatterns.length}.`
+      `Приоритетных связок: ${preferredPatterns.length}.`,
+      bestProfile
+        ? `Лучший профиль автобота: ${bestProfile.label} (${bestProfile.trades} сделок, ${bestProfile.winRate.toFixed(0)}%, ${bestProfile.avgPnlPct >= 0 ? "+" : ""}${bestProfile.avgPnlPct.toFixed(2)}% avg).`
+        : `Профили автобота еще тестируются: нужно минимум ${autopilotProfileMinSamples} закрытых автосделок на профиль.`
     ]
   };
   persistLearningPolicy();
@@ -2845,7 +2908,12 @@ function toggleScalpingMode() {
 }
 
 function updateAutopilotProfile() {
-  state.autopilot.profile = autopilotProfiles[autopilotProfile.value] ? autopilotProfile.value : "protective";
+  state.autopilot.profile = isValidAutopilotProfileChoice(autopilotProfile.value) ? autopilotProfile.value : "auto";
+  if (state.autopilot.profile === "auto") {
+    state.autopilot.activeProfile = selectAutopilotProfileForTesting();
+  } else {
+    state.autopilot.activeProfile = state.autopilot.profile;
+  }
   const profile = getAutopilotProfileSettings();
   state.autopilot.lastMessage = `профиль: ${profile.label}`;
   persistAutopilot();
@@ -2854,15 +2922,49 @@ function updateAutopilotProfile() {
 }
 
 function getAutopilotProfileSettings() {
-  const id = autopilotProfiles[state.autopilot.profile] ? state.autopilot.profile : "protective";
+  const id = getEffectiveAutopilotProfileId();
   return { id, ...autopilotProfiles[id] };
+}
+
+function getEffectiveAutopilotProfileId() {
+  if (state.autopilot.profile === "auto") {
+    return autopilotProfiles[state.autopilot.activeProfile] ? state.autopilot.activeProfile : "balanced";
+  }
+  return autopilotProfiles[state.autopilot.profile] ? state.autopilot.profile : "protective";
+}
+
+function isValidAutopilotProfileChoice(value) {
+  return value === "auto" || Boolean(autopilotProfiles[value]);
+}
+
+function selectAutopilotProfileForTesting() {
+  const stats = buildAutopilotProfileStats();
+  const items = Object.values(stats);
+  const underTested = items
+    .filter((item) => item.trades < autopilotProfileMinSamples)
+    .sort((a, b) => a.trades - b.trades);
+  if (underTested.length) {
+    const lowestTradeCount = underTested[0].trades;
+    const rotationPool = underTested.filter((item) => item.trades === lowestTradeCount);
+    const index = Math.abs(Number(state.autopilot.profileTestIndex) || 0) % rotationPool.length;
+    return rotationPool[index].id;
+  }
+  return items.sort((a, b) => b.score - a.score || b.winRate - a.winRate)[0]?.id || "balanced";
+}
+
+function formatAutopilotProfileStats(stats) {
+  const items = Object.values(stats || {}).filter((item) => item.trades > 0);
+  if (!items.length) return `Авто-тест профилей: статистики пока нет, сначала бот доберет по ${autopilotProfileMinSamples} сделок на профиль.`;
+  return `Авто-тест профилей: ${items.map((item) => `${item.label} ${item.trades} сделок, ${item.winRate.toFixed(0)}%, ${item.avgPnlPct >= 0 ? "+" : ""}${item.avgPnlPct.toFixed(2)}% avg`).join("; ")}.`;
 }
 
 function persistAutopilot() {
   localStorage.setItem(autopilotKey, JSON.stringify({
     enabled: state.autopilot.enabled,
     scalpingEnabled: state.autopilot.scalpingEnabled,
-    profile: state.autopilot.profile || "protective",
+    profile: state.autopilot.profile || "auto",
+    activeProfile: getEffectiveAutopilotProfileId(),
+    profileTestIndex: Number(state.autopilot.profileTestIndex) || 0,
     lastEntryAt: state.autopilot.lastEntryAt,
     lastMessage: state.autopilot.lastMessage
   }));
@@ -2873,6 +2975,11 @@ async function runAutopilotScan(force = false) {
   const now = Date.now();
   if (!force && now - state.autopilot.lastScanAt < autopilotScanMs) return;
   state.autopilot.lastScanAt = now;
+  if (state.autopilot.profile === "auto") {
+    state.autopilot.profileTestIndex = (Number(state.autopilot.profileTestIndex) || 0) + 1;
+    state.autopilot.activeProfile = selectAutopilotProfileForTesting();
+    persistAutopilot();
+  }
   await refreshSharedLearningMemory(false);
   await runDailyLearningReview(false);
 
@@ -4175,6 +4282,7 @@ function enterPaperTrade(options = {}) {
   const placedPrice = scenario.orderPrice || getExecutableMarketPrice(context.asset) || tradePlan.basePrice || entry;
   const triggerDirection = getOrderTriggerDirection(scenario.side, placedPrice, entry);
   const strategySnapshot = createStrategySnapshot(context, tradePlan, scenario, quality, { ...options, signalQuality });
+  const autopilotProfileId = options.autopilot ? getEffectiveAutopilotProfileId() : "";
 
   const trade = {
     id,
@@ -4195,6 +4303,7 @@ function enterPaperTrade(options = {}) {
     riskBudget: riskBudgetAtEntry,
     riskLimitPct: options.scalping ? scalpingRiskPct : Math.min(Number(risk.value) || 1, 2),
     autopilot: Boolean(options.autopilot),
+    autopilotProfile: autopilotProfileId,
     strategyMode: options.scalping ? "scalping" : context.strategyMode || "standard",
     autopilotReason: String(options.reason || ""),
     entry,
@@ -4295,7 +4404,10 @@ function createStrategySnapshot(context, tradePlan, scenario, quality, options =
     execution: {
       autopilot: Boolean(options.autopilot),
       reason: String(options.reason || ""),
-      minScore: strictAutopilotMinScore,
+      profileChoice: state.autopilot.profile || "auto",
+      profileId: options.autopilot ? getEffectiveAutopilotProfileId() : "",
+      profileLabel: options.autopilot ? getAutopilotProfileSettings().label : "",
+      minScore: options.autopilot ? getAutopilotProfileSettings().minScore : strictAutopilotMinScore,
       feePct: paperFeePct,
       slippagePct: paperSlippagePct
     },
@@ -5037,7 +5149,8 @@ function renderTradeArchive() {
     const statusLabel = trade.status === "pending" ? "PENDING" : trade.status === "open" ? "OPEN" : trade.status === "partial" ? "T1 50%" : trade.pnl >= 0 ? "WIN" : "LOSS";
     const sideClass = trade.side === "SHORT" ? "short" : "long";
     const sourceClass = trade.autopilot ? "auto" : "manual";
-    const sourceLabel = trade.autopilot ? "АВТО" : "РУЧНОЙ";
+    const profileLabel = autopilotProfiles[getTradeAutopilotProfileId(trade)]?.label || "";
+    const sourceLabel = trade.autopilot ? `АВТО${profileLabel ? ` · ${profileLabel}` : ""}` : "РУЧНОЙ";
     return `
       <tr>
         <td><button type="button" data-view-archive-trade="${escapeHtml(trade.id)}">${index + 1}</button></td>
@@ -5099,6 +5212,8 @@ function exportJournalToExcel() {
     "Депозит": trade.deposit || "",
     "Риск лимит %": trade.riskLimitPct || "",
     "Авто-бот": trade.autopilot ? "да" : "нет",
+    "Профиль автобота": trade.autopilot ? autopilotProfiles[getTradeAutopilotProfileId(trade)]?.label || "" : "",
+    "Выбор профиля": trade.strategySnapshot?.execution?.profileChoice || "",
     "Причина авто-бота": trade.autopilotReason || "",
     "Цена выхода": trade.exitPrice || "",
     "PnL USDT": trade.pnl,
@@ -5505,7 +5620,7 @@ initCmcRadarControls();
 initNewsAnalyticsControls();
 deposit.value = String(loadDeposit());
 scalpingMode.checked = Boolean(state.autopilot.scalpingEnabled);
-autopilotProfile.value = getAutopilotProfileSettings().id;
+autopilotProfile.value = isValidAutopilotProfileChoice(state.autopilot.profile) ? state.autopilot.profile : "auto";
 reconcileLegacyPaperBudget();
 updateRiskLabel();
 renderLiveReadout();
