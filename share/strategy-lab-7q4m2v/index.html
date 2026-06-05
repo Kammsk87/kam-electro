@@ -14,8 +14,26 @@
     <script src="market-radar-config.js"></script>
     <script src="app.js" defer></script>
   </head>
-  <body>
-    <main class="app-shell">
+  <body class="auth-locked">
+    <section class="auth-screen" data-auth-screen>
+      <form class="auth-card" data-auth-form>
+        <span class="brand-mark">БТ</span>
+        <h1>Боталин</h1>
+        <p>Бот для торговой стратегии</p>
+        <label>
+          Логин
+          <input id="authLogin" type="text" autocomplete="username" autofocus>
+        </label>
+        <label>
+          Пароль
+          <input id="authPassword" type="password" autocomplete="current-password">
+        </label>
+        <button class="primary-action full-width" type="submit">Войти</button>
+        <div class="auth-error" data-auth-error></div>
+      </form>
+    </section>
+
+    <main class="app-shell" aria-hidden="true">
       <aside class="side-panel" aria-label="Настройки стратегии">
         <a class="brand" href="./" aria-label="Боталин">
           <span class="brand-mark">БТ</span>
@@ -24,6 +42,7 @@
             <small>Бот для торговой стратегии</small>
           </span>
         </a>
+        <button class="text-button full-width" type="button" data-auth-logout>Выйти</button>
 
         <section class="panel-section">
           <div class="section-title">

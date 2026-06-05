@@ -27,6 +27,54 @@ body {
     linear-gradient(135deg, #101214 0%, #171616 48%, #14201c 100%);
 }
 
+body.auth-locked .app-shell {
+  display: none;
+}
+
+.auth-screen {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 20px;
+}
+
+.auth-screen[hidden] {
+  display: none;
+}
+
+.auth-card {
+  display: grid;
+  width: min(100%, 360px);
+  gap: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 22px;
+  background: rgba(23, 27, 31, 0.94);
+  box-shadow: var(--shadow);
+}
+
+.auth-card .brand-mark {
+  width: 44px;
+  height: 44px;
+}
+
+.auth-card h1 {
+  margin: 0;
+}
+
+.auth-card p {
+  margin: -8px 0 4px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.auth-error {
+  min-height: 18px;
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 button,
 input,
 select,

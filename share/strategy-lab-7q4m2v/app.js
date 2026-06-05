@@ -11,6 +11,12 @@ const newsAnalyticsConfigKey = "crypto-strategy-bot-news-analytics-v1";
 const rejectedSignalsKey = "crypto-strategy-bot-rejected-signals-v1";
 const signalCenterKey = "crypto-strategy-bot-signal-center-v1";
 const botControlKey = "crypto-strategy-bot-control-v1";
+const authSessionKey = "crypto-strategy-bot-auth-session-v1";
+const authUsers = [
+  { login: "user1", password: "111" },
+  { login: "user2", password: "222" },
+  { login: "тестгость", password: "333" }
+];
 
 const currentSessionId = getCurrentSessionId();
 const currentClientId = getCurrentClientId();
@@ -834,6 +840,64 @@ const chatForm = document.querySelector("[data-chat-form]");
 const chatInput = document.querySelector("#chatInput");
 const canvas = document.querySelector("#marketChart");
 const ctx = canvas.getContext("2d");
+const authScreen = document.querySelector("[data-auth-screen]");
+const authForm = document.querySelector("[data-auth-form]");
+const authLogin = document.querySelector("#authLogin");
+const authPassword = document.querySelector("#authPassword");
+const authError = document.querySelector("[data-auth-error]");
+const authLogout = document.querySelector("[data-auth-logout]");
+
+function initAuthGate() {
+  if (isAuthenticated()) {
+    unlockApp();
+  } else {
+    lockApp();
+  }
+
+  authForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const login = authLogin.value.trim();
+    const password = authPassword.value.trim();
+    const user = authUsers.find((item) => item.login === login && item.password === password);
+    if (!user) {
+      authError.textContent = "Неверный логин или пароль";
+      authPassword.value = "";
+      authPassword.focus();
+      return;
+    }
+    sessionStorage.setItem(authSessionKey, JSON.stringify({ login: user.login, time: Date.now() }));
+    authError.textContent = "";
+    unlockApp();
+  });
+
+  authLogout?.addEventListener("click", () => {
+    sessionStorage.removeItem(authSessionKey);
+    lockApp();
+  });
+}
+
+function isAuthenticated() {
+  try {
+    const session = JSON.parse(sessionStorage.getItem(authSessionKey));
+    return authUsers.some((user) => user.login === session?.login);
+  } catch (error) {
+    return false;
+  }
+}
+
+function unlockApp() {
+  document.body.classList.remove("auth-locked");
+  authScreen?.setAttribute("hidden", "");
+  document.querySelector(".app-shell")?.removeAttribute("aria-hidden");
+}
+
+function lockApp() {
+  document.body.classList.add("auth-locked");
+  authScreen?.removeAttribute("hidden");
+  document.querySelector(".app-shell")?.setAttribute("aria-hidden", "true");
+  if (authPassword) authPassword.value = "";
+  window.setTimeout(() => authLogin?.focus(), 0);
+}
 
 function loadRules() {
   try {
@@ -6643,6 +6707,7 @@ deposit.addEventListener("input", () => {
   renderStrategyIntelligence();
 });
 
+initAuthGate();
 renderRules();
 renderSources();
 renderRsiControls();
