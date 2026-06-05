@@ -42,6 +42,10 @@
             <small>Бот для торговой стратегии</small>
           </span>
         </a>
+        <div class="auth-user-pill">
+          <span>Пользователь</span>
+          <strong data-auth-user>не вошел</strong>
+        </div>
         <button class="text-button full-width" type="button" data-auth-logout>Выйти</button>
 
         <section class="panel-section">
@@ -778,6 +782,22 @@
                   <span>Итог PnL</span>
                   <strong data-archive-pnl>0.00 USDT</strong>
                 </div>
+                <div>
+                  <span>user1</span>
+                  <strong data-archive-user="user1">0</strong>
+                </div>
+                <div>
+                  <span>user2</span>
+                  <strong data-archive-user="user2">0</strong>
+                </div>
+                <div>
+                  <span>тестгость</span>
+                  <strong data-archive-user="тестгость">0</strong>
+                </div>
+                <div>
+                  <span>Legacy</span>
+                  <strong data-archive-user="legacy">0</strong>
+                </div>
               </div>
               <div class="journal-table-wrap archive-table-wrap" data-archive-panel hidden>
                 <table class="journal-table archive-table">
@@ -785,6 +805,7 @@
                     <tr>
                       <th>№</th>
                       <th>Дата</th>
+                      <th>Пользователь</th>
                       <th>Источник</th>
                       <th>Монета</th>
                       <th>ТФ</th>
@@ -798,7 +819,7 @@
                   </thead>
                   <tbody data-archive-rows>
                     <tr>
-                      <td colspan="11">Архив пока пуст</td>
+                      <td colspan="12">Архив пока пуст</td>
                     </tr>
                   </tbody>
                 </table>

@@ -835,6 +835,7 @@ const archiveTotal = document.querySelector("[data-archive-total]");
 const archiveManual = document.querySelector("[data-archive-manual]");
 const archiveAuto = document.querySelector("[data-archive-auto]");
 const archivePnl = document.querySelector("[data-archive-pnl]");
+const archiveUserCounters = document.querySelectorAll("[data-archive-user]");
 const chatLog = document.querySelector("[data-chat-log]");
 const chatForm = document.querySelector("[data-chat-form]");
 const chatInput = document.querySelector("#chatInput");
@@ -846,6 +847,7 @@ const authLogin = document.querySelector("#authLogin");
 const authPassword = document.querySelector("#authPassword");
 const authError = document.querySelector("[data-auth-error]");
 const authLogout = document.querySelector("[data-auth-logout]");
+const authUserLabel = document.querySelector("[data-auth-user]");
 
 function initAuthGate() {
   if (isAuthenticated()) {
@@ -885,16 +887,27 @@ function isAuthenticated() {
   }
 }
 
+function getCurrentAuthUser() {
+  try {
+    const session = JSON.parse(sessionStorage.getItem(authSessionKey));
+    return authUsers.some((user) => user.login === session?.login) ? session.login : "legacy";
+  } catch (error) {
+    return "legacy";
+  }
+}
+
 function unlockApp() {
   document.body.classList.remove("auth-locked");
   authScreen?.setAttribute("hidden", "");
   document.querySelector(".app-shell")?.removeAttribute("aria-hidden");
+  if (authUserLabel) authUserLabel.textContent = getCurrentAuthUser();
 }
 
 function lockApp() {
   document.body.classList.add("auth-locked");
   authScreen?.removeAttribute("hidden");
   document.querySelector(".app-shell")?.setAttribute("aria-hidden", "true");
+  if (authUserLabel) authUserLabel.textContent = "не вошел";
   if (authPassword) authPassword.value = "";
   window.setTimeout(() => authLogin?.focus(), 0);
 }
@@ -958,6 +971,7 @@ function normalizePaperTrade(trade) {
     ...trade,
     id: String(trade.id || `trade-${Date.now()}-${Math.round(Math.random() * 1000)}`),
     asset: String(trade.asset || "BTC/USDT"),
+    userLogin: String(trade.userLogin || trade.authUser || trade.strategySnapshot?.execution?.userLogin || "legacy"),
     sessionId: String(trade.sessionId || "legacy"),
     timeframe: String(trade.timeframe || "15m"),
     mode: String(trade.mode || ""),
@@ -5206,6 +5220,7 @@ function enterPaperTrade(options = {}) {
   const trade = {
     id,
     index: state.paperTrades.length + 1,
+    userLogin: getCurrentAuthUser(),
     sessionId: currentSessionId,
     asset: context.asset,
     timeframe: context.timeframe,
@@ -5329,6 +5344,7 @@ function createStrategySnapshot(context, tradePlan, scenario, quality, options =
     execution: {
       autopilot: Boolean(options.autopilot),
       reason: String(options.reason || ""),
+      userLogin: getCurrentAuthUser(),
       signalTemplate: state.signalCenter.activeTemplate,
       signalTemplateLabel: getActiveSignalTemplate().label,
       botPreset: state.botControl.activePreset,
@@ -6204,15 +6220,22 @@ function renderTradeArchive() {
   const manualTrades = trades.filter((trade) => !trade.autopilot);
   const autoTrades = trades.filter((trade) => trade.autopilot);
   const totalPnl = trades.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0);
+  const userStats = buildArchiveUserStats(trades);
 
   archiveTotal.textContent = String(trades.length);
   archiveManual.textContent = String(manualTrades.length);
   archiveAuto.textContent = String(autoTrades.length);
   archivePnl.textContent = `${totalPnl >= 0 ? "+" : ""}${totalPnl.toFixed(2)} USDT`;
   archivePnl.style.color = totalPnl >= 0 ? "#55c7a2" : "#ef6b5b";
+  archiveUserCounters.forEach((counter) => {
+    const login = counter.dataset.archiveUser;
+    const stat = userStats[login] || { trades: 0, pnl: 0 };
+    counter.textContent = `${stat.trades} · ${stat.pnl >= 0 ? "+" : ""}${stat.pnl.toFixed(1)}`;
+    counter.style.color = stat.pnl >= 0 ? "#55c7a2" : "#ef6b5b";
+  });
 
   if (!trades.length) {
-    archiveRows.innerHTML = `<tr><td colspan="11">Архив пока пуст: сделки будут появляться здесь из ручных входов и авто-бота</td></tr>`;
+    archiveRows.innerHTML = `<tr><td colspan="12">Архив пока пуст: сделки будут появляться здесь из ручных входов и авто-бота</td></tr>`;
     return;
   }
 
@@ -6228,6 +6251,7 @@ function renderTradeArchive() {
       <tr>
         <td><button type="button" data-view-archive-trade="${escapeHtml(trade.id)}">${index + 1}</button></td>
         <td>${formatArchiveTime(trade.openedAt)}</td>
+        <td>${escapeHtml(getTradeUserLogin(trade))}</td>
         <td><span class="source-badge ${sourceClass}">${sourceLabel}</span></td>
         <td>${escapeHtml(trade.asset.replace("/USDT", ""))}</td>
         <td>${escapeHtml(trade.timeframe || "")}</td>
@@ -6247,6 +6271,20 @@ function renderTradeArchive() {
       updatePaperTrades();
     });
   });
+}
+
+function buildArchiveUserStats(trades) {
+  return trades.reduce((acc, trade) => {
+    const login = getTradeUserLogin(trade);
+    acc[login] ||= { trades: 0, pnl: 0 };
+    acc[login].trades += 1;
+    acc[login].pnl += Number(trade.pnl) || 0;
+    return acc;
+  }, {});
+}
+
+function getTradeUserLogin(trade) {
+  return String(trade.userLogin || trade.authUser || trade.strategySnapshot?.execution?.userLogin || "legacy");
 }
 
 function getTradeSortTime(trade) {
@@ -6269,6 +6307,7 @@ function toggleTradeArchive() {
 function exportJournalToExcel() {
   const rows = state.paperTrades.map((trade, index) => ({
     "#": index + 1,
+    "Пользователь": getTradeUserLogin(trade),
     "Сессия": trade.sessionId || "",
     "Время": formatJournalTime(trade.openedAt),
     "Монета": trade.asset,
