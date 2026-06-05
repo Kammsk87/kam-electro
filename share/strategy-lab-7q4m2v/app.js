@@ -462,6 +462,7 @@ function getCurrentClientId() {
 
 function loadRemoteJournalConfig() {
   const sharedConfig = normalizeRemoteJournalConfig(window.BOTALIN_REMOTE_JOURNAL_CONFIG);
+  if (isRemoteJournalConfigFilled(sharedConfig)) return sharedConfig;
   try {
     const saved = JSON.parse(localStorage.getItem(remoteJournalConfigKey));
     const savedConfig = normalizeRemoteJournalConfig(saved);
@@ -1651,11 +1652,16 @@ function initRemoteJournalControls() {
 }
 
 function saveRemoteJournalConfig() {
-  state.remoteJournal.config = normalizeRemoteJournalConfig({
+  const sharedConfig = normalizeRemoteJournalConfig(window.BOTALIN_REMOTE_JOURNAL_CONFIG);
+  const nextConfig = normalizeRemoteJournalConfig({
     url: remoteUrl.value,
     anonKey: remoteKey.value,
     table: remoteTable.value
   });
+  state.remoteJournal.config = isRemoteJournalConfigFilled(nextConfig) ? nextConfig : sharedConfig;
+  remoteUrl.value = state.remoteJournal.config.url;
+  remoteKey.value = state.remoteJournal.config.anonKey;
+  remoteTable.value = state.remoteJournal.config.table;
   localStorage.setItem(remoteJournalConfigKey, JSON.stringify(state.remoteJournal.config));
   setRemoteJournalStatus(isRemoteJournalConfigured() ? "saved" : "local");
   syncRemoteJournal(true);
@@ -1668,6 +1674,7 @@ function isRemoteJournalConfigured() {
 
 function renderRemoteJournalStatus() {
   remoteStatus.textContent = state.remoteJournal.status;
+  remoteStatus.title = state.remoteJournal.status;
 }
 
 function setRemoteJournalStatus(status) {
@@ -5467,6 +5474,7 @@ function scheduleRemoteJournalSync() {
 
 async function syncRemoteJournal(force = false) {
   if (!isRemoteJournalConfigured()) {
+    setRemoteJournalStatus("local: нет URL/key");
     renderRemoteJournalStatus();
     return;
   }
@@ -5485,7 +5493,8 @@ async function syncRemoteJournal(force = false) {
     renderTradeJournal();
     updatePaperTrades();
   } catch (error) {
-    setRemoteJournalStatus("error");
+    setRemoteJournalStatus(`error: ${getRemoteJournalErrorMessage(error)}`);
+    console.warn("Remote journal sync failed", error);
   } finally {
     state.remoteJournal.syncing = false;
   }
@@ -5532,10 +5541,22 @@ async function remoteJournalFetch(path, options = {}) {
       ...(options.headers || {})
     }
   });
-  if (!response.ok) throw new Error("Remote journal request failed");
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`${response.status} ${text || response.statusText || "Remote journal request failed"}`);
+  }
   if (response.status === 204) return null;
   const text = await response.text();
   return text ? JSON.parse(text) : null;
+}
+
+function getRemoteJournalErrorMessage(error) {
+  const message = String(error?.message || error || "sync failed");
+  if (message.includes("PGRST205")) return "таблица не найдена";
+  if (message.includes("401") || message.includes("403")) return "ключ/права";
+  if (message.includes("404")) return "таблица/API";
+  if (message.length > 44) return `${message.slice(0, 41)}...`;
+  return message;
 }
 
 function mergeRemoteJournalTrades(remoteTrades) {
