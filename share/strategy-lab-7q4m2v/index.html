@@ -404,6 +404,50 @@
               </div>
             </div>
 
+            <div class="signal-center">
+              <div class="output-header">
+                <span>Сигнальные стратегии</span>
+                <span class="status-pill" data-signal-mode>внутридневной</span>
+              </div>
+              <div class="signal-strategy-grid">
+                <button type="button" data-signal-template="scalper">
+                  <strong>Скальпер</strong>
+                  <span>1-5m · быстрые сигналы</span>
+                </button>
+                <button type="button" data-signal-template="intraday" class="is-active">
+                  <strong>Внутридневной</strong>
+                  <span>15-30m · среднее удержание</span>
+                </button>
+                <button type="button" data-signal-template="swing">
+                  <strong>Среднесрочный</strong>
+                  <span>1h-1d · редкие входы</span>
+                </button>
+              </div>
+              <div class="signal-summary" data-signal-summary>
+                Сигнал будет формироваться из текущей монеты, таймфрейма и лучшего LONG/SHORT сценария.
+              </div>
+              <div class="signal-table-wrap">
+                <table class="signal-table">
+                  <thead>
+                    <tr>
+                      <th>Дата</th>
+                      <th>Монета</th>
+                      <th>ТФ</th>
+                      <th>L/S</th>
+                      <th>Источник</th>
+                      <th>Score</th>
+                      <th>Результат</th>
+                    </tr>
+                  </thead>
+                  <tbody data-signal-rows>
+                    <tr>
+                      <td colspan="7">Сигналов пока нет</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
             <div class="paper-panel">
               <div class="paper-chart-wrap">
                 <div class="output-header">

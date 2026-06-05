@@ -477,6 +477,88 @@ canvas {
   line-height: 1.45;
 }
 
+.signal-center {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(23, 27, 31, 0.88);
+  box-shadow: var(--shadow);
+}
+
+.signal-strategy-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.signal-strategy-grid button {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 7px;
+  color: var(--ink);
+  background: rgba(32, 38, 44, 0.84);
+  cursor: pointer;
+  text-align: left;
+}
+
+.signal-strategy-grid button.is-active {
+  border-color: rgba(85, 199, 162, 0.72);
+  background: rgba(85, 199, 162, 0.16);
+}
+
+.signal-strategy-grid strong,
+.signal-strategy-grid span {
+  display: block;
+}
+
+.signal-strategy-grid strong {
+  font-size: 12px;
+}
+
+.signal-strategy-grid span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.signal-summary {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.signal-table-wrap {
+  max-height: 120px;
+  margin-top: 8px;
+  overflow: auto;
+}
+
+.signal-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.signal-table th,
+.signal-table td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  padding: 5px 6px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.signal-table th {
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
 .paper-panel {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(210px, 260px);
@@ -1140,6 +1222,7 @@ canvas {
   .metrics,
   .trade-plan-strip,
   .intel-grid,
+  .signal-strategy-grid,
   .sim-grid,
   .sim-actions {
     gap: 6px;
@@ -1163,6 +1246,39 @@ canvas {
 
   .strategy-intel {
     padding: 7px;
+  }
+
+  .signal-center {
+    padding: 7px;
+  }
+
+  .signal-strategy-grid {
+    margin-top: 6px;
+  }
+
+  .signal-strategy-grid button {
+    padding: 5px;
+  }
+
+  .signal-summary {
+    margin-top: 6px;
+    font-size: 11px;
+    line-height: 1.28;
+  }
+
+  .signal-table-wrap {
+    max-height: 86px;
+    margin-top: 6px;
+  }
+
+  .signal-table {
+    min-width: 700px;
+    font-size: 10px;
+  }
+
+  .signal-table th,
+  .signal-table td {
+    padding: 4px 5px;
   }
 
   .intel-details {
@@ -1275,6 +1391,7 @@ canvas {
 
   .trade-plan-strip,
   .intel-grid,
+  .signal-strategy-grid,
   .sim-grid,
   .journal-summary {
     grid-template-columns: repeat(2, 1fr);

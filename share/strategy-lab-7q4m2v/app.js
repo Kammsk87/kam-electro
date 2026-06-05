@@ -9,6 +9,7 @@ const remoteClientIdKey = "crypto-strategy-bot-client-id";
 const cmcRadarConfigKey = "crypto-strategy-bot-cmc-radar-v1";
 const newsAnalyticsConfigKey = "crypto-strategy-bot-news-analytics-v1";
 const rejectedSignalsKey = "crypto-strategy-bot-rejected-signals-v1";
+const signalCenterKey = "crypto-strategy-bot-signal-center-v1";
 
 const currentSessionId = getCurrentSessionId();
 const currentClientId = getCurrentClientId();
@@ -64,6 +65,26 @@ const autopilotProfiles = {
     strictScore: 70,
     penaltyMultiplier: 0.5,
     note: "больше тестовых входов, обязательные лимиты капитала остаются"
+  }
+};
+const signalTemplates = {
+  scalper: {
+    label: "Скальпер",
+    source: "Боталин Signal · scalper",
+    timeframes: ["1m", "5m"],
+    description: "1-5m · быстрые сигналы"
+  },
+  intraday: {
+    label: "Внутридневной",
+    source: "Боталин Signal · intraday",
+    timeframes: ["15m", "30m"],
+    description: "15-30m · среднее удержание"
+  },
+  swing: {
+    label: "Среднесрочный",
+    source: "Боталин Signal · swing",
+    timeframes: ["1h", "4h", "1d"],
+    description: "1h-1d · редкие входы"
   }
 };
 const baseQuarantineAssets = new Set([
@@ -486,6 +507,34 @@ function loadRejectedSignals() {
   }
 }
 
+function loadSignalCenterState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(signalCenterKey));
+    const activeTemplate = signalTemplates[saved?.activeTemplate] ? saved.activeTemplate : "intraday";
+    const signals = Array.isArray(saved?.signals) ? saved.signals.map(normalizeSignalItem).filter(Boolean).slice(-120) : [];
+    return { activeTemplate, signals };
+  } catch (error) {
+    return { activeTemplate: "intraday", signals: [] };
+  }
+}
+
+function normalizeSignalItem(signal) {
+  if (!signal || !signal.asset || !signal.side) return null;
+  const template = signalTemplates[signal.template] ? signal.template : "intraday";
+  return {
+    id: String(signal.id || `signal-${Date.now()}-${Math.round(Math.random() * 1000)}`),
+    time: Number(signal.time) || Date.now(),
+    asset: String(signal.asset || "BTC/USDT"),
+    timeframe: String(signal.timeframe || "15m"),
+    side: signal.side === "SHORT" ? "SHORT" : "LONG",
+    source: String(signal.source || signalTemplates[template].source),
+    score: Number(signal.score) || 0,
+    result: String(signal.result || "ожидает сделки"),
+    template,
+    strategyMode: String(signal.strategyMode || "standard")
+  };
+}
+
 const state = {
   rules: loadRules(),
   lastStrategy: "",
@@ -494,6 +543,7 @@ const state = {
   signalQuality: null,
   paperTrades: loadPaperTrades(),
   rejectedSignals: loadRejectedSignals(),
+  signalCenter: loadSignalCenterState(),
   activePaperTradeId: null,
   paperPriceCache: {},
   paperPriceLastFetch: 0,
@@ -592,6 +642,10 @@ const learningScore = document.querySelector("[data-learning-score]");
 const autopilotStatus = document.querySelector("[data-autopilot-status]");
 const intelDetails = document.querySelector("[data-intel-details]");
 const intelRefresh = document.querySelector("[data-intel-refresh]");
+const signalMode = document.querySelector("[data-signal-mode]");
+const signalSummary = document.querySelector("[data-signal-summary]");
+const signalRows = document.querySelector("[data-signal-rows]");
+const signalTemplateButtons = document.querySelectorAll("[data-signal-template]");
 const autopilotToggle = document.querySelector("[data-autopilot-toggle]");
 const scalpingMode = document.querySelector("#scalpingMode");
 const autopilotProfile = document.querySelector("#autopilotProfile");
@@ -868,6 +922,121 @@ function persistPaperTrades() {
 
 function persistRejectedSignals() {
   localStorage.setItem(rejectedSignalsKey, JSON.stringify({ items: state.rejectedSignals.slice(-300) }));
+}
+
+function persistSignalCenter() {
+  localStorage.setItem(signalCenterKey, JSON.stringify({
+    activeTemplate: state.signalCenter.activeTemplate,
+    signals: state.signalCenter.signals.slice(-120)
+  }));
+}
+
+function getActiveSignalTemplate() {
+  return signalTemplates[state.signalCenter.activeTemplate] || signalTemplates.intraday;
+}
+
+function setSignalTemplate(id) {
+  if (!signalTemplates[id]) return;
+  state.signalCenter.activeTemplate = id;
+  persistSignalCenter();
+  renderSignalCenter();
+  generateStrategy(state.lastUserIdea);
+}
+
+function recordSignalSnapshot(context, tradePlan, signalQuality, source = "strategy") {
+  const best = signalQuality?.best;
+  if (!best?.side) return;
+  const scenario = tradePlan?.scenarios?.find((item) => item.side === best.side) || tradePlan?.primary;
+  if (!scenario) return;
+  const now = Date.now();
+  const templateId = state.signalCenter.activeTemplate;
+  const template = getActiveSignalTemplate();
+  const duplicate = state.signalCenter.signals.some((signal) =>
+    signal.asset === context.asset &&
+    signal.timeframe === context.timeframe &&
+    signal.side === best.side &&
+    signal.template === templateId &&
+    now - Number(signal.time) < 10 * 60 * 1000
+  );
+  if (duplicate) return;
+
+  state.signalCenter.signals.push({
+    id: `signal-${now}-${Math.round(Math.random() * 1000)}`,
+    time: now,
+    asset: context.asset,
+    timeframe: context.timeframe,
+    side: best.side,
+    source: source === "autopilot" ? `${template.source} · auto` : template.source,
+    score: Number(best.score) || 0,
+    result: "ожидает сделки",
+    template: templateId,
+    strategyMode: context.strategyMode || "standard",
+    entry: scenario.entry,
+    stop: scenario.stop,
+    target1: scenario.target1,
+    target2: scenario.target2
+  });
+  state.signalCenter.signals = state.signalCenter.signals.slice(-120);
+  persistSignalCenter();
+}
+
+function renderSignalCenter() {
+  if (!signalMode || !signalSummary || !signalRows) return;
+  const template = getActiveSignalTemplate();
+  signalMode.textContent = template.label;
+  signalTemplateButtons.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.signalTemplate === state.signalCenter.activeTemplate);
+  });
+
+  const context = getContext();
+  const best = state.signalQuality?.best;
+  const timeframeFits = template.timeframes.includes(context.timeframe);
+  const fitLabel = timeframeFits
+    ? "таймфрейм подходит"
+    : `лучше ТФ ${template.timeframes.join(", ")}`;
+  signalSummary.textContent = best
+    ? `${template.label}: ${context.asset} ${context.timeframe}, ${fitLabel}. Лучший сигнал ${best.side} ${best.score}/100, ${best.decision}.`
+    : `${template.label}: ждет расчет качества сигнала.`;
+
+  const signals = state.signalCenter.signals.slice(-20).reverse();
+  if (!signals.length) {
+    signalRows.innerHTML = `<tr><td colspan="7">Сигнальный журнал пуст: он начнет копить сигналы после генерации стратегии</td></tr>`;
+    return;
+  }
+
+  signalRows.innerHTML = signals.map((signal) => {
+    const status = getSignalResult(signal);
+    const sideClass = signal.side === "SHORT" ? "short" : "long";
+    return `
+      <tr>
+        <td>${formatJournalTime(signal.time)}</td>
+        <td>${escapeHtml(signal.asset.replace("/USDT", ""))}</td>
+        <td>${escapeHtml(signal.timeframe)}</td>
+        <td><span class="side-badge ${sideClass}">${signal.side}</span></td>
+        <td>${escapeHtml(signal.source)}</td>
+        <td>${Math.round(Number(signal.score) || 0)}/100</td>
+        <td><span class="status-badge ${status.className}">${escapeHtml(status.label)}</span></td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function getSignalResult(signal) {
+  const trade = [...state.paperTrades]
+    .filter((item) =>
+      item.asset === signal.asset &&
+      item.timeframe === signal.timeframe &&
+      item.side === signal.side &&
+      Number(item.openedAt) >= Number(signal.time) - 2 * 60 * 1000
+    )
+    .sort((a, b) => Number(b.openedAt) - Number(a.openedAt))[0];
+
+  if (!trade) return { label: "ожидает", className: "pending" };
+  if (isPaperTradeActive(trade)) return { label: trade.status === "pending" ? "PENDING" : "OPEN", className: trade.status === "pending" ? "pending" : "open" };
+  if (isPaperTradeCancelled(trade)) return { label: "CANCELLED", className: "cancelled" };
+  return Number(trade.pnl) >= 0
+    ? { label: `WIN ${trade.pnlPct >= 0 ? "+" : ""}${trade.pnlPct.toFixed(1)}%`, className: "win" }
+    : { label: `LOSS ${trade.pnlPct.toFixed(1)}%`, className: "loss" };
 }
 
 function rememberRejectedSignal(context, signalQuality, gate, tradePlan = null, source = "autopilot") {
@@ -1997,6 +2166,8 @@ function generateStrategy(userIdea = "") {
   maxRisk.textContent = `${context.risk.toFixed(2)}%`;
   filterCount.textContent = String((context.conservative ? 4 : 3) + context.rsi.filter((indicator) => indicator.use).length + context.ema.filter((indicator) => indicator.use).length + 4);
   renderSignalQualityReadout(signalQuality);
+  recordSignalSnapshot(context, tradePlan, signalQuality);
+  renderSignalCenter();
   renderNewsAnalytics();
   renderStrategyIntelligence();
   chartLabel.textContent = `${context.asset} · ${context.timeframe}`;
@@ -4576,6 +4747,7 @@ function enterPaperTrade(options = {}) {
     autopilotProfile: autopilotProfileId,
     exchangePreflight: preflight,
     strategyMode: options.scalping ? "scalping" : context.strategyMode || "standard",
+    signalTemplate: state.signalCenter.activeTemplate,
     autopilotReason: String(options.reason || ""),
     entry,
     quantity,
@@ -4608,6 +4780,7 @@ function enterPaperTrade(options = {}) {
   };
 
   const normalizedTrade = ensureBybitPaperState(trade);
+  recordSignalSnapshot(context, tradePlan, signalQuality, options.autopilot ? "autopilot" : "manual");
   if (scenario.immediateFill) {
     markPaperOpeningOrderFilled(normalizedTrade);
   }
@@ -4675,6 +4848,8 @@ function createStrategySnapshot(context, tradePlan, scenario, quality, options =
     execution: {
       autopilot: Boolean(options.autopilot),
       reason: String(options.reason || ""),
+      signalTemplate: state.signalCenter.activeTemplate,
+      signalTemplateLabel: getActiveSignalTemplate().label,
       profileChoice: state.autopilot.profile || "auto",
       profileId: options.autopilot ? getEffectiveAutopilotProfileId() : "",
       profileLabel: options.autopilot ? getAutopilotProfileSettings().label : "",
@@ -5437,6 +5612,7 @@ function renderPaperReadout(trade, currentPrice, pnl, pnlPct) {
 
 function renderTradeJournal() {
   renderTradeArchive();
+  renderSignalCenter();
   renderWalletReadout();
   const trades = getVisibleJournalTrades();
   const openTrades = trades.filter(isPaperTradeActive);
@@ -5594,6 +5770,7 @@ function exportJournalToExcel() {
     "Риск лимит %": trade.riskLimitPct || "",
     "Авто-бот": trade.autopilot ? "да" : "нет",
     "Профиль автобота": trade.autopilot ? autopilotProfiles[getTradeAutopilotProfileId(trade)]?.label || "" : "",
+    "Сигнальная стратегия": signalTemplates[trade.signalTemplate || trade.strategySnapshot?.execution?.signalTemplate]?.label || "",
     "Выбор профиля": trade.strategySnapshot?.execution?.profileChoice || "",
     "Причина авто-бота": trade.autopilotReason || "",
     "Цена выхода": trade.exitPrice || "",
@@ -5934,6 +6111,9 @@ cmcSave.addEventListener("click", saveCmcRadarConfig);
 cmcRefresh.addEventListener("click", () => refreshCmcRadar(true));
 newsSave.addEventListener("click", saveNewsAnalyticsConfig);
 newsRefresh.addEventListener("click", () => refreshNewsAnalytics(true));
+signalTemplateButtons.forEach((button) => {
+  button.addEventListener("click", () => setSignalTemplate(button.dataset.signalTemplate));
+});
 paperSide.addEventListener("change", () => {
   resetPaperTrade();
 });
@@ -6010,6 +6190,7 @@ reconcileLegacyPaperBudget();
 updateRiskLabel();
 renderLiveReadout();
 renderWalletReadout();
+renderSignalCenter();
 renderTradeJournal();
 renderBattleReadiness();
 generateStrategy();
