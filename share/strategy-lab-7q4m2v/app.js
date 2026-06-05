@@ -5496,6 +5496,7 @@ async function pushRemoteJournalTrades() {
     id: trade.id,
     client_id: currentClientId,
     session_id: trade.sessionId,
+    user_login: getTradeUserLogin(trade),
     asset: trade.asset,
     timeframe: trade.timeframe,
     side: trade.side,
