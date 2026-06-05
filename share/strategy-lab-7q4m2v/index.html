@@ -448,6 +448,132 @@
               </div>
             </div>
 
+            <div class="bot-control-suite">
+              <div class="output-header">
+                <span>Профиль и контроль автобота</span>
+                <span class="status-pill" data-bot-health-status>health check</span>
+              </div>
+
+              <div class="bot-preset-grid" data-bot-presets></div>
+
+              <div class="bot-control-grid">
+                <div class="bot-control-panel">
+                  <div class="mini-title">Условия входа</div>
+                  <label class="check-row">
+                    <input type="checkbox" data-entry-condition="rsi" checked>
+                    <span>RSI подтверждает сторону</span>
+                  </label>
+                  <label class="check-row">
+                    <input type="checkbox" data-entry-condition="ema" checked>
+                    <span>EMA 34/89 по направлению</span>
+                  </label>
+                  <label class="check-row">
+                    <input type="checkbox" data-entry-condition="volume" checked>
+                    <span>Объем выше среднего</span>
+                  </label>
+                  <label class="check-row">
+                    <input type="checkbox" data-entry-condition="news" checked>
+                    <span>Новостной фон не против</span>
+                  </label>
+                  <label class="check-row">
+                    <input type="checkbox" data-entry-condition="higherTf" checked>
+                    <span>Старший ТФ подтверждает</span>
+                  </label>
+                  <label class="check-row">
+                    <input type="checkbox" data-entry-condition="history" checked>
+                    <span>История похожих сделок не слабая</span>
+                  </label>
+                </div>
+
+                <div class="bot-control-panel">
+                  <div class="mini-title">Условия выхода</div>
+                  <label class="check-row">
+                    <input type="checkbox" data-exit-rule="breakevenAfterT1" checked>
+                    <span>Безубыток после T1</span>
+                  </label>
+                  <label class="check-row">
+                    <input type="checkbox" data-exit-rule="trailingStop">
+                    <span>Trailing stop после импульса</span>
+                  </label>
+                  <label class="check-row">
+                    <input type="checkbox" data-exit-rule="emaFlip">
+                    <span>Закрыть при развороте EMA</span>
+                  </label>
+                  <label class="check-row">
+                    <input type="checkbox" data-exit-rule="newsFlip">
+                    <span>Закрыть при ухудшении новости</span>
+                  </label>
+                  <label class="check-row">
+                    <input type="checkbox" data-exit-rule="tradeTimeout" checked>
+                    <span>Тайм-аут сделки</span>
+                  </label>
+                </div>
+
+                <div class="bot-control-panel">
+                  <div class="mini-title">Сетка и TTL</div>
+                  <label class="check-row">
+                    <input type="checkbox" data-grid-enabled>
+                    <span>Сетка добора вручную</span>
+                  </label>
+                  <label>
+                    Макс. доборов
+                    <input type="number" min="1" max="3" step="1" value="2" data-grid-orders>
+                  </label>
+                  <label>
+                    TTL pending, мин
+                    <input type="number" min="1" max="120" step="1" value="30" data-pending-ttl>
+                  </label>
+                  <label>
+                    TTL scalping, мин
+                    <input type="number" min="1" max="30" step="1" value="5" data-scalping-ttl>
+                  </label>
+                </div>
+              </div>
+
+              <div class="bot-market-grid">
+                <div class="bot-control-panel">
+                  <div class="mini-title">Маркет стратегий</div>
+                  <div class="strategy-market" data-strategy-market></div>
+                </div>
+                <div class="bot-control-panel">
+                  <div class="mini-title">Проверка перед запуском</div>
+                  <button class="secondary-action full-width" type="button" data-strategy-precheck>Проверить стратегию</button>
+                  <div class="bot-control-report" data-strategy-precheck-report>Проверка еще не запускалась</div>
+                </div>
+                <div class="bot-control-panel">
+                  <div class="mini-title">Почему вошел / не вошел</div>
+                  <div class="bot-control-report" data-decision-log>Жду новых решений автобота</div>
+                </div>
+              </div>
+
+              <div class="bot-health-grid">
+                <div>
+                  <span>Свободно</span>
+                  <strong data-health-free>0 USDT</strong>
+                </div>
+                <div>
+                  <span>В рынке</span>
+                  <strong data-health-reserved>0 USDT</strong>
+                </div>
+                <div>
+                  <span>День PnL</span>
+                  <strong data-health-day-pnl>0 USDT</strong>
+                </div>
+                <div>
+                  <span>Лимит риска</span>
+                  <strong data-health-risk-limit>OK</strong>
+                </div>
+                <div>
+                  <span>Активные</span>
+                  <strong data-health-active>0</strong>
+                </div>
+                <div>
+                  <span>Качество рынка</span>
+                  <strong data-health-market>нет данных</strong>
+                </div>
+              </div>
+            </div>
+
             <div class="paper-panel">
               <div class="paper-chart-wrap">
                 <div class="output-header">

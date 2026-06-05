@@ -10,6 +10,7 @@ const cmcRadarConfigKey = "crypto-strategy-bot-cmc-radar-v1";
 const newsAnalyticsConfigKey = "crypto-strategy-bot-news-analytics-v1";
 const rejectedSignalsKey = "crypto-strategy-bot-rejected-signals-v1";
 const signalCenterKey = "crypto-strategy-bot-signal-center-v1";
+const botControlKey = "crypto-strategy-bot-control-v1";
 
 const currentSessionId = getCurrentSessionId();
 const currentClientId = getCurrentClientId();
@@ -86,6 +87,79 @@ const signalTemplates = {
     timeframes: ["1h", "4h", "1d"],
     description: "1h-1d · редкие входы"
   }
+};
+const botPresetProfiles = {
+  safe: {
+    label: "Осторожный",
+    description: "меньше сделок, выше фильтр качества",
+    minScoreBoost: 8,
+    autopilotProfile: "protective",
+    signalTemplate: "swing"
+  },
+  balanced: {
+    label: "Баланс",
+    description: "базовый режим для накопления статистики",
+    minScoreBoost: 0,
+    autopilotProfile: "balanced",
+    signalTemplate: "intraday"
+  },
+  activeTest: {
+    label: "Агрессивный тест",
+    description: "больше входов, только демо/dry-run",
+    minScoreBoost: -4,
+    autopilotProfile: "active",
+    signalTemplate: "scalper"
+  },
+  majorOnly: {
+    label: "Только BTC/ETH",
+    description: "торгует только самые ликвидные активы",
+    minScoreBoost: 3,
+    allowedAssets: ["BTC/USDT", "ETH/USDT"],
+    autopilotProfile: "balanced",
+    signalTemplate: "intraday"
+  },
+  trendOnly: {
+    label: "Только сильный тренд",
+    description: "входы только при тренде/пробое",
+    minScoreBoost: 5,
+    allowedModes: ["trend", "breakout"],
+    autopilotProfile: "protective",
+    signalTemplate: "intraday"
+  },
+  drawdownGuard: {
+    label: "Антипросадка",
+    description: "после слабого дня максимально режет риск",
+    minScoreBoost: 10,
+    autopilotProfile: "protective",
+    signalTemplate: "swing"
+  }
+};
+const defaultBotControlState = {
+  activePreset: "balanced",
+  entryConditions: {
+    rsi: true,
+    ema: true,
+    volume: true,
+    news: true,
+    higherTf: true,
+    history: true
+  },
+  exitRules: {
+    breakevenAfterT1: true,
+    trailingStop: false,
+    emaFlip: false,
+    newsFlip: false,
+    tradeTimeout: true
+  },
+  grid: {
+    enabled: false,
+    orders: 2
+  },
+  ttl: {
+    pendingMin: 30,
+    scalpingMin: 5
+  },
+  lastPrecheck: null
 };
 const baseQuarantineAssets = new Set([
   "AAVE/USDT",
@@ -518,6 +592,39 @@ function loadSignalCenterState() {
   }
 }
 
+function loadBotControlState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(botControlKey));
+    return normalizeBotControlState(saved);
+  } catch (error) {
+    return normalizeBotControlState();
+  }
+}
+
+function normalizeBotControlState(saved = {}) {
+  const activePreset = botPresetProfiles[saved?.activePreset] ? saved.activePreset : defaultBotControlState.activePreset;
+  return {
+    activePreset,
+    entryConditions: {
+      ...defaultBotControlState.entryConditions,
+      ...(saved?.entryConditions && typeof saved.entryConditions === "object" ? saved.entryConditions : {})
+    },
+    exitRules: {
+      ...defaultBotControlState.exitRules,
+      ...(saved?.exitRules && typeof saved.exitRules === "object" ? saved.exitRules : {})
+    },
+    grid: {
+      enabled: Boolean(saved?.grid?.enabled),
+      orders: Math.max(1, Math.min(3, Number(saved?.grid?.orders) || defaultBotControlState.grid.orders))
+    },
+    ttl: {
+      pendingMin: Math.max(1, Math.min(120, Number(saved?.ttl?.pendingMin) || defaultBotControlState.ttl.pendingMin)),
+      scalpingMin: Math.max(1, Math.min(30, Number(saved?.ttl?.scalpingMin) || defaultBotControlState.ttl.scalpingMin))
+    },
+    lastPrecheck: saved?.lastPrecheck && typeof saved.lastPrecheck === "object" ? saved.lastPrecheck : null
+  };
+}
+
 function normalizeSignalItem(signal) {
   if (!signal || !signal.asset || !signal.side) return null;
   const template = signalTemplates[signal.template] ? signal.template : "intraday";
@@ -544,6 +651,7 @@ const state = {
   paperTrades: loadPaperTrades(),
   rejectedSignals: loadRejectedSignals(),
   signalCenter: loadSignalCenterState(),
+  botControl: loadBotControlState(),
   activePaperTradeId: null,
   paperPriceCache: {},
   paperPriceLastFetch: 0,
@@ -646,6 +754,24 @@ const signalMode = document.querySelector("[data-signal-mode]");
 const signalSummary = document.querySelector("[data-signal-summary]");
 const signalRows = document.querySelector("[data-signal-rows]");
 const signalTemplateButtons = document.querySelectorAll("[data-signal-template]");
+const botHealthStatus = document.querySelector("[data-bot-health-status]");
+const botPresets = document.querySelector("[data-bot-presets]");
+const entryConditionInputs = document.querySelectorAll("[data-entry-condition]");
+const exitRuleInputs = document.querySelectorAll("[data-exit-rule]");
+const gridEnabled = document.querySelector("[data-grid-enabled]");
+const gridOrders = document.querySelector("[data-grid-orders]");
+const pendingTtl = document.querySelector("[data-pending-ttl]");
+const scalpingTtl = document.querySelector("[data-scalping-ttl]");
+const strategyMarket = document.querySelector("[data-strategy-market]");
+const strategyPrecheck = document.querySelector("[data-strategy-precheck]");
+const strategyPrecheckReport = document.querySelector("[data-strategy-precheck-report]");
+const decisionLog = document.querySelector("[data-decision-log]");
+const healthFree = document.querySelector("[data-health-free]");
+const healthReserved = document.querySelector("[data-health-reserved]");
+const healthDayPnl = document.querySelector("[data-health-day-pnl]");
+const healthRiskLimit = document.querySelector("[data-health-risk-limit]");
+const healthActive = document.querySelector("[data-health-active]");
+const healthMarket = document.querySelector("[data-health-market]");
 const autopilotToggle = document.querySelector("[data-autopilot-toggle]");
 const scalpingMode = document.querySelector("#scalpingMode");
 const autopilotProfile = document.querySelector("#autopilotProfile");
@@ -1037,6 +1163,270 @@ function getSignalResult(signal) {
   return Number(trade.pnl) >= 0
     ? { label: `WIN ${trade.pnlPct >= 0 ? "+" : ""}${trade.pnlPct.toFixed(1)}%`, className: "win" }
     : { label: `LOSS ${trade.pnlPct.toFixed(1)}%`, className: "loss" };
+}
+
+function persistBotControl() {
+  localStorage.setItem(botControlKey, JSON.stringify(state.botControl));
+}
+
+function getActiveBotPreset() {
+  return botPresetProfiles[state.botControl.activePreset] || botPresetProfiles.balanced;
+}
+
+function setBotPreset(id) {
+  if (!botPresetProfiles[id]) return;
+  state.botControl.activePreset = id;
+  const preset = getActiveBotPreset();
+  state.autopilot.profile = preset.autopilotProfile || "balanced";
+  state.autopilot.activeProfile = preset.autopilotProfile || "balanced";
+  if (preset.signalTemplate && signalTemplates[preset.signalTemplate]) {
+    state.signalCenter.activeTemplate = preset.signalTemplate;
+    persistSignalCenter();
+  }
+  persistAutopilot();
+  persistBotControl();
+  renderBotControlSuite();
+  generateStrategy(state.lastUserIdea);
+  if (state.autopilot.enabled) runAutopilotScan(true);
+}
+
+function renderBotControlSuite() {
+  renderBotPresets();
+  syncBotControlInputs();
+  renderStrategyMarket();
+  renderDecisionLog();
+  renderBotHealth();
+  renderStrategyPrecheck();
+}
+
+function renderBotPresets() {
+  if (!botPresets) return;
+  botPresets.innerHTML = Object.entries(botPresetProfiles).map(([id, preset]) => `
+    <button type="button" data-bot-preset="${id}" class="${state.botControl.activePreset === id ? "is-active" : ""}">
+      <strong>${escapeHtml(preset.label)}</strong>
+      <span>${escapeHtml(preset.description)}</span>
+    </button>
+  `).join("");
+  botPresets.querySelectorAll("[data-bot-preset]").forEach((button) => {
+    button.addEventListener("click", () => setBotPreset(button.dataset.botPreset));
+  });
+}
+
+function syncBotControlInputs() {
+  entryConditionInputs.forEach((input) => {
+    input.checked = Boolean(state.botControl.entryConditions[input.dataset.entryCondition]);
+  });
+  exitRuleInputs.forEach((input) => {
+    input.checked = Boolean(state.botControl.exitRules[input.dataset.exitRule]);
+  });
+  if (gridEnabled) gridEnabled.checked = Boolean(state.botControl.grid.enabled);
+  if (gridOrders) gridOrders.value = String(state.botControl.grid.orders);
+  if (pendingTtl) pendingTtl.value = String(state.botControl.ttl.pendingMin);
+  if (scalpingTtl) scalpingTtl.value = String(state.botControl.ttl.scalpingMin);
+}
+
+function updateBotControlFromInputs() {
+  entryConditionInputs.forEach((input) => {
+    state.botControl.entryConditions[input.dataset.entryCondition] = input.checked;
+  });
+  exitRuleInputs.forEach((input) => {
+    state.botControl.exitRules[input.dataset.exitRule] = input.checked;
+  });
+  state.botControl.grid.enabled = Boolean(gridEnabled?.checked);
+  state.botControl.grid.orders = Math.max(1, Math.min(3, Number(gridOrders?.value) || 2));
+  state.botControl.ttl.pendingMin = Math.max(1, Math.min(120, Number(pendingTtl?.value) || 30));
+  state.botControl.ttl.scalpingMin = Math.max(1, Math.min(30, Number(scalpingTtl?.value) || 5));
+  persistBotControl();
+  generateStrategy(state.lastUserIdea);
+  renderBotControlSuite();
+}
+
+function renderStrategyMarket() {
+  if (!strategyMarket) return;
+  const stats = buildStrategyMarketStats();
+  if (!stats.length) {
+    strategyMarket.innerHTML = `<div class="market-strategy-row">Пока нет закрытых сделок для рейтинга стратегий</div>`;
+    return;
+  }
+  strategyMarket.innerHTML = stats.slice(0, 5).map((item) => `
+    <div class="market-strategy-row">
+      <strong>${escapeHtml(item.label)}</strong>
+      <span>${item.trades} сделок · ${item.winRate.toFixed(0)}% · PF ${item.profitFactor >= 90 ? "∞" : item.profitFactor.toFixed(2)} · ${item.pnl >= 0 ? "+" : ""}${item.pnl.toFixed(2)} USDT</span>
+      <em>${item.action}</em>
+    </div>
+  `).join("");
+}
+
+function buildStrategyMarketStats() {
+  const closed = state.paperTrades.filter(isPaperTradeClosedForStats);
+  const byKey = new Map();
+  closed.forEach((trade) => {
+    const template = trade.signalTemplate || trade.strategySnapshot?.execution?.signalTemplate || "intraday";
+    const mode = trade.strategyMode || trade.strategySnapshot?.context?.strategyMode || "standard";
+    const profile = getTradeAutopilotProfileId(trade);
+    const key = `${template}|${mode}|${profile}`;
+    if (!byKey.has(key)) {
+      byKey.set(key, {
+        key,
+        label: `${signalTemplates[template]?.label || "Сигнал"} · ${mode === "scalping" ? "скальпинг" : "стандарт"} · ${autopilotProfiles[profile]?.label || "профиль"}`,
+        trades: 0,
+        wins: 0,
+        pnl: 0,
+        grossProfit: 0,
+        grossLoss: 0,
+        avgHoldMs: 0
+      });
+    }
+    const item = byKey.get(key);
+    const pnl = Number(trade.pnl) || 0;
+    item.trades += 1;
+    item.wins += pnl > 0 ? 1 : 0;
+    item.pnl += pnl;
+    item.grossProfit += Math.max(0, pnl);
+    item.grossLoss += Math.abs(Math.min(0, pnl));
+    item.avgHoldMs += Math.max(0, (Number(trade.closedAt) || Number(trade.openedAt) || 0) - (Number(trade.openedAt) || 0));
+  });
+  return [...byKey.values()].map((item) => {
+    const winRate = item.trades ? (item.wins / item.trades) * 100 : 0;
+    const profitFactor = item.grossLoss > 0 ? item.grossProfit / item.grossLoss : item.grossProfit > 0 ? 99 : 0;
+    const action = item.trades < 5
+      ? "копим статистику"
+      : winRate >= targetWinRatePct && item.pnl > 0
+        ? "приоритет"
+        : "снизить вес";
+    return {
+      ...item,
+      winRate,
+      profitFactor,
+      score: winRate + Math.min(30, profitFactor * 10) + Math.max(-20, Math.min(20, item.pnl / 10)),
+      action
+    };
+  }).sort((a, b) => b.score - a.score || b.pnl - a.pnl);
+}
+
+function renderDecisionLog() {
+  if (!decisionLog) return;
+  const recentTrades = [...state.paperTrades]
+    .sort((a, b) => getTradeSortTime(b) - getTradeSortTime(a))
+    .slice(0, 3)
+    .map((trade) => `Вход: ${trade.asset} ${trade.timeframe} ${trade.side} · ${trade.score || "--"}/100 · ${trade.autopilot ? trade.autopilotReason || "авто-бот" : "ручной вход"}`);
+  const rejects = state.rejectedSignals.slice(-3).reverse().map((signal) =>
+    `Отказ: ${signal.asset} ${signal.timeframe} ${signal.side || ""} · ${signal.score || 0}/100 · ${signal.reason}`
+  );
+  const rows = [...recentTrades, ...rejects].slice(0, 5);
+  decisionLog.textContent = rows.length ? rows.join("\n") : "Жду новых входов и отказов автобота";
+}
+
+function renderBotHealth() {
+  if (!botHealthStatus) return;
+  const reserved = getReservedPaperBudget();
+  const free = getDepositValue();
+  const dailyRisk = getDailyRiskState();
+  const activeTrades = state.paperTrades.filter(isPaperTradeActive);
+  const market = state.marketIntel.marketStructure;
+  const riskBlocked = dailyRisk.blocked;
+  botHealthStatus.textContent = riskBlocked ? "risk stop" : state.autopilot.enabled ? "active" : "standby";
+  botHealthStatus.classList.toggle("is-live", state.autopilot.enabled && !riskBlocked);
+  healthFree.textContent = `${free.toFixed(2)} USDT`;
+  healthReserved.textContent = `${reserved.toFixed(2)} USDT`;
+  healthDayPnl.textContent = `${dailyRisk.pnl >= 0 ? "+" : ""}${dailyRisk.pnl.toFixed(2)} USDT`;
+  healthDayPnl.style.color = dailyRisk.pnl >= 0 ? "#55c7a2" : "#ef6b5b";
+  healthRiskLimit.textContent = riskBlocked ? `STOP ${dailyRisk.lossPct.toFixed(2)}%` : `OK до ${dailyMaxLossPct}%`;
+  healthRiskLimit.style.color = riskBlocked ? "#ef6b5b" : "#55c7a2";
+  healthActive.textContent = String(activeTrades.length);
+  healthMarket.textContent = market ? `ADX ${market.adx.toFixed(0)}, ATR ${market.atrPct.toFixed(2)}%` : "нет данных";
+}
+
+function runStrategyPrecheck() {
+  const context = getContext();
+  const tradePlan = state.tradePlan || buildTradePlan(context);
+  const signalQuality = state.signalQuality || evaluateSignalQuality(context, tradePlan);
+  const gate = evaluateAutopilotQualityGate(context, signalQuality, state.marketIntel, tradePlan);
+  const battle = analyzeBattleReadiness();
+  const preset = getActiveBotPreset();
+  const checks = [
+    { ok: signalQuality.best?.score >= getPresetMinScore(), label: `score ${signalQuality.best?.score || 0}/${getPresetMinScore()}` },
+    { ok: gate.ok, label: gate.reason },
+    { ok: !getDailyRiskState().blocked, label: "дневной риск-лимит" },
+    { ok: battle.score >= 50, label: `готовность ${battle.score}/100` },
+    { ok: areEntryConditionsSatisfied(context, signalQuality.best?.side).ok, label: "условия входа" }
+  ];
+  const passed = checks.filter((item) => item.ok).length;
+  const allowed = checks.every((item) => item.ok);
+  state.botControl.lastPrecheck = {
+    time: Date.now(),
+    allowed,
+    score: Math.round((passed / checks.length) * 100),
+    report: `${preset.label}: ${allowed ? "можно тестировать" : "лучше не входить"} · ${passed}/${checks.length}. ${checks.map((item) => `${item.ok ? "OK" : "BLOCK"} ${item.label}`).join("; ")}`
+  };
+  persistBotControl();
+  renderStrategyPrecheck();
+}
+
+function renderStrategyPrecheck() {
+  if (!strategyPrecheckReport) return;
+  const check = state.botControl.lastPrecheck;
+  strategyPrecheckReport.textContent = check
+    ? `${formatJournalTime(check.time)} · ${check.score}/100 · ${check.report}`
+    : "Проверка еще не запускалась";
+}
+
+function getPresetMinScore() {
+  const profile = getAutopilotProfileSettings();
+  const preset = getActiveBotPreset();
+  return Math.max(55, Math.min(92, Number(profile.strictScore || strictAutopilotMinScore) + Number(preset.minScoreBoost || 0)));
+}
+
+function areEntryConditionsSatisfied(context, side) {
+  const conditions = state.botControl.entryConditions;
+  const failures = [];
+  const market = context.intel?.marketStructure || {};
+  const news = context.news || summarizeNewsForAsset(context.asset);
+  const pattern = getQualityPatternStat(context, side);
+
+  if (conditions.rsi) {
+    const rsi = evaluateRsiForScenario(context, side);
+    if (rsi.delta < 0) failures.push(`RSI: ${rsi.reason}`);
+  }
+  if (conditions.ema) {
+    const ema = evaluateEmaForScenario(context, side);
+    if (ema.delta < 0) failures.push(`EMA: ${ema.reason}`);
+  }
+  if (conditions.volume && Number.isFinite(market.volumeRatio) && market.volumeRatio < 0.8) {
+    failures.push(`объем x${market.volumeRatio.toFixed(2)} ниже среднего`);
+  }
+  if (conditions.news) {
+    if (news.regulatoryRisk) failures.push("новости: регуляторный риск");
+    if (news.bias === "BULLISH" && side === "SHORT") failures.push("новости против SHORT");
+    if (news.bias === "BEARISH" && side === "LONG") failures.push("новости против LONG");
+  }
+  if (conditions.higherTf && context.intel?.higherTimeframe?.direction && !["NEUTRAL", "UNKNOWN", side].includes(context.intel.higherTimeframe.direction)) {
+    failures.push(`старший ТФ против ${side}`);
+  }
+  if (conditions.history && pattern?.trades >= 3 && (pattern.winRate < targetWinRatePct || pattern.avgPnl <= 0)) {
+    failures.push(`история паттерна ${pattern.winRate.toFixed(0)}%`);
+  }
+  return { ok: failures.length === 0, failures };
+}
+
+function getBotControlStrategyBlock() {
+  const preset = getActiveBotPreset();
+  const activeEntry = Object.entries(state.botControl.entryConditions).filter(([, enabled]) => enabled).length;
+  const activeExit = Object.entries(state.botControl.exitRules).filter(([, enabled]) => enabled).length;
+  const gridText = state.botControl.grid.enabled
+    ? `Сетка добора включена вручную: максимум ${state.botControl.grid.orders} добора без мартингейла и без превышения общего риска.`
+    : "Сетка добора выключена: вход одной позицией с частичной фиксацией.";
+  return `
+    <section>
+      <h3>Управление ботом</h3>
+      <ul>
+        <li>Активный профиль: ${escapeHtml(preset.label)}; минимальный score для автобота: ${getPresetMinScore()}/100.</li>
+        <li>Условия входа: ${activeEntry} активных фильтров из 6; условия выхода: ${activeExit} активных правил из 5.</li>
+        <li>${gridText}</li>
+        <li>Pending-ордера отменяются: стандарт ${state.botControl.ttl.pendingMin} мин, скальпинг ${state.botControl.ttl.scalpingMin} мин.</li>
+      </ul>
+    </section>
+  `;
 }
 
 function rememberRejectedSignal(context, signalQuality, gate, tradePlan = null, source = "autopilot") {
@@ -1835,6 +2225,7 @@ function buildStrategy(userIdea = "", tradePlan = null, signalQuality = null) {
   const liveBlock = buildLiveStrategyBlock(context);
   const newsBlock = buildNewsStrategyBlock(context);
   const intelligenceBlock = buildIntelligenceStrategyBlock(context);
+  const botControlBlock = getBotControlStrategyBlock();
   const tradePlanBlock = buildTradePlanBlock(tradePlan);
   const rsiBlock = buildRsiStrategyBlock(context);
   const emaBlock = buildEmaStrategyBlock(context);
@@ -1853,6 +2244,7 @@ function buildStrategy(userIdea = "", tradePlan = null, signalQuality = null) {
     ${liveBlock}
     ${newsBlock}
     ${intelligenceBlock}
+    ${botControlBlock}
     ${tradePlanBlock}
     ${signalQualityBlock}
     ${historyRestrictionsBlock}
@@ -2238,6 +2630,7 @@ function renderStrategyIntelligence() {
   const rejectText = lastReject ? `Последний отказ: ${lastReject.asset} ${lastReject.timeframe} ${lastReject.side} - ${lastReject.reason}.` : "Отказов автобота пока нет.";
   intelDetails.textContent = `${learningMode} ${formatLearningPolicyNote()} ${profileText} ${newsText} ${scalpingText} ${riskText} ${rejectText} ${intel.notes.join(" ")}`;
   renderBattleReadiness();
+  renderBotControlSuite();
 }
 
 async function refreshStrategyIntelligence(force = false) {
@@ -2864,6 +3257,10 @@ function scoreAutopilotCandidate(context, tradePlan, signalQuality, intel) {
   const gate = evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan);
   if (!gate.ok) return gate.score;
   let score = Number.isFinite(gate.score) ? gate.score : best.score;
+  const preset = getActiveBotPreset();
+  if (preset.allowedAssets && !preset.allowedAssets.includes(context.asset)) score -= 80;
+  if (preset.allowedModes && !preset.allowedModes.includes(context.mode)) score -= 50;
+  score -= Number(preset.minScoreBoost || 0);
   if (context.strategyMode === "scalping") {
     const scalp = tradePlan?.scalpingSignal;
     score = Math.max(score, scalp?.score || 0);
@@ -2898,6 +3295,7 @@ function evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan =
   const dailyRisk = getDailyRiskState();
   const qualityPattern = getQualityPatternStat(context, best.side);
   const profile = getAutopilotProfileSettings();
+  const preset = getActiveBotPreset();
   const softGate = (reason, penalty, hard = false) => {
     const adjusted = best.score - Math.round(penalty * profile.penaltyMultiplier);
     if (profile.id === "protective" || hard) return { ok: false, reason, score: adjusted };
@@ -2905,6 +3303,16 @@ function evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan =
   };
   if (dailyRisk.blocked) {
     return { ok: false, reason: `дневной стоп: ${dailyRisk.lossPct.toFixed(2)}% убытка или ${dailyRisk.stops} стопов`, score: best.score - 90 };
+  }
+  if (preset.allowedAssets && !preset.allowedAssets.includes(context.asset)) {
+    return { ok: false, reason: `профиль ${preset.label}: актив не входит в разрешенный список`, score: best.score - 80 };
+  }
+  if (preset.allowedModes && !preset.allowedModes.includes(context.mode)) {
+    return { ok: false, reason: `профиль ${preset.label}: режим ${modeLabel(context.mode)} запрещен`, score: best.score - 55 };
+  }
+  const entryCheck = areEntryConditionsSatisfied(context, best.side);
+  if (!entryCheck.ok) {
+    return softGate(`условия входа: ${entryCheck.failures.slice(0, 2).join("; ")}`, 48, state.botControl.activePreset === "safe" || state.botControl.activePreset === "drawdownGuard");
   }
   const crash = intel?.marketCrash;
   if (crash?.severe) {
@@ -2931,7 +3339,8 @@ function evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan =
   if (scenario && hasRecentSimilarAutopilotSignal(context, scenario)) {
     return { ok: false, reason: "дубль похожего сигнала в течение 60 минут", score: best.score - 55 };
   }
-  if (best.score < profile.strictScore) return { ok: false, reason: `профиль ${profile.label}: score ${best.score}/100 ниже ${profile.strictScore}`, score: best.score - 100 };
+  const minScore = getPresetMinScore();
+  if (best.score < minScore) return { ok: false, reason: `профиль ${profile.label}/${preset.label}: score ${best.score}/100 ниже ${minScore}`, score: best.score - 100 };
   if (!backtest || backtest.trades < 8) return softGate("недостаточно сделок в бэктесте", 55);
   if (backtest.winRate < 55) return softGate(`бэктест winrate ${backtest.winRate.toFixed(0)}% ниже 55%`, 45);
   if (backtest.expectancyPct <= 0) return softGate(`матожидание ${backtest.expectancyPct.toFixed(2)}% не положительное`, 45);
@@ -3193,7 +3602,8 @@ async function runAutopilotScan(force = false) {
   const bestCandidate = candidates[0] || null;
 
   const profile = getAutopilotProfileSettings();
-  if (bestCandidate && bestCandidate.autopilotScore >= profile.minScore) {
+  const minScore = getPresetMinScore();
+  if (bestCandidate && bestCandidate.autopilotScore >= minScore) {
     if (bestCandidate.context.asset === asset.value) {
       state.marketIntel = bestCandidate.intel;
       state.tradePlan = bestCandidate.tradePlan;
@@ -3216,7 +3626,7 @@ async function runAutopilotScan(force = false) {
     const gate = bestCandidate ? evaluateAutopilotQualityGate(bestCandidate.context, bestCandidate.signalQuality, bestCandidate.intel, bestCandidate.tradePlan) : null;
     if (bestCandidate) {
       const rejectGate = gate?.ok
-        ? { ok: false, reason: `итоговый score ${bestCandidate.autopilotScore}/100 ниже ${profile.minScore} для профиля ${profile.label}`, score: bestCandidate.autopilotScore }
+        ? { ok: false, reason: `итоговый score ${bestCandidate.autopilotScore}/100 ниже ${minScore} для профиля ${profile.label}/${getActiveBotPreset().label}`, score: bestCandidate.autopilotScore }
         : gate;
       rememberRejectedSignal(bestCandidate.context, bestCandidate.signalQuality, rejectGate, bestCandidate.tradePlan, "autopilot");
     }
@@ -4195,6 +4605,8 @@ function buildTradePlan(context) {
   return {
     source: context.live.active ? "live" : "simulation",
     basePrice,
+    grid: { ...state.botControl.grid },
+    exitRules: { ...state.botControl.exitRules },
     scenarios,
     primary: scenarios[0] || long
   };
@@ -4247,6 +4659,8 @@ function buildScalpingTradePlan(context) {
     source: "scalping",
     basePrice,
     scalpingSignal: signal,
+    grid: { ...state.botControl.grid },
+    exitRules: { ...state.botControl.exitRules },
     scenarios: scenarios.length ? scenarios : [long, short].filter((scenario) => scenario.side === signal.side),
     primary: scenarios[0] || (signal.side === "SHORT" ? short : long)
   };
@@ -4748,6 +5162,9 @@ function enterPaperTrade(options = {}) {
     exchangePreflight: preflight,
     strategyMode: options.scalping ? "scalping" : context.strategyMode || "standard",
     signalTemplate: state.signalCenter.activeTemplate,
+    botPreset: state.botControl.activePreset,
+    gridPlan: { ...state.botControl.grid },
+    exitRules: { ...state.botControl.exitRules },
     autopilotReason: String(options.reason || ""),
     entry,
     quantity,
@@ -4850,6 +5267,10 @@ function createStrategySnapshot(context, tradePlan, scenario, quality, options =
       reason: String(options.reason || ""),
       signalTemplate: state.signalCenter.activeTemplate,
       signalTemplateLabel: getActiveSignalTemplate().label,
+      botPreset: state.botControl.activePreset,
+      botPresetLabel: getActiveBotPreset().label,
+      grid: { ...state.botControl.grid },
+      exitRules: { ...state.botControl.exitRules },
       profileChoice: state.autopilot.profile || "auto",
       profileId: options.autopilot ? getEffectiveAutopilotProfileId() : "",
       profileLabel: options.autopilot ? getAutopilotProfileSettings().label : "",
@@ -5221,6 +5642,7 @@ function replayPaperTradeCandle(trade, candle) {
   }
 
   if (!["open", "partial"].includes(trade.status)) return changed;
+  applyDynamicExitRules(trade, candle.close);
 
   const hitStop = trade.side === "LONG" ? candle.low <= trade.stop : candle.high >= trade.stop;
   const hitTarget1 = trade.side === "LONG" ? candle.high >= trade.target1 : candle.low <= trade.target1;
@@ -5274,6 +5696,7 @@ function updateSinglePaperTrade(trade) {
   trade.pnlPct = pnlPct;
 
   if (["open", "partial"].includes(trade.status)) {
+    applyDynamicExitRules(trade, currentPrice);
     appendPaperPoint(trade, currentPrice, pnl, pnlPct);
     const hitTarget1 = trade.side === "LONG" ? currentPrice >= trade.target1 : currentPrice <= trade.target1;
     const hitTarget2 = trade.side === "LONG" ? currentPrice >= trade.target : currentPrice <= trade.target;
@@ -5291,6 +5714,33 @@ function updateSinglePaperTrade(trade) {
 
     if (["open", "partial"].includes(trade.status) && hitTarget2) {
       closePaperPositionByTpsl(trade, "target");
+    }
+  }
+}
+
+function applyDynamicExitRules(trade, currentPrice) {
+  if (!["open", "partial"].includes(trade.status)) return;
+  const rules = trade.exitRules || trade.strategySnapshot?.execution?.exitRules || state.botControl.exitRules;
+  const entry = Number(trade.entry);
+  const price = Number(currentPrice);
+  const originalRisk = Math.abs(entry - Number(trade.strategySnapshot?.selectedScenario?.stop || trade.stop));
+  if (!Number.isFinite(entry) || !Number.isFinite(price) || !Number.isFinite(originalRisk) || originalRisk <= 0) return;
+
+  if (rules.breakevenAfterT1 && trade.status === "partial") {
+    if (trade.side === "LONG") trade.stop = Math.max(Number(trade.stop) || entry, entry);
+    else trade.stop = Math.min(Number(trade.stop) || entry, entry);
+    trade.slOrder.triggerPrice = trade.stop;
+    trade.result = trade.result.includes("безубыток") ? trade.result : `${trade.result}; стоп переведен в безубыток`;
+  }
+
+  if (rules.trailingStop) {
+    const profitDistance = trade.side === "LONG" ? price - entry : entry - price;
+    if (profitDistance >= originalRisk * 1.2) {
+      const trailDistance = originalRisk * 0.65;
+      const nextStop = trade.side === "LONG" ? price - trailDistance : price + trailDistance;
+      if (trade.side === "LONG" && nextStop > trade.stop) trade.stop = nextStop;
+      if (trade.side === "SHORT" && nextStop < trade.stop) trade.stop = nextStop;
+      trade.slOrder.triggerPrice = trade.stop;
     }
   }
 }
@@ -5464,11 +5914,12 @@ function getPendingOrderCancelReason(trade, currentPrice, checkedAt = Date.now()
 
 function getPendingOrderMaxAgeMs(trade) {
   if (trade.strategyMode === "scalping" || trade.strategySnapshot?.context?.strategyMode === "scalping") {
-    return pendingScalpingMaxAgeMs;
+    return Math.max(60 * 1000, state.botControl.ttl.scalpingMin * 60 * 1000);
   }
   const intervalMs = intervalToMs(trade.timeframe);
-  const candleLimit = Number.isFinite(intervalMs) && intervalMs > 0 ? intervalMs * 2 : pendingOrderMaxAgeMs;
-  return Math.max(60 * 1000, Math.min(pendingOrderMaxAgeMs, candleLimit));
+  const configuredLimit = Math.max(60 * 1000, state.botControl.ttl.pendingMin * 60 * 1000);
+  const candleLimit = Number.isFinite(intervalMs) && intervalMs > 0 ? intervalMs * 2 : configuredLimit;
+  return Math.max(60 * 1000, Math.min(configuredLimit, candleLimit));
 }
 
 function formatPendingLifetime(ms) {
@@ -5613,6 +6064,7 @@ function renderPaperReadout(trade, currentPrice, pnl, pnlPct) {
 function renderTradeJournal() {
   renderTradeArchive();
   renderSignalCenter();
+  renderBotControlSuite();
   renderWalletReadout();
   const trades = getVisibleJournalTrades();
   const openTrades = trades.filter(isPaperTradeActive);
@@ -5771,6 +6223,9 @@ function exportJournalToExcel() {
     "Авто-бот": trade.autopilot ? "да" : "нет",
     "Профиль автобота": trade.autopilot ? autopilotProfiles[getTradeAutopilotProfileId(trade)]?.label || "" : "",
     "Сигнальная стратегия": signalTemplates[trade.signalTemplate || trade.strategySnapshot?.execution?.signalTemplate]?.label || "",
+    "Пресет бота": botPresetProfiles[trade.botPreset || trade.strategySnapshot?.execution?.botPreset]?.label || "",
+    "Сетка включена": trade.gridPlan?.enabled || trade.strategySnapshot?.execution?.grid?.enabled ? "да" : "нет",
+    "Правила выхода JSON": JSON.stringify(trade.exitRules || trade.strategySnapshot?.execution?.exitRules || {}),
     "Выбор профиля": trade.strategySnapshot?.execution?.profileChoice || "",
     "Причина авто-бота": trade.autopilotReason || "",
     "Цена выхода": trade.exitPrice || "",
@@ -6114,6 +6569,18 @@ newsRefresh.addEventListener("click", () => refreshNewsAnalytics(true));
 signalTemplateButtons.forEach((button) => {
   button.addEventListener("click", () => setSignalTemplate(button.dataset.signalTemplate));
 });
+entryConditionInputs.forEach((input) => {
+  input.addEventListener("change", updateBotControlFromInputs);
+});
+exitRuleInputs.forEach((input) => {
+  input.addEventListener("change", updateBotControlFromInputs);
+});
+[gridEnabled, gridOrders, pendingTtl, scalpingTtl].filter(Boolean).forEach((control) => {
+  control.addEventListener("change", updateBotControlFromInputs);
+});
+if (strategyPrecheck) {
+  strategyPrecheck.addEventListener("click", runStrategyPrecheck);
+}
 paperSide.addEventListener("change", () => {
   resetPaperTrade();
 });
@@ -6191,6 +6658,7 @@ updateRiskLabel();
 renderLiveReadout();
 renderWalletReadout();
 renderSignalCenter();
+renderBotControlSuite();
 renderTradeJournal();
 renderBattleReadiness();
 generateStrategy();

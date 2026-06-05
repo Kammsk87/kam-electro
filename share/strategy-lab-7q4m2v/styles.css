@@ -559,6 +559,154 @@ canvas {
   text-transform: uppercase;
 }
 
+.bot-control-suite {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(23, 27, 31, 0.88);
+  box-shadow: var(--shadow);
+}
+
+.bot-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.bot-preset-grid button,
+.bot-control-panel {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(32, 38, 44, 0.84);
+}
+
+.bot-preset-grid button {
+  min-width: 0;
+  padding: 7px;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.bot-preset-grid button.is-active {
+  border-color: rgba(85, 199, 162, 0.72);
+  background: rgba(85, 199, 162, 0.16);
+}
+
+.bot-preset-grid strong,
+.bot-preset-grid span {
+  display: block;
+}
+
+.bot-preset-grid strong {
+  font-size: 12px;
+}
+
+.bot-preset-grid span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.bot-control-grid,
+.bot-market-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.bot-control-panel {
+  min-width: 0;
+  padding: 8px;
+}
+
+.mini-title {
+  margin-bottom: 7px;
+  color: var(--accent-2);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.bot-control-panel label {
+  margin-bottom: 6px;
+}
+
+.bot-control-panel .check-row {
+  gap: 7px;
+  font-size: 11px;
+}
+
+.bot-control-report {
+  max-height: 94px;
+  overflow: auto;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+  white-space: pre-line;
+}
+
+.strategy-market {
+  display: grid;
+  gap: 5px;
+  max-height: 122px;
+  overflow: auto;
+}
+
+.market-strategy-row {
+  display: grid;
+  gap: 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.market-strategy-row strong {
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.market-strategy-row em {
+  color: var(--accent);
+  font-style: normal;
+}
+
+.bot-health-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.bot-health-grid div {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 7px;
+  background: rgba(32, 38, 44, 0.84);
+}
+
+.bot-health-grid span,
+.bot-health-grid strong {
+  display: block;
+}
+
+.bot-health-grid span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.bot-health-grid strong {
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
 .paper-panel {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(210px, 260px);
@@ -1223,6 +1371,9 @@ canvas {
   .trade-plan-strip,
   .intel-grid,
   .signal-strategy-grid,
+  .bot-preset-grid,
+  .bot-control-grid,
+  .bot-market-grid,
   .sim-grid,
   .sim-actions {
     gap: 6px;
@@ -1279,6 +1430,51 @@ canvas {
   .signal-table th,
   .signal-table td {
     padding: 4px 5px;
+  }
+
+  .bot-control-suite {
+    padding: 7px;
+  }
+
+  .bot-preset-grid,
+  .bot-control-grid,
+  .bot-market-grid,
+  .bot-health-grid {
+    gap: 5px;
+    margin-top: 6px;
+  }
+
+  .bot-preset-grid button,
+  .bot-control-panel,
+  .bot-health-grid div {
+    padding: 5px;
+  }
+
+  .mini-title {
+    margin-bottom: 5px;
+    font-size: 11px;
+  }
+
+  .bot-control-panel label {
+    margin-bottom: 4px;
+  }
+
+  .bot-control-panel .check-row,
+  .bot-control-report,
+  .market-strategy-row {
+    font-size: 10px;
+  }
+
+  .bot-control-report {
+    max-height: 70px;
+  }
+
+  .strategy-market {
+    max-height: 88px;
+  }
+
+  .bot-health-grid strong {
+    font-size: 11px;
   }
 
   .intel-details {
@@ -1392,8 +1588,15 @@ canvas {
   .trade-plan-strip,
   .intel-grid,
   .signal-strategy-grid,
+  .bot-preset-grid,
+  .bot-control-grid,
+  .bot-market-grid,
   .sim-grid,
   .journal-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .bot-health-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 
