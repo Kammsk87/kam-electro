@@ -2,6 +2,7 @@ create table if not exists public.crypto_strategy_trades (
   id text primary key,
   client_id text,
   session_id text,
+  user_login text,
   asset text,
   timeframe text,
   side text,
@@ -18,6 +19,12 @@ create index if not exists crypto_strategy_trades_updated_at_idx
 
 create index if not exists crypto_strategy_trades_asset_timeframe_idx
   on public.crypto_strategy_trades (asset, timeframe, side);
+
+alter table public.crypto_strategy_trades
+  add column if not exists user_login text;
+
+create index if not exists crypto_strategy_trades_user_login_idx
+  on public.crypto_strategy_trades (user_login);
 
 alter table public.crypto_strategy_trades enable row level security;
 
