@@ -6267,7 +6267,7 @@ function renderTradeArchive() {
     const statusLabel = getPaperStatusLabel(trade);
     const sideClass = trade.side === "SHORT" ? "short" : "long";
     const sourceClass = trade.autopilot ? "auto" : "manual";
-    const profileLabel = autopilotProfiles[getTradeAutopilotProfileId(trade)]?.label || "";
+    const profileLabel = getTradeUserLogin(trade) === "server" ? "Сервер" : autopilotProfiles[getTradeAutopilotProfileId(trade)]?.label || "";
     const sourceLabel = trade.autopilot ? `АВТО${profileLabel ? ` · ${profileLabel}` : ""}` : "РУЧНОЙ";
     return `
       <tr>
