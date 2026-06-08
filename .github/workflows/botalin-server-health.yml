@@ -1,0 +1,20 @@
+name: Botalin Server Health
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/30 * * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check Botalin server health
+        run: node share/strategy-lab-7q4m2v/server-health.mjs --json

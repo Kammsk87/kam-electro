@@ -1,0 +1,10 @@
+[Unit]
+Description=Botalin server health check
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/botalin
+ExecStart=/usr/bin/node /opt/botalin/share/strategy-lab-7q4m2v/server-health.mjs
+Nice=5
