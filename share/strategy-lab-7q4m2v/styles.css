@@ -939,7 +939,8 @@ canvas {
 }
 
 .trade-journal,
-.trade-archive {
+.trade-archive,
+.instruction-panel {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   padding: 10px;
@@ -949,6 +950,77 @@ canvas {
 
 .trade-archive {
   margin-top: 8px;
+}
+
+.instruction-panel {
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.instruction-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding-top: 10px;
+}
+
+.instruction-grid details {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: rgba(32, 38, 44, 0.68);
+}
+
+.instruction-grid summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.instruction-grid ol,
+.instruction-grid ul,
+.instruction-grid dl,
+.instruction-grid p {
+  margin: 8px 0 0;
+  color: #d8dddf;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.instruction-grid ol,
+.instruction-grid ul {
+  padding-left: 18px;
+}
+
+.instruction-grid li {
+  margin-bottom: 5px;
+}
+
+.instruction-grid dl {
+  display: grid;
+  gap: 5px;
+}
+
+.instruction-grid dt {
+  color: var(--accent-2);
+  font-weight: 800;
+}
+
+.instruction-grid dd {
+  margin: -3px 0 5px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.instruction-grid code {
+  border: 1px solid rgba(85, 199, 162, 0.25);
+  border-radius: 6px;
+  padding: 1px 5px;
+  color: var(--accent);
+  background: rgba(85, 199, 162, 0.1);
+  font-size: 0.94em;
 }
 
 .journal-summary {
@@ -1585,8 +1657,30 @@ canvas {
   }
 
   .trade-journal,
-  .trade-archive {
+  .trade-archive,
+  .instruction-panel {
     padding: 7px;
+  }
+
+  .instruction-grid {
+    gap: 6px;
+    padding-top: 7px;
+  }
+
+  .instruction-grid details {
+    padding: 7px 8px;
+  }
+
+  .instruction-grid summary {
+    font-size: 12px;
+  }
+
+  .instruction-grid ol,
+  .instruction-grid ul,
+  .instruction-grid dl,
+  .instruction-grid p {
+    font-size: 11px;
+    line-height: 1.35;
   }
 
   .journal-summary {
@@ -1665,7 +1759,8 @@ canvas {
   .bot-control-grid,
   .bot-market-grid,
   .sim-grid,
-  .journal-summary {
+  .journal-summary,
+  .instruction-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 
@@ -1683,5 +1778,12 @@ canvas {
 
   .strategy-card {
     min-height: auto;
+  }
+}
+
+@media (max-width: 560px) {
+  .instruction-grid,
+  .journal-summary {
+    grid-template-columns: 1fr;
   }
 }
