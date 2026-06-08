@@ -205,22 +205,28 @@ async function main() {
 
 async function fetchRemoteRows() {
   const table = encodeURIComponent(tableName);
-  const [lightResult, activeResult] = await Promise.allSettled([
-    remoteFetch(`/${table}?select=id,user_login,asset,timeframe,side,status,pnl,opened_at,closed_at,updated_at,trade&order=updated_at.desc&limit=1200`),
-    remoteFetch(`/${table}?select=*&status=in.(pending,open,partial)&order=updated_at.desc&limit=300`)
+  const [lightResult, activeResult, serverFullResult] = await Promise.allSettled([
+    remoteFetch(`/${table}?select=id,user_login,asset,timeframe,side,status,pnl,opened_at,closed_at,updated_at&order=updated_at.desc&limit=1200`),
+    remoteFetch(`/${table}?select=*&status=in.(pending,open,partial)&order=updated_at.desc&limit=300`),
+    remoteFetch(`/${table}?select=*&user_login=eq.${encodeURIComponent(config.userLogin)}&order=updated_at.desc&limit=300`)
   ]);
   const lightRows = lightResult.status === "fulfilled" ? lightResult.value : [];
   const activeRows = activeResult.status === "fulfilled" ? activeResult.value : [];
-  if (!lightRows.length && !activeRows.length) {
-    throw new Error(`Supabase journal unavailable: ${lightResult.reason?.message || activeResult.reason?.message || "no rows"}`);
+  const serverFullRows = serverFullResult.status === "fulfilled" ? serverFullResult.value : [];
+  if (!lightRows.length && !activeRows.length && !serverFullRows.length) {
+    throw new Error(`Supabase journal unavailable: ${lightResult.reason?.message || activeResult.reason?.message || serverFullResult.reason?.message || "no rows"}`);
   }
   if (lightResult.status === "rejected") log(`light journal fallback: ${lightResult.reason?.message}`);
   if (activeResult.status === "rejected") log(`active journal fallback: ${activeResult.reason?.message}`);
+  if (serverFullResult.status === "rejected") log(`server strategy journal fallback: ${serverFullResult.reason?.message}`);
   const byId = new Map();
   (Array.isArray(lightRows) ? lightRows : []).forEach((row) => {
     byId.set(row.id, { ...row, trade: normalizeTradeRow(row) });
   });
   (Array.isArray(activeRows) ? activeRows : []).forEach((row) => {
+    byId.set(row.id, row);
+  });
+  (Array.isArray(serverFullRows) ? serverFullRows : []).forEach((row) => {
     byId.set(row.id, row);
   });
   return [...byId.values()];
