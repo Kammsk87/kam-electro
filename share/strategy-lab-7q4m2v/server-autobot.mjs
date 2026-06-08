@@ -52,6 +52,44 @@ const serverProfiles = {
 const activeProfileId = serverProfiles[requestedProfile] ? requestedProfile : "balanced";
 const activeProfile = serverProfiles[activeProfileId];
 
+const serverStrategies = {
+  trend: {
+    id: "trend",
+    label: "Тренд EMA34/89",
+    enabled: true,
+    kind: "trend",
+    strategyMode: "standard",
+    signalTemplate: "intraday",
+    timeframes: ["15m", "1h", "4h"],
+    minScoreOffset: 0,
+    maxEntriesPerRun: 1
+  },
+  pullback: {
+    id: "pullback",
+    label: "Откат к тренду",
+    enabled: true,
+    kind: "pullback",
+    strategyMode: "pullback",
+    signalTemplate: "swing",
+    timeframes: ["15m", "1h", "4h"],
+    minScoreOffset: 2,
+    maxEntriesPerRun: 1
+  },
+  scalping: {
+    id: "scalping",
+    label: "Скальпинг",
+    enabled: true,
+    kind: "scalping",
+    strategyMode: "scalping",
+    signalTemplate: "scalper",
+    timeframes: ["5m", "15m"],
+    minScoreOffset: 3,
+    maxEntriesPerRun: 1
+  }
+};
+
+const enabledStrategies = Object.values(serverStrategies).filter((strategy) => strategy.enabled);
+
 const config = {
   enabled: true,
   dryRun: process.argv.includes("--dry-run"),
@@ -75,6 +113,7 @@ const config = {
   minExpectedNetPct: activeProfile.minExpectedNetPct,
   minScalpingExpectedNetPct: activeProfile.minScalpingExpectedNetPct,
   blockedAssetMode: activeProfile.blockedAssetMode,
+  maxActivePerAsset: 2,
   assets: [
     "BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT", "TON/USDT",
     "ADA/USDT", "DOGE/USDT", "TRX/USDT", "AVAX/USDT", "LINK/USDT", "DOT/USDT",
@@ -126,7 +165,7 @@ async function main() {
   const learningPolicy = mergeLearningPolicies(remotePolicy, journalPolicy);
   const changedTrades = await updateActiveTrades(trades);
   const candidates = await scanCandidates(trades, learningPolicy);
-  const entryCandidates = candidates.filter((candidate) => candidate.score >= config.minScore).slice(0, config.maxEntriesPerRun);
+  const entryCandidates = selectEntryCandidates(candidates, trades);
   const best = entryCandidates[0] || candidates[0] || null;
   const newTrades = [];
 
@@ -152,21 +191,22 @@ async function main() {
       },
       sharedPolicy: summarizeLearningPolicy(learningPolicy),
       nextPolicy: summarizeLearningPolicy(nextPolicy),
+      strategies: summarizeStrategyStats([...trades, ...newTrades]),
       candidates: candidates.slice(0, 5).map(formatCandidateForLog),
-      plannedTrade: newTrades[0] || null
+      plannedTrades: newTrades
     }, null, 2));
     return;
   }
 
   if (toUpsert.length) await upsertTrades(toUpsert);
   await saveSharedLearningPolicy(nextPolicy).catch((error) => log(`shared learning save skipped: ${error.message}`));
-  log(`server-autobot done: profile ${config.profileId}, updated ${changedTrades.length}, new ${newTrades.length}, best ${best ? `${best.symbol} ${best.interval} ${best.side} ${best.score}` : "none"}`);
+  log(`server-autobot done: profile ${config.profileId}, strategies ${enabledStrategies.map((strategy) => strategy.id).join("/")}, updated ${changedTrades.length}, new ${newTrades.length}, best ${best ? `${best.symbol} ${best.interval} ${best.side} ${best.score}` : "none"}`);
 }
 
 async function fetchRemoteRows() {
   const table = encodeURIComponent(tableName);
   const [lightResult, activeResult] = await Promise.allSettled([
-    remoteFetch(`/${table}?select=id,user_login,asset,timeframe,side,status,pnl,opened_at,closed_at,updated_at&order=updated_at.desc&limit=1200`),
+    remoteFetch(`/${table}?select=id,user_login,asset,timeframe,side,status,pnl,opened_at,closed_at,updated_at,trade&order=updated_at.desc&limit=1200`),
     remoteFetch(`/${table}?select=*&status=in.(pending,open,partial)&order=updated_at.desc&limit=300`)
   ]);
   const lightRows = lightResult.status === "fulfilled" ? lightResult.value : [];
@@ -188,6 +228,7 @@ async function fetchRemoteRows() {
 
 function normalizeTradeRow(row) {
   return {
+    ...(row.trade && typeof row.trade === "object" ? row.trade : {}),
     id: row.id,
     userLogin: row.user_login || "legacy",
     asset: row.asset,
@@ -246,7 +287,7 @@ async function saveSharedLearningPolicy(policy) {
 
 async function remoteFetch(path, options = {}, attempt = 1) {
   try {
-    const response = await fetch(`${supabaseUrl}/rest/v1${path}`, {
+    const response = await fetchWithTimeout(`${supabaseUrl}/rest/v1${path}`, {
       ...options,
       headers: {
         apikey: supabaseKey,
@@ -254,7 +295,7 @@ async function remoteFetch(path, options = {}, attempt = 1) {
         "Content-Type": "application/json",
         ...(options.headers || {})
       }
-    });
+    }, 10_000);
     if (!response.ok) {
       const text = await response.text().catch(() => "");
       throw new Error(formatRemoteError(response.status, text || response.statusText));
@@ -342,35 +383,85 @@ function applyTradeCandle(trade, candle) {
 }
 
 async function scanCandidates(trades, learningPolicy) {
-  const results = [];
-  const activeKeys = new Set(trades.filter(isActiveTrade).map((trade) => `${trade.asset}|${trade.timeframe}|${trade.side}`));
-  const activeAssets = new Set(trades.filter(isActiveTrade).map((trade) => trade.asset));
+  const activeKeys = new Set(trades.filter(isActiveTrade).map((trade) => getTradeStrategyExposureKey(trade)));
+  const activeAssetCounts = countActiveAssets(trades);
   const dailyRisk = getDailyRisk(trades);
   if (dailyRisk.blocked) return [];
 
+  const strategiesByInterval = groupStrategiesByInterval(enabledStrategies);
+  const scanTasks = [];
   for (const symbol of config.assets) {
-    if (activeAssets.has(symbol)) continue;
-    for (const interval of config.timeframes) {
-      const candles = await fetchCandles(symbol, interval, 220).catch(() => []);
-      if (candles.length < 90) continue;
-      const candidate = evaluateCandidate(symbol, interval, candles, false, trades, learningPolicy);
-      if (candidate && !activeKeys.has(`${symbol}|${interval}|${candidate.side}`)) results.push(candidate);
-    }
-    for (const interval of config.scalpingTimeframes) {
-      const candles = await fetchCandles(symbol, interval, 160).catch(() => []);
-      if (candles.length < 60) continue;
-      const candidate = evaluateCandidate(symbol, interval, candles, true, trades, learningPolicy);
-      if (candidate && !activeKeys.has(`${symbol}|${interval}|${candidate.side}`)) results.push(candidate);
+    if ((activeAssetCounts.get(symbol) || 0) >= config.maxActivePerAsset) continue;
+    for (const [interval, strategies] of strategiesByInterval.entries()) {
+      scanTasks.push({ symbol, interval, strategies });
     }
   }
 
+  const groups = await mapLimit(scanTasks, 6, async ({ symbol, interval, strategies }) => {
+    const needsStandardHistory = strategies.some((strategy) => strategy.kind !== "scalping");
+    const candles = await fetchCandles(symbol, interval, needsStandardHistory ? 220 : 160).catch(() => []);
+    if (candles.length < (needsStandardHistory ? 90 : 60)) return [];
+    return strategies
+      .filter((strategy) => candles.length >= (strategy.kind === "scalping" ? 60 : 90))
+      .map((strategy) => evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy))
+      .filter((candidate) => candidate && !activeKeys.has(getCandidateStrategyExposureKey(candidate)));
+  });
+
+  const results = groups.flat();
   return results
     .filter((candidate) => !hasRecentDuplicate(trades, candidate))
     .sort((a, b) => b.score - a.score)
-    .slice(0, 12);
+    .slice(0, 24);
 }
 
-function evaluateCandidate(symbol, interval, candles, scalping, trades, learningPolicy) {
+function groupStrategiesByInterval(strategies) {
+  const byInterval = new Map();
+  strategies.forEach((strategy) => {
+    strategy.timeframes.forEach((interval) => {
+      if (!byInterval.has(interval)) byInterval.set(interval, []);
+      byInterval.get(interval).push(strategy);
+    });
+  });
+  return byInterval;
+}
+
+async function mapLimit(items, limit, iteratee) {
+  const results = [];
+  let index = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (index < items.length) {
+      const current = index;
+      index += 1;
+      results[current] = await iteratee(items[current], current);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
+function selectEntryCandidates(candidates, trades) {
+  const selected = [];
+  const strategyCounts = new Map();
+  const activeAssetCounts = countActiveAssets(trades);
+
+  for (const candidate of candidates) {
+    const strategy = serverStrategies[candidate.strategyId] || serverStrategies.trend;
+    const minScore = getStrategyMinScore(strategy);
+    if (candidate.score < minScore) continue;
+    if ((strategyCounts.get(strategy.id) || 0) >= strategy.maxEntriesPerRun) continue;
+    if ((activeAssetCounts.get(candidate.symbol) || 0) >= config.maxActivePerAsset) continue;
+
+    selected.push(candidate);
+    strategyCounts.set(strategy.id, (strategyCounts.get(strategy.id) || 0) + 1);
+    activeAssetCounts.set(candidate.symbol, (activeAssetCounts.get(candidate.symbol) || 0) + 1);
+    if (selected.length >= config.maxEntriesPerRun) break;
+  }
+
+  return selected;
+}
+
+function evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy) {
+  const scalping = strategy.kind === "scalping";
   const closes = candles.map((candle) => candle.close);
   const last = candles[candles.length - 1];
   const prev = candles[candles.length - 2];
@@ -391,7 +482,7 @@ function evaluateCandidate(symbol, interval, candles, scalping, trades, learning
   const avgVolume = average(candles.slice(-30, -1).map((candle) => candle.volume));
   const volumeRatio = avgVolume > 0 ? last.volume / avgVolume : 1;
   const impulsePct = prev.close > 0 ? ((last.close - prev.close) / prev.close) * 100 : 0;
-  const history = getPatternStats(trades, symbol, interval, trend);
+  const history = getPatternStats(trades, symbol, interval, trend, strategy.id);
   const crash = detectCrash(candles);
 
   if (crash.severe || trend === "NEUTRAL" || atrPct > 4.5 || atrPct < 0.18) return null;
@@ -399,7 +490,7 @@ function evaluateCandidate(symbol, interval, candles, scalping, trades, learning
   if (volumeRatio < (scalping ? config.minScalpingVolumeRatio : config.minVolumeRatio)) return null;
 
   const side = trend;
-  const patternKey = getLearningPatternKey(symbol, interval, side);
+  const patternKey = getLearningPatternKey(symbol, interval, side, strategy.id);
   if (isAssetBlockedByPolicy(symbol, learningPolicy) || learningPolicy?.blockedPatterns?.includes(patternKey)) return null;
   let score = 45;
   score += side === "LONG" ? Math.max(-10, Math.min(14, slopePct * 8)) : Math.max(-10, Math.min(14, -slopePct * 8));
@@ -410,6 +501,11 @@ function evaluateCandidate(symbol, interval, candles, scalping, trades, learning
   if (atrPct >= 0.25 && atrPct <= 1.8) score += 10;
   if (Math.abs(impulsePct) > 3.2) score -= 12;
   if (interval === "5m" || interval === "15m") score += 3;
+  if (strategy.kind === "pullback") {
+    const pullback = evaluatePullback(closes, candles, side, rsi, atrPct, volumeRatio);
+    if (!pullback.ok) return null;
+    score += pullback.scoreBoost;
+  }
   if (scalping) {
     const scalp = evaluateScalp(closes, candles, side, rsi, atrPct, volumeRatio);
     if (!scalp.ok) return null;
@@ -418,9 +514,9 @@ function evaluateCandidate(symbol, interval, candles, scalping, trades, learning
   if (history.trades >= 3) score += history.winRate >= 60 && history.avgPnlPct > 0 ? 10 : -18;
 
   const riskDistance = last.close * Math.max(scalping ? 0.0015 : 0.0035, Math.min(scalping ? 0.005 : 0.025, atrPct / 100 * (scalping ? 0.58 : 0.75)));
-  const rr1 = scalping ? 0.55 : 1.6;
-  const rr2 = scalping ? 0.9 : 2.2;
-  const entry = side === "LONG" ? last.close * 1.0003 : last.close * 0.9997;
+  const rr1 = scalping ? 0.55 : strategy.kind === "pullback" ? 1.35 : 1.6;
+  const rr2 = scalping ? 0.9 : strategy.kind === "pullback" ? 2 : 2.2;
+  const entry = getStrategyEntryPrice(last.close, side, strategy.kind);
   const scenario = side === "LONG"
     ? {
         side,
@@ -447,6 +543,11 @@ function evaluateCandidate(symbol, interval, candles, scalping, trades, learning
     side,
     score: Math.round(Math.max(0, Math.min(100, score))),
     scalping,
+    strategyId: strategy.id,
+    strategyLabel: strategy.label,
+    strategyKind: strategy.kind,
+    strategyMode: strategy.strategyMode,
+    signalTemplate: strategy.signalTemplate,
     price: last.close,
     rsi,
     atrPct,
@@ -457,8 +558,29 @@ function evaluateCandidate(symbol, interval, candles, scalping, trades, learning
     scenario,
     expected,
     patternKey,
-    reason: `${scalping ? "SCALP " : ""}EMA34/89 ${side}, RSI ${rsi.toFixed(1)}, volume x${volumeRatio.toFixed(2)}, ATR ${atrPct.toFixed(2)}%, чистая цель ${expected.weightedNetPct.toFixed(2)}%`
+    reason: `${strategy.label}: EMA34/89 ${side}, RSI ${rsi.toFixed(1)}, volume x${volumeRatio.toFixed(2)}, ATR ${atrPct.toFixed(2)}%, чистая цель ${expected.weightedNetPct.toFixed(2)}%`
   };
+}
+
+function evaluatePullback(closes, candles, side, rsi, atrPct, volumeRatio) {
+  const i = closes.length - 1;
+  const last = candles[i];
+  const ema21 = calculateEma(closes, 21);
+  const ema34 = calculateEma(closes, 34);
+  const distanceToEmaPct = ema34[i] > 0 ? Math.abs((last.close - ema34[i]) / ema34[i]) * 100 : 999;
+  const isNearTrend = distanceToEmaPct <= Math.max(0.35, atrPct * 1.1);
+  const longOk = side === "LONG" && closes[i] >= ema34[i] && closes[i] <= ema21[i] * 1.012 && rsi >= 42 && rsi <= 58;
+  const shortOk = side === "SHORT" && closes[i] <= ema34[i] && closes[i] >= ema21[i] * 0.988 && rsi >= 42 && rsi <= 58;
+  if (!isNearTrend || !(longOk || shortOk) || volumeRatio < config.minVolumeRatio) return { ok: false, scoreBoost: 0 };
+  let scoreBoost = 8;
+  if (distanceToEmaPct <= atrPct * 0.7) scoreBoost += 5;
+  if (volumeRatio >= 1.05) scoreBoost += 4;
+  return { ok: true, scoreBoost };
+}
+
+function getStrategyEntryPrice(price, side, kind) {
+  if (kind === "pullback") return side === "LONG" ? price * 0.9985 : price * 1.0015;
+  return side === "LONG" ? price * 1.0003 : price * 0.9997;
 }
 
 function evaluateScalp(closes, candles, side, rsi, atrPct, volumeRatio) {
@@ -518,7 +640,7 @@ function buildServerTrade(candidate, trades) {
     sessionId: "server-autobot",
     asset: candidate.symbol,
     timeframe: candidate.interval,
-    mode: candidate.scalping ? "scalping" : "trend",
+    mode: candidate.strategyKind === "pullback" ? "pullback" : candidate.scalping ? "scalping" : "trend",
     modeSource: "server-auto",
     side: candidate.side,
     amount,
@@ -532,10 +654,12 @@ function buildServerTrade(candidate, trades) {
     riskLimitPct: config.maxTradePct,
     autopilot: true,
     autopilotProfile: config.profileId,
-    strategyMode: candidate.scalping ? "scalping" : "standard",
-    signalTemplate: candidate.scalping ? "scalper" : "intraday",
-    botPreset: "server",
-    autopilotReason: `server-autobot ${config.profileLabel}: ${candidate.reason}, score ${candidate.score}/100`,
+    serverStrategyId: candidate.strategyId,
+    serverStrategyLabel: candidate.strategyLabel,
+    strategyMode: candidate.strategyMode,
+    signalTemplate: candidate.signalTemplate,
+    botPreset: `server-${candidate.strategyId}`,
+    autopilotReason: `server-autobot ${config.profileLabel}/${candidate.strategyLabel}: ${candidate.reason}, score ${candidate.score}/100`,
     entry: scenario.entry,
     quantity,
     initialQuantity: quantity,
@@ -548,7 +672,7 @@ function buildServerTrade(candidate, trades) {
     target1HitAt: null,
     target1ExitPrice: null,
     placedPrice: scenario.entry,
-    triggerDirection: candidate.side === "LONG" ? "above" : "below",
+    triggerDirection: getTriggerDirection(candidate),
     executionType: candidate.scalping ? "marketable" : "conditional",
     immediateFill: candidate.scalping,
     openedAt: now,
@@ -572,14 +696,16 @@ function buildStrategySnapshot(candidate, amount) {
   return {
     version: "server-1",
     capturedAt: Date.now(),
-    strategyText: `Server-autobot ${config.profileLabel} выбрал ${candidate.side} ${candidate.symbol} ${candidate.interval}: ${candidate.reason}.`,
+    strategyText: `Server-autobot ${config.profileLabel}/${candidate.strategyLabel} выбрал ${candidate.side} ${candidate.symbol} ${candidate.interval}: ${candidate.reason}.`,
     userIdea: "Автономная демо-торговля без открытого браузера",
     context: {
       asset: candidate.symbol,
       timeframe: candidate.interval,
-      mode: candidate.scalping ? "scalping" : "trend",
+      mode: candidate.strategyKind === "pullback" ? "pullback" : candidate.scalping ? "scalping" : "trend",
       modeSource: "server-auto",
-      strategyMode: candidate.scalping ? "scalping" : "standard",
+      strategyMode: candidate.strategyMode,
+      serverStrategyId: candidate.strategyId,
+      serverStrategyLabel: candidate.strategyLabel,
       risk: config.maxTradePct,
       conservative: true,
       includeLongs: true,
@@ -622,21 +748,25 @@ function buildStrategySnapshot(candidate, amount) {
       autopilot: true,
       reason: candidate.reason,
       userLogin: config.userLogin,
-      signalTemplate: candidate.scalping ? "scalper" : "intraday",
-      botPreset: "server",
-      profileChoice: "server",
+      signalTemplate: candidate.signalTemplate,
+      botPreset: `server-${candidate.strategyId}`,
+      profileChoice: `server-${candidate.strategyId}`,
       profileId: config.profileId,
       profileLabel: `Серверный автобот: ${config.profileLabel}`,
+      serverStrategyId: candidate.strategyId,
+      serverStrategyLabel: candidate.strategyLabel,
       minScore: config.minScore,
+      strategyMinScore: getStrategyMinScore(serverStrategies[candidate.strategyId] || serverStrategies.trend),
       feePct: config.feePct,
       slippagePct: config.slippagePct,
       amount
     },
-    qualityPatternKey: candidate.patternKey || getLearningPatternKey(candidate.symbol, candidate.interval, candidate.side),
+      qualityPatternKey: candidate.patternKey || getLearningPatternKey(candidate.symbol, candidate.interval, candidate.side, candidate.strategyId),
     rules: [
       "EMA34/89 должна подтверждать направление",
       "RSI должен быть в рабочей зоне выбранной стороны",
       "ATR и объем должны быть в умеренном диапазоне",
+      `Серверная стратегия: ${candidate.strategyLabel}`,
       "Чистая ожидаемая прибыль после комиссии и проскальзывания должна быть положительной",
       "LONG блокируется при risk-off/crash режиме",
       "Размер позиции ограничен бюджетом сервера"
@@ -653,7 +783,7 @@ async function fetchCandles(symbol, interval, limit = 220, start = null) {
     limit: String(limit)
   });
   if (start) params.set("start", String(start));
-  const response = await fetch(`https://api.bybit.com/v5/market/kline?${params.toString()}`);
+  const response = await fetchWithTimeout(`https://api.bybit.com/v5/market/kline?${params.toString()}`, {}, 7_000);
   if (!response.ok) throw new Error(`Bybit ${response.status}`);
   const data = await response.json();
   if (data.retCode !== 0 || !Array.isArray(data.result?.list)) throw new Error(data.retMsg || "Bybit kline failed");
@@ -763,6 +893,35 @@ function getWalletState(trades) {
   return { equity, reserved, free: Math.max(0, equity - reserved) };
 }
 
+function getStrategyMinScore(strategy) {
+  return config.minScore + (Number(strategy?.minScoreOffset) || 0);
+}
+
+function getTriggerDirection(candidate) {
+  if (candidate.strategyKind === "pullback") return candidate.side === "LONG" ? "below" : "above";
+  return candidate.side === "LONG" ? "above" : "below";
+}
+
+function countActiveAssets(trades) {
+  const counts = new Map();
+  trades.filter(isActiveTrade).forEach((trade) => {
+    counts.set(trade.asset, (counts.get(trade.asset) || 0) + 1);
+  });
+  return counts;
+}
+
+function getTradeStrategyId(trade) {
+  return trade.serverStrategyId || trade.strategySnapshot?.execution?.serverStrategyId || trade.strategyMode || "legacy";
+}
+
+function getTradeStrategyExposureKey(trade) {
+  return `${trade.asset}|${trade.timeframe}|${trade.side}|${getTradeStrategyId(trade)}`;
+}
+
+function getCandidateStrategyExposureKey(candidate) {
+  return `${candidate.symbol}|${candidate.interval}|${candidate.side}|${candidate.strategyId}`;
+}
+
 function getDailyRisk(trades) {
   const dayStart = new Date();
   dayStart.setHours(0, 0, 0, 0);
@@ -774,10 +933,10 @@ function getDailyRisk(trades) {
   return { pnl, lossPct, stops, blocked: lossPct >= 3 || stops >= 3 };
 }
 
-function getPatternStats(trades, symbol, interval, side) {
+function getPatternStats(trades, symbol, interval, side, strategyId = "legacy") {
   const closed = trades.filter((trade) => {
     if (isActiveTrade(trade) || trade.status === "cancelled") return false;
-    return trade.asset === symbol && trade.timeframe === interval && trade.side === side;
+    return trade.asset === symbol && trade.timeframe === interval && trade.side === side && getTradeStrategyId(trade) === strategyId;
   });
   const wins = closed.filter((trade) => Number(trade.pnl) > 0).length;
   const avgPnlPct = closed.length ? average(closed.map((trade) => Number(trade.pnlPct) || 0)) : 0;
@@ -796,7 +955,8 @@ function isAssetBlockedByPolicy(symbol, learningPolicy) {
 function createLearningPolicyFromTrades(trades) {
   const closed = trades.filter((trade) => !isActiveTrade(trade) && trade.status !== "cancelled");
   const assetStats = buildGroupStats(closed, (trade) => trade.asset);
-  const patternStats = buildGroupStats(closed, (trade) => getLearningPatternKey(trade.asset, trade.timeframe, trade.side));
+  const patternStats = buildGroupStats(closed, (trade) => getLearningPatternKey(trade.asset, trade.timeframe, trade.side, getTradeStrategyId(trade)));
+  const strategyStats = buildGroupStats(closed.filter((trade) => trade.autopilot || trade.userLogin === config.userLogin), getTradeStrategyId);
   const blockedAssets = Object.values(assetStats)
     .filter((item) => item.trades >= 8 && item.winRate < 35 && item.avgPnl <= -2)
     .map((item) => item.key);
@@ -820,7 +980,8 @@ function createLearningPolicyFromTrades(trades) {
       `Server-самоанализ: ${closed.length} закрытых сделок.`,
       `Блок монет: ${blockedAssets.length}.`,
       `Блок связок: ${blockedPatterns.length}.`,
-      `Приоритет связок: ${preferredPatterns.length}.`
+      `Приоритет связок: ${preferredPatterns.length}.`,
+      formatBestStrategyNote(strategyStats)
     ]
   });
 }
@@ -881,8 +1042,35 @@ function summarizeLearningPolicy(policy) {
   };
 }
 
-function getLearningPatternKey(symbol, interval, side) {
-  return `${symbol || "unknown"}|${interval || "unknown"}|${side || "unknown"}`;
+function summarizeStrategyStats(trades) {
+  const closed = trades.filter((trade) => !isActiveTrade(trade) && trade.status !== "cancelled" && (trade.autopilot || trade.userLogin === config.userLogin));
+  const stats = buildGroupStats(closed, getTradeStrategyId);
+  return enabledStrategies.map((strategy) => {
+    const item = stats[strategy.id] || { trades: 0, wins: 0, pnl: 0, avgPnl: 0, winRate: 0 };
+    return {
+      id: strategy.id,
+      label: strategy.label,
+      minScore: getStrategyMinScore(strategy),
+      closedTrades: item.trades,
+      winRate: Math.round(item.winRate || 0),
+      avgPnl: Number(item.avgPnl || 0).toFixed(2),
+      pnl: Number(item.pnl || 0).toFixed(2)
+    };
+  });
+}
+
+function formatBestStrategyNote(strategyStats) {
+  const ranked = Object.values(strategyStats)
+    .filter((item) => item.trades >= 5)
+    .sort((a, b) => (b.winRate - a.winRate) || (b.avgPnl - a.avgPnl));
+  if (!ranked.length) return "Стратегии сервера еще тестируются параллельно: нужно минимум 5 закрытых сделок на стратегию.";
+  const best = ranked[0];
+  const label = serverStrategies[best.key]?.label || best.key;
+  return `Лучшая серверная стратегия сейчас: ${label}, ${best.trades} сделок, winrate ${best.winRate.toFixed(0)}%, avg ${best.avgPnl.toFixed(2)} USDT.`;
+}
+
+function getLearningPatternKey(symbol, interval, side, strategyId = "legacy") {
+  return `${symbol || "unknown"}|${interval || "unknown"}|${side || "unknown"}|${strategyId || "legacy"}`;
 }
 
 function getDateKey(date = new Date()) {
@@ -914,6 +1102,7 @@ function hasRecentDuplicate(trades, candidate) {
   const now = Date.now();
   return trades.some((trade) => {
     if (!trade.autopilot || trade.asset !== candidate.symbol || trade.timeframe !== candidate.interval || trade.side !== candidate.side) return false;
+    if (getTradeStrategyId(trade) !== candidate.strategyId) return false;
     const openedAt = Number(trade.openedAt) || 0;
     return openedAt > 0 && now - openedAt < config.duplicateCooldownMs;
   });
@@ -1021,6 +1210,9 @@ function toIsoOrNull(timestamp) {
 
 function formatCandidateForLog(candidate) {
   return {
+    strategy: candidate.strategyId,
+    strategyLabel: candidate.strategyLabel,
+    minScore: getStrategyMinScore(serverStrategies[candidate.strategyId] || serverStrategies.trend),
     symbol: candidate.symbol,
     interval: candidate.interval,
     side: candidate.side,
@@ -1037,6 +1229,16 @@ function log(message) {
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = 10_000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function formatRemoteError(status, text) {

@@ -6305,7 +6305,7 @@ function renderTradeArchive() {
     const statusLabel = getPaperStatusLabel(trade);
     const sideClass = trade.side === "SHORT" ? "short" : "long";
     const sourceClass = trade.autopilot ? "auto" : "manual";
-    const profileLabel = getTradeUserLogin(trade) === "server" ? "Сервер" : autopilotProfiles[getTradeAutopilotProfileId(trade)]?.label || "";
+    const profileLabel = getTradeUserLogin(trade) === "server" ? `Сервер · ${getServerStrategyLabel(trade)}` : autopilotProfiles[getTradeAutopilotProfileId(trade)]?.label || "";
     const sourceLabel = trade.autopilot ? `АВТО${profileLabel ? ` · ${profileLabel}` : ""}` : "РУЧНОЙ";
     return `
       <tr>
@@ -6347,6 +6347,16 @@ function getTradeUserLogin(trade) {
   return String(trade.userLogin || trade.authUser || trade.strategySnapshot?.execution?.userLogin || "legacy");
 }
 
+function getServerStrategyLabel(trade) {
+  return String(
+    trade.serverStrategyLabel ||
+    trade.strategySnapshot?.execution?.serverStrategyLabel ||
+    trade.strategySnapshot?.context?.serverStrategyLabel ||
+    trade.strategyMode ||
+    "стратегия"
+  );
+}
+
 function getTradeSortTime(trade) {
   return Number(trade.closedAt || trade.updatedAt || trade.openedAt) || 0;
 }
@@ -6385,6 +6395,7 @@ function exportJournalToExcel() {
     "Риск лимит %": trade.riskLimitPct || "",
     "Авто-бот": trade.autopilot ? "да" : "нет",
     "Профиль автобота": trade.autopilot ? autopilotProfiles[getTradeAutopilotProfileId(trade)]?.label || "" : "",
+    "Серверная стратегия": getTradeUserLogin(trade) === "server" ? getServerStrategyLabel(trade) : "",
     "Сигнальная стратегия": signalTemplates[trade.signalTemplate || trade.strategySnapshot?.execution?.signalTemplate]?.label || "",
     "Пресет бота": botPresetProfiles[trade.botPreset || trade.strategySnapshot?.execution?.botPreset]?.label || "",
     "Сетка включена": trade.gridPlan?.enabled || trade.strategySnapshot?.execution?.grid?.enabled ? "да" : "нет",
