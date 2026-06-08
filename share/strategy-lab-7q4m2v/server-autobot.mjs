@@ -5,27 +5,76 @@ const supabaseKey = "sb_publishable_BYYOhjwhgjZBP27Yw7YkVg_CEhF6ugc";
 const tableName = "crypto_strategy_trades";
 const settingsTableName = "crypto_strategy_settings";
 const learningPolicyKey = "botalin_learning_policy_v1";
+const requestedProfile = getArgValue("--profile") || process.env.BOTALIN_SERVER_PROFILE || "balanced";
+
+const serverProfiles = {
+  protective: {
+    label: "Осторожный",
+    minScore: 78,
+    maxTradePct: 3,
+    maxPortfolioPct: 18,
+    maxEntriesPerRun: 1,
+    duplicateCooldownMs: 120 * 60 * 1000,
+    minVolumeRatio: 0.95,
+    minScalpingVolumeRatio: 1.45,
+    minExpectedNetPct: 0.25,
+    minScalpingExpectedNetPct: 0.16,
+    blockedAssetMode: "strict"
+  },
+  balanced: {
+    label: "Баланс",
+    minScore: 72,
+    maxTradePct: 3,
+    maxPortfolioPct: 24,
+    maxEntriesPerRun: 2,
+    duplicateCooldownMs: 45 * 60 * 1000,
+    minVolumeRatio: 0.75,
+    minScalpingVolumeRatio: 1.15,
+    minExpectedNetPct: 0.14,
+    minScalpingExpectedNetPct: 0.1,
+    blockedAssetMode: "hard-only"
+  },
+  active: {
+    label: "Активный",
+    minScore: 68,
+    maxTradePct: 2,
+    maxPortfolioPct: 30,
+    maxEntriesPerRun: 3,
+    duplicateCooldownMs: 25 * 60 * 1000,
+    minVolumeRatio: 0.65,
+    minScalpingVolumeRatio: 1.05,
+    minExpectedNetPct: 0.1,
+    minScalpingExpectedNetPct: 0.08,
+    blockedAssetMode: "hard-only"
+  }
+};
+
+const activeProfileId = serverProfiles[requestedProfile] ? requestedProfile : "balanced";
+const activeProfile = serverProfiles[activeProfileId];
 
 const config = {
   enabled: true,
   dryRun: process.argv.includes("--dry-run"),
   once: process.argv.includes("--once") || process.argv.includes("--dry-run"),
   userLogin: "server",
+  profileId: activeProfileId,
+  profileLabel: activeProfile.label,
   depositUsdt: 10000,
-  maxTradePct: 5,
-  maxPortfolioPct: 30,
-  minScore: 78,
+  maxTradePct: activeProfile.maxTradePct,
+  maxPortfolioPct: activeProfile.maxPortfolioPct,
+  minScore: activeProfile.minScore,
   minNotionalUsdt: 10,
-  maxEntriesPerRun: 1,
-  duplicateCooldownMs: 90 * 60 * 1000,
+  maxEntriesPerRun: activeProfile.maxEntriesPerRun,
+  duplicateCooldownMs: activeProfile.duplicateCooldownMs,
   pendingTtlMs: 30 * 60 * 1000,
   scalpingTtlMs: 6 * 60 * 1000,
   feePct: 0.1,
   slippagePct: 0.03,
-  minVolumeRatio: 0.85,
-  minScalpingVolumeRatio: 1.25,
-  minExpectedNetPct: 0.18,
-  minScalpingExpectedNetPct: 0.12,
+  minVolumeRatio: activeProfile.minVolumeRatio,
+  minScalpingVolumeRatio: activeProfile.minScalpingVolumeRatio,
+  minExpectedNetPct: activeProfile.minExpectedNetPct,
+  minScalpingExpectedNetPct: activeProfile.minScalpingExpectedNetPct,
+  blockedAssetMode: activeProfile.blockedAssetMode,
   assets: [
     "BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT", "TON/USDT",
     "ADA/USDT", "DOGE/USDT", "TRX/USDT", "AVAX/USDT", "LINK/USDT", "DOT/USDT",
@@ -77,11 +126,12 @@ async function main() {
   const learningPolicy = mergeLearningPolicies(remotePolicy, journalPolicy);
   const changedTrades = await updateActiveTrades(trades);
   const candidates = await scanCandidates(trades, learningPolicy);
-  const best = candidates[0] || null;
+  const entryCandidates = candidates.filter((candidate) => candidate.score >= config.minScore).slice(0, config.maxEntriesPerRun);
+  const best = entryCandidates[0] || candidates[0] || null;
   const newTrades = [];
 
-  if (best && best.score >= config.minScore) {
-    const trade = buildServerTrade(best, trades);
+  for (const candidate of entryCandidates) {
+    const trade = buildServerTrade(candidate, [...trades, ...newTrades]);
     if (trade) newTrades.push(trade);
   }
 
@@ -91,6 +141,15 @@ async function main() {
     log(JSON.stringify({
       mode: "dry-run",
       activeUpdated: changedTrades.length,
+      profile: `${config.profileLabel} (${config.profileId})`,
+      limits: {
+        minScore: config.minScore,
+        maxTradePct: config.maxTradePct,
+        maxPortfolioPct: config.maxPortfolioPct,
+        maxEntriesPerRun: config.maxEntriesPerRun,
+        minVolumeRatio: config.minVolumeRatio,
+        minExpectedNetPct: config.minExpectedNetPct
+      },
       sharedPolicy: summarizeLearningPolicy(learningPolicy),
       nextPolicy: summarizeLearningPolicy(nextPolicy),
       candidates: candidates.slice(0, 5).map(formatCandidateForLog),
@@ -101,15 +160,22 @@ async function main() {
 
   if (toUpsert.length) await upsertTrades(toUpsert);
   await saveSharedLearningPolicy(nextPolicy).catch((error) => log(`shared learning save skipped: ${error.message}`));
-  log(`server-autobot done: updated ${changedTrades.length}, new ${newTrades.length}, best ${best ? `${best.symbol} ${best.interval} ${best.side} ${best.score}` : "none"}`);
+  log(`server-autobot done: profile ${config.profileId}, updated ${changedTrades.length}, new ${newTrades.length}, best ${best ? `${best.symbol} ${best.interval} ${best.side} ${best.score}` : "none"}`);
 }
 
 async function fetchRemoteRows() {
   const table = encodeURIComponent(tableName);
-  const [lightRows, activeRows] = await Promise.all([
+  const [lightResult, activeResult] = await Promise.allSettled([
     remoteFetch(`/${table}?select=id,user_login,asset,timeframe,side,status,pnl,opened_at,closed_at,updated_at&order=updated_at.desc&limit=1200`),
     remoteFetch(`/${table}?select=*&status=in.(pending,open,partial)&order=updated_at.desc&limit=300`)
   ]);
+  const lightRows = lightResult.status === "fulfilled" ? lightResult.value : [];
+  const activeRows = activeResult.status === "fulfilled" ? activeResult.value : [];
+  if (!lightRows.length && !activeRows.length) {
+    throw new Error(`Supabase journal unavailable: ${lightResult.reason?.message || activeResult.reason?.message || "no rows"}`);
+  }
+  if (lightResult.status === "rejected") log(`light journal fallback: ${lightResult.reason?.message}`);
+  if (activeResult.status === "rejected") log(`active journal fallback: ${activeResult.reason?.message}`);
   const byId = new Map();
   (Array.isArray(lightRows) ? lightRows : []).forEach((row) => {
     byId.set(row.id, { ...row, trade: normalizeTradeRow(row) });
@@ -178,23 +244,29 @@ async function saveSharedLearningPolicy(policy) {
   });
 }
 
-async function remoteFetch(path, options = {}) {
-  const response = await fetch(`${supabaseUrl}/rest/v1${path}`, {
-    ...options,
-    headers: {
-      apikey: supabaseKey,
-      Authorization: `Bearer ${supabaseKey}`,
-      "Content-Type": "application/json",
-      ...(options.headers || {})
+async function remoteFetch(path, options = {}, attempt = 1) {
+  try {
+    const response = await fetch(`${supabaseUrl}/rest/v1${path}`, {
+      ...options,
+      headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+        ...(options.headers || {})
+      }
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      throw new Error(formatRemoteError(response.status, text || response.statusText));
     }
-  });
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(`${response.status} ${text || response.statusText}`);
+    if (response.status === 204) return null;
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
+  } catch (error) {
+    if (attempt >= 3) throw error;
+    await wait(800 * attempt);
+    return remoteFetch(path, options, attempt + 1);
   }
-  if (response.status === 204) return null;
-  const text = await response.text();
-  return text ? JSON.parse(text) : null;
 }
 
 async function updateActiveTrades(trades) {
@@ -328,7 +400,7 @@ function evaluateCandidate(symbol, interval, candles, scalping, trades, learning
 
   const side = trend;
   const patternKey = getLearningPatternKey(symbol, interval, side);
-  if (learningPolicy?.blockedAssets?.includes(symbol) || learningPolicy?.blockedPatterns?.includes(patternKey)) return null;
+  if (isAssetBlockedByPolicy(symbol, learningPolicy) || learningPolicy?.blockedPatterns?.includes(patternKey)) return null;
   let score = 45;
   score += side === "LONG" ? Math.max(-10, Math.min(14, slopePct * 8)) : Math.max(-10, Math.min(14, -slopePct * 8));
   if (side === "LONG" && rsi >= 48 && rsi <= 66) score += 15;
@@ -459,11 +531,11 @@ function buildServerTrade(candidate, trades) {
     riskBudget: amount,
     riskLimitPct: config.maxTradePct,
     autopilot: true,
-    autopilotProfile: "server",
+    autopilotProfile: config.profileId,
     strategyMode: candidate.scalping ? "scalping" : "standard",
     signalTemplate: candidate.scalping ? "scalper" : "intraday",
     botPreset: "server",
-    autopilotReason: `server-autobot: ${candidate.reason}, score ${candidate.score}/100`,
+    autopilotReason: `server-autobot ${config.profileLabel}: ${candidate.reason}, score ${candidate.score}/100`,
     entry: scenario.entry,
     quantity,
     initialQuantity: quantity,
@@ -500,7 +572,7 @@ function buildStrategySnapshot(candidate, amount) {
   return {
     version: "server-1",
     capturedAt: Date.now(),
-    strategyText: `Server-autobot выбрал ${candidate.side} ${candidate.symbol} ${candidate.interval}: ${candidate.reason}.`,
+    strategyText: `Server-autobot ${config.profileLabel} выбрал ${candidate.side} ${candidate.symbol} ${candidate.interval}: ${candidate.reason}.`,
     userIdea: "Автономная демо-торговля без открытого браузера",
     context: {
       asset: candidate.symbol,
@@ -553,8 +625,8 @@ function buildStrategySnapshot(candidate, amount) {
       signalTemplate: candidate.scalping ? "scalper" : "intraday",
       botPreset: "server",
       profileChoice: "server",
-      profileId: "server",
-      profileLabel: "Серверный автобот",
+      profileId: config.profileId,
+      profileLabel: `Серверный автобот: ${config.profileLabel}`,
       minScore: config.minScore,
       feePct: config.feePct,
       slippagePct: config.slippagePct,
@@ -716,13 +788,19 @@ function getPatternStats(trades, symbol, interval, side) {
   };
 }
 
+function isAssetBlockedByPolicy(symbol, learningPolicy) {
+  if (!learningPolicy?.blockedAssets?.includes(symbol)) return false;
+  return config.blockedAssetMode === "strict" || learningPolicy.hardBlockedAssets?.includes(symbol);
+}
+
 function createLearningPolicyFromTrades(trades) {
   const closed = trades.filter((trade) => !isActiveTrade(trade) && trade.status !== "cancelled");
   const assetStats = buildGroupStats(closed, (trade) => trade.asset);
   const patternStats = buildGroupStats(closed, (trade) => getLearningPatternKey(trade.asset, trade.timeframe, trade.side));
   const blockedAssets = Object.values(assetStats)
-    .filter((item) => item.trades >= 5 && (item.winRate < 45 || item.avgPnl <= 0))
+    .filter((item) => item.trades >= 8 && item.winRate < 35 && item.avgPnl <= -2)
     .map((item) => item.key);
+  const hardBlockedAssets = blockedAssets;
   const blockedPatterns = Object.values(patternStats)
     .filter((item) => item.trades >= 3 && (item.winRate < 50 || item.avgPnl <= 0))
     .map((item) => item.key);
@@ -735,6 +813,7 @@ function createLearningPolicyFromTrades(trades) {
     lastReviewDate: getDateKey(),
     reviewedAt: Date.now(),
     blockedAssets,
+    hardBlockedAssets,
     blockedPatterns,
     preferredPatterns,
     notes: [
@@ -767,6 +846,7 @@ function normalizeLearningPolicy(policy) {
     lastReviewDate: String(policy?.lastReviewDate || ""),
     reviewedAt: Number(policy?.reviewedAt) || 0,
     blockedAssets: Array.isArray(policy?.blockedAssets) ? policy.blockedAssets.map(String) : [],
+    hardBlockedAssets: Array.isArray(policy?.hardBlockedAssets) ? policy.hardBlockedAssets.map(String) : [],
     blockedPatterns: Array.isArray(policy?.blockedPatterns) ? policy.blockedPatterns.map(String) : [],
     preferredPatterns: Array.isArray(policy?.preferredPatterns) ? policy.preferredPatterns.map(String) : [],
     notes: Array.isArray(policy?.notes) ? policy.notes.map(String) : []
@@ -780,6 +860,7 @@ function mergeLearningPolicies(...policies) {
     lastReviewDate: normalized.sort((a, b) => (b.reviewedAt || 0) - (a.reviewedAt || 0))[0]?.lastReviewDate || "",
     reviewedAt: Math.max(...normalized.map((policy) => Number(policy.reviewedAt) || 0)),
     blockedAssets: uniqueFlat(normalized.map((policy) => policy.blockedAssets)),
+    hardBlockedAssets: uniqueFlat(normalized.map((policy) => policy.hardBlockedAssets)),
     blockedPatterns: uniqueFlat(normalized.map((policy) => policy.blockedPatterns)),
     preferredPatterns: uniqueFlat(normalized.map((policy) => policy.preferredPatterns)),
     notes: uniqueFlat(normalized.map((policy) => policy.notes)).slice(-12)
@@ -794,6 +875,7 @@ function summarizeLearningPolicy(policy) {
   return {
     reviewedAt: policy?.reviewedAt || 0,
     blockedAssets: policy?.blockedAssets?.length || 0,
+    hardBlockedAssets: policy?.hardBlockedAssets?.length || 0,
     blockedPatterns: policy?.blockedPatterns?.length || 0,
     preferredPatterns: policy?.preferredPatterns?.length || 0
   };
@@ -805,6 +887,12 @@ function getLearningPatternKey(symbol, interval, side) {
 
 function getDateKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function getArgValue(name) {
+  const prefix = `${name}=`;
+  const match = process.argv.find((item) => item.startsWith(prefix));
+  return match ? match.slice(prefix.length) : "";
 }
 
 function detectCrash(candles) {
@@ -947,7 +1035,25 @@ function log(message) {
   console.log(`[${new Date().toISOString()}] ${message}`);
 }
 
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function formatRemoteError(status, text) {
+  const message = String(text || "");
+  if (status === 522 || message.includes("Error code 522") || message.includes("Connection timed out")) {
+    return `${status} Supabase/Cloudflare timeout`;
+  }
+  if (message.length > 220) return `${status} ${message.slice(0, 217)}...`;
+  return `${status} ${message || "Remote request failed"}`;
+}
+
 main().catch((error) => {
+  if (String(error?.message || "").startsWith("Supabase journal unavailable")) {
+    log(`${error.message}. Cycle skipped without opening trades.`);
+    process.exitCode = 0;
+    return;
+  }
   console.error(error);
   process.exitCode = 1;
 });

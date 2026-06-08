@@ -1,0 +1,14 @@
+[Unit]
+Description=Botalin server paper-autobot
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/botalin
+Environment=BOTALIN_SERVER_PROFILE=balanced
+ExecStart=/usr/bin/node /opt/botalin/share/strategy-lab-7q4m2v/server-autobot.mjs --once
+Nice=5
+
+[Install]
+WantedBy=multi-user.target
