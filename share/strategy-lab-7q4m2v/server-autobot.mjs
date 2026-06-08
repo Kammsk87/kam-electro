@@ -3,6 +3,8 @@
 const supabaseUrl = "https://dcpenxsthdhvhhqgvgjq.supabase.co";
 const supabaseKey = "sb_publishable_BYYOhjwhgjZBP27Yw7YkVg_CEhF6ugc";
 const tableName = "crypto_strategy_trades";
+const settingsTableName = "crypto_strategy_settings";
+const learningPolicyKey = "botalin_learning_policy_v1";
 
 const config = {
   enabled: true,
@@ -20,6 +22,10 @@ const config = {
   scalpingTtlMs: 6 * 60 * 1000,
   feePct: 0.1,
   slippagePct: 0.03,
+  minVolumeRatio: 0.85,
+  minScalpingVolumeRatio: 1.25,
+  minExpectedNetPct: 0.18,
+  minScalpingExpectedNetPct: 0.12,
   assets: [
     "BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT", "TON/USDT",
     "ADA/USDT", "DOGE/USDT", "TRX/USDT", "AVAX/USDT", "LINK/USDT", "DOT/USDT",
@@ -63,8 +69,14 @@ async function main() {
 
   const rows = await fetchRemoteRows();
   const trades = rows.map((row) => normalizeTrade(row.trade)).filter(Boolean);
+  const remotePolicy = await fetchSharedLearningPolicy().catch((error) => {
+    log(`shared learning fallback: ${error.message}`);
+    return null;
+  });
+  const journalPolicy = createLearningPolicyFromTrades(trades);
+  const learningPolicy = mergeLearningPolicies(remotePolicy, journalPolicy);
   const changedTrades = await updateActiveTrades(trades);
-  const candidates = await scanCandidates(trades);
+  const candidates = await scanCandidates(trades, learningPolicy);
   const best = candidates[0] || null;
   const newTrades = [];
 
@@ -74,10 +86,13 @@ async function main() {
   }
 
   const toUpsert = [...changedTrades, ...newTrades];
+  const nextPolicy = mergeLearningPolicies(learningPolicy, createLearningPolicyFromTrades([...trades, ...newTrades]));
   if (config.dryRun) {
     log(JSON.stringify({
       mode: "dry-run",
       activeUpdated: changedTrades.length,
+      sharedPolicy: summarizeLearningPolicy(learningPolicy),
+      nextPolicy: summarizeLearningPolicy(nextPolicy),
       candidates: candidates.slice(0, 5).map(formatCandidateForLog),
       plannedTrade: newTrades[0] || null
     }, null, 2));
@@ -85,12 +100,40 @@ async function main() {
   }
 
   if (toUpsert.length) await upsertTrades(toUpsert);
+  await saveSharedLearningPolicy(nextPolicy).catch((error) => log(`shared learning save skipped: ${error.message}`));
   log(`server-autobot done: updated ${changedTrades.length}, new ${newTrades.length}, best ${best ? `${best.symbol} ${best.interval} ${best.side} ${best.score}` : "none"}`);
 }
 
 async function fetchRemoteRows() {
-  const path = `/${encodeURIComponent(tableName)}?select=*&order=updated_at.desc&limit=5000`;
-  return remoteFetch(path);
+  const table = encodeURIComponent(tableName);
+  const [lightRows, activeRows] = await Promise.all([
+    remoteFetch(`/${table}?select=id,user_login,asset,timeframe,side,status,pnl,opened_at,closed_at,updated_at&order=updated_at.desc&limit=1200`),
+    remoteFetch(`/${table}?select=*&status=in.(pending,open,partial)&order=updated_at.desc&limit=300`)
+  ]);
+  const byId = new Map();
+  (Array.isArray(lightRows) ? lightRows : []).forEach((row) => {
+    byId.set(row.id, { ...row, trade: normalizeTradeRow(row) });
+  });
+  (Array.isArray(activeRows) ? activeRows : []).forEach((row) => {
+    byId.set(row.id, row);
+  });
+  return [...byId.values()];
+}
+
+function normalizeTradeRow(row) {
+  return {
+    id: row.id,
+    userLogin: row.user_login || "legacy",
+    asset: row.asset,
+    timeframe: row.timeframe,
+    side: row.side,
+    status: row.status,
+    pnl: Number(row.pnl) || 0,
+    openedAt: Date.parse(row.opened_at) || 0,
+    closedAt: Date.parse(row.closed_at) || 0,
+    updatedAt: Date.parse(row.updated_at) || 0,
+    autopilot: row.user_login === config.userLogin
+  };
 }
 
 async function upsertTrades(trades) {
@@ -114,6 +157,24 @@ async function upsertTrades(trades) {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
     body: JSON.stringify(rows)
+  });
+}
+
+async function fetchSharedLearningPolicy() {
+  const rows = await remoteFetch(`/${encodeURIComponent(settingsTableName)}?select=value&key=eq.${encodeURIComponent(learningPolicyKey)}&limit=1`);
+  const policy = Array.isArray(rows) ? rows[0]?.value : null;
+  return normalizeLearningPolicy(policy);
+}
+
+async function saveSharedLearningPolicy(policy) {
+  await remoteFetch(`/${encodeURIComponent(settingsTableName)}?on_conflict=key`, {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify([{
+      key: learningPolicyKey,
+      value: normalizeLearningPolicy(policy),
+      updated_at: new Date().toISOString()
+    }])
   });
 }
 
@@ -208,7 +269,7 @@ function applyTradeCandle(trade, candle) {
   return true;
 }
 
-async function scanCandidates(trades) {
+async function scanCandidates(trades, learningPolicy) {
   const results = [];
   const activeKeys = new Set(trades.filter(isActiveTrade).map((trade) => `${trade.asset}|${trade.timeframe}|${trade.side}`));
   const activeAssets = new Set(trades.filter(isActiveTrade).map((trade) => trade.asset));
@@ -220,13 +281,13 @@ async function scanCandidates(trades) {
     for (const interval of config.timeframes) {
       const candles = await fetchCandles(symbol, interval, 220).catch(() => []);
       if (candles.length < 90) continue;
-      const candidate = evaluateCandidate(symbol, interval, candles, false, trades);
+      const candidate = evaluateCandidate(symbol, interval, candles, false, trades, learningPolicy);
       if (candidate && !activeKeys.has(`${symbol}|${interval}|${candidate.side}`)) results.push(candidate);
     }
     for (const interval of config.scalpingTimeframes) {
       const candles = await fetchCandles(symbol, interval, 160).catch(() => []);
       if (candles.length < 60) continue;
-      const candidate = evaluateCandidate(symbol, interval, candles, true, trades);
+      const candidate = evaluateCandidate(symbol, interval, candles, true, trades, learningPolicy);
       if (candidate && !activeKeys.has(`${symbol}|${interval}|${candidate.side}`)) results.push(candidate);
     }
   }
@@ -237,7 +298,7 @@ async function scanCandidates(trades) {
     .slice(0, 12);
 }
 
-function evaluateCandidate(symbol, interval, candles, scalping, trades) {
+function evaluateCandidate(symbol, interval, candles, scalping, trades, learningPolicy) {
   const closes = candles.map((candle) => candle.close);
   const last = candles[candles.length - 1];
   const prev = candles[candles.length - 2];
@@ -263,8 +324,11 @@ function evaluateCandidate(symbol, interval, candles, scalping, trades) {
 
   if (crash.severe || trend === "NEUTRAL" || atrPct > 4.5 || atrPct < 0.18) return null;
   if (crash.riskOff && trend === "LONG") return null;
+  if (volumeRatio < (scalping ? config.minScalpingVolumeRatio : config.minVolumeRatio)) return null;
 
   const side = trend;
+  const patternKey = getLearningPatternKey(symbol, interval, side);
+  if (learningPolicy?.blockedAssets?.includes(symbol) || learningPolicy?.blockedPatterns?.includes(patternKey)) return null;
   let score = 45;
   score += side === "LONG" ? Math.max(-10, Math.min(14, slopePct * 8)) : Math.max(-10, Math.min(14, -slopePct * 8));
   if (side === "LONG" && rsi >= 48 && rsi <= 66) score += 15;
@@ -300,6 +364,10 @@ function evaluateCandidate(symbol, interval, candles, scalping, trades) {
         target1: entry - riskDistance * rr1,
         target2: entry - riskDistance * rr2
       };
+  const expected = estimateScenarioExpectedNet(scenario, scalping);
+  if (expected.weightedNetPct < (scalping ? config.minScalpingExpectedNetPct : config.minExpectedNetPct)) return null;
+  if (expected.target2NetPct <= 0) return null;
+  if (learningPolicy?.preferredPatterns?.includes(patternKey)) score += 8;
 
   return {
     symbol,
@@ -315,7 +383,9 @@ function evaluateCandidate(symbol, interval, candles, scalping, trades) {
     history,
     crash,
     scenario,
-    reason: `${scalping ? "SCALP " : ""}EMA34/89 ${side}, RSI ${rsi.toFixed(1)}, volume x${volumeRatio.toFixed(2)}, ATR ${atrPct.toFixed(2)}%`
+    expected,
+    patternKey,
+    reason: `${scalping ? "SCALP " : ""}EMA34/89 ${side}, RSI ${rsi.toFixed(1)}, volume x${volumeRatio.toFixed(2)}, ATR ${atrPct.toFixed(2)}%, чистая цель ${expected.weightedNetPct.toFixed(2)}%`
   };
 }
 
@@ -325,6 +395,7 @@ function evaluateScalp(closes, candles, side, rsi, atrPct, volumeRatio) {
   const i = closes.length - 1;
   const longOk = side === "LONG" && closes[i] > ema9[i] && ema9[i] > ema21[i] && rsi >= 48 && rsi <= 68;
   const shortOk = side === "SHORT" && closes[i] < ema9[i] && ema9[i] < ema21[i] && rsi >= 32 && rsi <= 52;
+  if (volumeRatio < config.minScalpingVolumeRatio) return { ok: false, score: 0 };
   let score = 52;
   if (longOk || shortOk) score += 22;
   if (volumeRatio >= 1.35) score += 12;
@@ -332,6 +403,28 @@ function evaluateScalp(closes, candles, side, rsi, atrPct, volumeRatio) {
   const lastRangePct = candles[i].close > 0 ? ((candles[i].high - candles[i].low) / candles[i].close) * 100 : 0;
   if (lastRangePct <= 1.8) score += 4;
   return { ok: (longOk || shortOk) && score >= 72, score: Math.round(score) };
+}
+
+function estimateScenarioExpectedNet(scenario, scalping) {
+  const entry = Number(scenario.entry);
+  const target1 = Number(scenario.target1);
+  const target2 = Number(scenario.target2);
+  const direction = scenario.side === "LONG" ? 1 : -1;
+  const roundTripCostPct = 2 * (config.feePct + config.slippagePct);
+  const target1GrossPct = entry > 0 ? ((target1 - entry) / entry) * 100 * direction : 0;
+  const target2GrossPct = entry > 0 ? ((target2 - entry) / entry) * 100 * direction : 0;
+  const target1NetPct = target1GrossPct - roundTripCostPct;
+  const target2NetPct = target2GrossPct - roundTripCostPct;
+  const weightedNetPct = target1NetPct * 0.5 + target2NetPct * 0.5;
+  return {
+    scalping: Boolean(scalping),
+    roundTripCostPct,
+    target1GrossPct,
+    target2GrossPct,
+    target1NetPct,
+    target2NetPct,
+    weightedNetPct
+  };
 }
 
 function buildServerTrade(candidate, trades) {
@@ -432,7 +525,8 @@ function buildStrategySnapshot(candidate, amount) {
       marketStructure: {
         atrPct: candidate.atrPct,
         volumeRatio: candidate.volumeRatio,
-        slopePct: candidate.slopePct
+        slopePct: candidate.slopePct,
+        expectedNetPct: candidate.expected?.weightedNetPct || 0
       },
       marketCrash: candidate.crash,
       learning: candidate.history,
@@ -466,11 +560,12 @@ function buildStrategySnapshot(candidate, amount) {
       slippagePct: config.slippagePct,
       amount
     },
-    qualityPatternKey: [candidate.symbol, candidate.interval, candidate.side, candidate.scalping ? "scalping" : "trend", "rsi14", "ema34-89"].join("|"),
+    qualityPatternKey: candidate.patternKey || getLearningPatternKey(candidate.symbol, candidate.interval, candidate.side),
     rules: [
       "EMA34/89 должна подтверждать направление",
       "RSI должен быть в рабочей зоне выбранной стороны",
       "ATR и объем должны быть в умеренном диапазоне",
+      "Чистая ожидаемая прибыль после комиссии и проскальзывания должна быть положительной",
       "LONG блокируется при risk-off/crash режиме",
       "Размер позиции ограничен бюджетом сервера"
     ],
@@ -621,6 +716,97 @@ function getPatternStats(trades, symbol, interval, side) {
   };
 }
 
+function createLearningPolicyFromTrades(trades) {
+  const closed = trades.filter((trade) => !isActiveTrade(trade) && trade.status !== "cancelled");
+  const assetStats = buildGroupStats(closed, (trade) => trade.asset);
+  const patternStats = buildGroupStats(closed, (trade) => getLearningPatternKey(trade.asset, trade.timeframe, trade.side));
+  const blockedAssets = Object.values(assetStats)
+    .filter((item) => item.trades >= 5 && (item.winRate < 45 || item.avgPnl <= 0))
+    .map((item) => item.key);
+  const blockedPatterns = Object.values(patternStats)
+    .filter((item) => item.trades >= 3 && (item.winRate < 50 || item.avgPnl <= 0))
+    .map((item) => item.key);
+  const preferredPatterns = Object.values(patternStats)
+    .filter((item) => item.trades >= 5 && item.winRate >= 60 && item.avgPnl > 0)
+    .sort((a, b) => b.avgPnl - a.avgPnl)
+    .slice(0, 20)
+    .map((item) => item.key);
+  return normalizeLearningPolicy({
+    lastReviewDate: getDateKey(),
+    reviewedAt: Date.now(),
+    blockedAssets,
+    blockedPatterns,
+    preferredPatterns,
+    notes: [
+      `Server-самоанализ: ${closed.length} закрытых сделок.`,
+      `Блок монет: ${blockedAssets.length}.`,
+      `Блок связок: ${blockedPatterns.length}.`,
+      `Приоритет связок: ${preferredPatterns.length}.`
+    ]
+  });
+}
+
+function buildGroupStats(trades, keyFn) {
+  return trades.reduce((acc, trade) => {
+    const key = keyFn(trade);
+    if (!key) return acc;
+    acc[key] ||= { key, trades: 0, wins: 0, losses: 0, pnl: 0, avgPnl: 0, winRate: 0 };
+    const item = acc[key];
+    item.trades += 1;
+    item.pnl += Number(trade.pnl) || 0;
+    if ((Number(trade.pnl) || 0) > 0) item.wins += 1;
+    else item.losses += 1;
+    item.avgPnl = item.pnl / item.trades;
+    item.winRate = (item.wins / item.trades) * 100;
+    return acc;
+  }, {});
+}
+
+function normalizeLearningPolicy(policy) {
+  return {
+    lastReviewDate: String(policy?.lastReviewDate || ""),
+    reviewedAt: Number(policy?.reviewedAt) || 0,
+    blockedAssets: Array.isArray(policy?.blockedAssets) ? policy.blockedAssets.map(String) : [],
+    blockedPatterns: Array.isArray(policy?.blockedPatterns) ? policy.blockedPatterns.map(String) : [],
+    preferredPatterns: Array.isArray(policy?.preferredPatterns) ? policy.preferredPatterns.map(String) : [],
+    notes: Array.isArray(policy?.notes) ? policy.notes.map(String) : []
+  };
+}
+
+function mergeLearningPolicies(...policies) {
+  const normalized = policies.filter(Boolean).map(normalizeLearningPolicy);
+  if (!normalized.length) return normalizeLearningPolicy(null);
+  return normalizeLearningPolicy({
+    lastReviewDate: normalized.sort((a, b) => (b.reviewedAt || 0) - (a.reviewedAt || 0))[0]?.lastReviewDate || "",
+    reviewedAt: Math.max(...normalized.map((policy) => Number(policy.reviewedAt) || 0)),
+    blockedAssets: uniqueFlat(normalized.map((policy) => policy.blockedAssets)),
+    blockedPatterns: uniqueFlat(normalized.map((policy) => policy.blockedPatterns)),
+    preferredPatterns: uniqueFlat(normalized.map((policy) => policy.preferredPatterns)),
+    notes: uniqueFlat(normalized.map((policy) => policy.notes)).slice(-12)
+  });
+}
+
+function uniqueFlat(groups) {
+  return [...new Set(groups.flat().filter(Boolean).map(String).filter((item) => item !== "connectivity test"))];
+}
+
+function summarizeLearningPolicy(policy) {
+  return {
+    reviewedAt: policy?.reviewedAt || 0,
+    blockedAssets: policy?.blockedAssets?.length || 0,
+    blockedPatterns: policy?.blockedPatterns?.length || 0,
+    preferredPatterns: policy?.preferredPatterns?.length || 0
+  };
+}
+
+function getLearningPatternKey(symbol, interval, side) {
+  return `${symbol || "unknown"}|${interval || "unknown"}|${side || "unknown"}`;
+}
+
+function getDateKey(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 function detectCrash(candles) {
   const last = candles[candles.length - 1];
   const c12 = candles[Math.max(0, candles.length - 12)] || candles[0];
@@ -752,6 +938,7 @@ function formatCandidateForLog(candidate) {
     side: candidate.side,
     score: candidate.score,
     scalping: candidate.scalping,
+    expectedNetPct: candidate.expected?.weightedNetPct,
     reason: candidate.reason
   };
 }

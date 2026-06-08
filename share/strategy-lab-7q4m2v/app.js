@@ -6,6 +6,8 @@ const autopilotKey = "crypto-strategy-bot-autopilot-v1";
 const learningPolicyKey = "crypto-strategy-bot-learning-policy-v1";
 const remoteJournalConfigKey = "crypto-strategy-bot-remote-journal-v1";
 const remoteClientIdKey = "crypto-strategy-bot-client-id";
+const remoteSettingsTableName = "crypto_strategy_settings";
+const remoteLearningPolicyKey = "botalin_learning_policy_v1";
 const cmcRadarConfigKey = "crypto-strategy-bot-cmc-radar-v1";
 const newsAnalyticsConfigKey = "crypto-strategy-bot-news-analytics-v1";
 const rejectedSignalsKey = "crypto-strategy-bot-rejected-signals-v1";
@@ -566,16 +568,9 @@ function loadAutopilotState() {
 function loadLearningPolicy() {
   try {
     const saved = JSON.parse(localStorage.getItem(learningPolicyKey));
-    return {
-      lastReviewDate: String(saved?.lastReviewDate || ""),
-      reviewedAt: Number(saved?.reviewedAt) || 0,
-      blockedAssets: Array.isArray(saved?.blockedAssets) ? saved.blockedAssets : [],
-      blockedPatterns: Array.isArray(saved?.blockedPatterns) ? saved.blockedPatterns : [],
-      preferredPatterns: Array.isArray(saved?.preferredPatterns) ? saved.preferredPatterns : [],
-      notes: Array.isArray(saved?.notes) ? saved.notes : []
-    };
+    return normalizeLearningPolicy(saved);
   } catch (error) {
-    return { lastReviewDate: "", reviewedAt: 0, blockedAssets: [], blockedPatterns: [], preferredPatterns: [], notes: [] };
+    return normalizeLearningPolicy(null);
   }
 }
 
@@ -2746,6 +2741,7 @@ async function refreshStrategyIntelligence(force = false) {
 async function refreshSharedLearningMemory(force = false) {
   if (!isRemoteJournalConfigured() || state.remoteJournal.syncing) return false;
   await syncRemoteJournal(force);
+  await fetchSharedLearningPolicy().catch((error) => console.warn("Shared learning policy fetch failed", error));
   return true;
 }
 
@@ -3109,6 +3105,46 @@ function persistLearningPolicy() {
   localStorage.setItem(learningPolicyKey, JSON.stringify(state.learningPolicy));
 }
 
+function normalizeLearningPolicy(policy) {
+  return {
+    lastReviewDate: String(policy?.lastReviewDate || ""),
+    reviewedAt: Number(policy?.reviewedAt) || 0,
+    blockedAssets: Array.isArray(policy?.blockedAssets) ? policy.blockedAssets.map(String) : [],
+    blockedPatterns: Array.isArray(policy?.blockedPatterns) ? policy.blockedPatterns.map(String) : [],
+    preferredPatterns: Array.isArray(policy?.preferredPatterns) ? policy.preferredPatterns.map(String) : [],
+    notes: Array.isArray(policy?.notes) ? policy.notes.map(String) : []
+  };
+}
+
+async function fetchSharedLearningPolicy() {
+  if (!isRemoteJournalConfigured()) return false;
+  const rows = await remoteJournalFetch(`/${encodeURIComponent(remoteSettingsTableName)}?select=value&key=eq.${encodeURIComponent(remoteLearningPolicyKey)}&limit=1`);
+  const remotePolicy = Array.isArray(rows) ? rows[0]?.value : null;
+  if (!remotePolicy) return false;
+  const normalized = normalizeLearningPolicy(remotePolicy);
+  if (normalized.reviewedAt >= (Number(state.learningPolicy.reviewedAt) || 0)) {
+    state.learningPolicy = normalized;
+    persistLearningPolicy();
+    renderStrategyIntelligence();
+  }
+  return true;
+}
+
+async function saveSharedLearningPolicy() {
+  if (!isRemoteJournalConfigured()) return false;
+  const value = normalizeLearningPolicy(state.learningPolicy);
+  await remoteJournalFetch(`/${encodeURIComponent(remoteSettingsTableName)}?on_conflict=key`, {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify([{
+      key: remoteLearningPolicyKey,
+      value,
+      updated_at: new Date().toISOString()
+    }])
+  });
+  return true;
+}
+
 function getLocalDateKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
@@ -3132,6 +3168,7 @@ async function runDailyLearningReview(force = false) {
       notes: [`Самоанализ: закрытых сделок ${closed.length}, для корректировки нужно минимум 10.`]
     };
     persistLearningPolicy();
+    await saveSharedLearningPolicy().catch((error) => console.warn("Shared learning policy save failed", error));
     renderStrategyIntelligence();
     return true;
   }
@@ -3171,6 +3208,7 @@ async function runDailyLearningReview(force = false) {
     ]
   };
   persistLearningPolicy();
+  await saveSharedLearningPolicy().catch((error) => console.warn("Shared learning policy save failed", error));
   renderStrategyIntelligence();
   generateStrategy(state.lastUserIdea);
   return true;
