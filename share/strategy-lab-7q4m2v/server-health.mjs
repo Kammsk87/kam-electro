@@ -30,6 +30,7 @@ async function checkSupabase() {
   const started = Date.now();
   const result = {
     ok: false,
+    slow: false,
     ms: 0,
     status: 0,
     serverTrades: 0,
@@ -59,6 +60,7 @@ async function checkSupabase() {
     result.error = normalizeError(error);
   } finally {
     result.ms = Date.now() - started;
+    result.slow = result.ok && result.ms > 3000;
   }
 
   return result;
@@ -160,7 +162,7 @@ function printReport(value) {
   const github = value.checks.github;
   const lines = [
     `Botalin server health: ${value.ok ? "OK" : "PROBLEM"}`,
-    `Supabase: ${supabase.ok ? "OK" : "FAIL"} (${supabase.ms} ms) serverTrades=${supabase.serverTrades}, active=${supabase.activeTrades}${supabase.lastServerTradeAgeMinutes !== null ? `, lastServerTrade=${supabase.lastServerTradeAgeMinutes} min ago` : ""}${supabase.error ? `, error=${supabase.error}` : ""}`,
+    `Supabase: ${supabase.ok ? supabase.slow ? "SLOW" : "OK" : "FAIL"} (${supabase.ms} ms) serverTrades=${supabase.serverTrades}, active=${supabase.activeTrades}${supabase.lastServerTradeAgeMinutes !== null ? `, lastServerTrade=${supabase.lastServerTradeAgeMinutes} min ago` : ""}${supabase.error ? `, error=${supabase.error}` : ""}`,
     `Bybit: ${bybit.ok ? "OK" : "FAIL"} (${bybit.ms} ms) rows=${bybit.rows}${bybit.error ? `, error=${bybit.error}` : ""}`,
     `GitHub Actions: ${github.ok ? "OK" : "WARN"} (${github.ms} ms) last=${github.lastConclusion || "none"}${github.lastRunAgeMinutes !== null ? `, ${github.lastRunAgeMinutes} min ago` : ""}${github.warning ? `, ${github.warning}` : ""}${github.error ? `, error=${github.error}` : ""}`
   ];
