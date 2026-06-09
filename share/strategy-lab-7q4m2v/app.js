@@ -26,6 +26,7 @@ const autopilotMinScore = 74;
 const autopilotScanMs = 30000;
 const autopilotDuplicateCooldownMs = 60 * 60 * 1000;
 const autopilotMaxActivePerSide = 3;
+const maxPaperHistoryPoints = 120;
 const manualMaxSingleTradePct = 10;
 const manualMaxPortfolioPct = 50;
 const autopilotMaxSingleTradePct = 7;
@@ -56,22 +57,22 @@ const autopilotProfileMinSamples = 5;
 const autopilotProfiles = {
   protective: {
     label: "Защитный",
-    minScore: 74,
-    strictScore: 78,
+    minScore: 78,
+    strictScore: 82,
     penaltyMultiplier: 1,
     note: "максимум защиты, входы только по лучшим сетапам"
   },
   balanced: {
     label: "Баланс",
-    minScore: 70,
-    strictScore: 74,
+    minScore: 74,
+    strictScore: 78,
     penaltyMultiplier: 0.7,
     note: "часть фильтров снижает score вместо полного запрета"
   },
   active: {
     label: "Активный",
-    minScore: 66,
-    strictScore: 70,
+    minScore: 70,
+    strictScore: 74,
     penaltyMultiplier: 0.5,
     note: "больше тестовых входов, обязательные лимиты капитала остаются"
   }
@@ -177,6 +178,20 @@ const baseQuarantineAssets = new Set([
   "LINK/USDT",
   "OP/USDT",
   "TWT/USDT"
+]);
+const baseBlockedPatterns = new Set([
+  "SUI/USDT|5m|LONG",
+  "FIL/USDT|5m|LONG",
+  "BCH/USDT|4h|SHORT",
+  "ETC/USDT|15m|LONG",
+  "OP/USDT|15m|LONG",
+  "ARB/USDT|5m|LONG"
+]);
+const basePreferredPatterns = new Set([
+  "FIL/USDT|5m|SHORT",
+  "TIA/USDT|5m|SHORT",
+  "ARB/USDT|5m|SHORT",
+  "ATOM/USDT|5m|LONG"
 ]);
 const emaProfiles = [
   { id: "ema-34", label: "EMA 34", period: 34, color: "#c084fc", role: "быстрая EMA из чисел Фибоначчи: фильтр импульса и отката." },
@@ -1019,9 +1034,29 @@ function normalizePaperTrade(trade) {
     releasedPnl: Number.isFinite(Number(trade.releasedPnl)) ? Number(trade.releasedPnl) : 0,
     budgetReserved: Boolean(trade.budgetReserved),
     walletSettled: Boolean(trade.walletSettled || (!isActiveStatus && trade.budgetReserved)),
-    history
+    history: trimPaperHistory(history)
   };
   return ensureBybitPaperState(normalizedTrade);
+}
+
+function trimPaperHistory(history, limit = maxPaperHistoryPoints) {
+  if (!Array.isArray(history)) return [];
+  const compact = history
+    .map((point) => ({
+      time: Number(point.time) || Date.now(),
+      price: Number(point.price) || 0,
+      pnl: Number(point.pnl) || 0,
+      pnlPct: Number(point.pnlPct) || 0
+    }))
+    .filter((point) => point.price > 0);
+  return compact.length > limit ? compact.slice(-limit) : compact;
+}
+
+function compactPaperTradeForStorage(trade) {
+  return {
+    ...trade,
+    history: trimPaperHistory(trade.history)
+  };
 }
 
 function ensureBybitPaperState(trade) {
@@ -1116,6 +1151,7 @@ function persist() {
 }
 
 function persistPaperTrades() {
+  state.paperTrades = state.paperTrades.map(compactPaperTradeForStorage);
   localStorage.setItem(paperJournalKey, JSON.stringify({ trades: state.paperTrades }));
   scheduleRemoteJournalSync();
 }
@@ -3240,11 +3276,11 @@ function isAssetQuarantined(symbol) {
 }
 
 function isPatternBlocked(symbol, interval, side) {
-  return state.learningPolicy.blockedPatterns.includes(getLearningPatternKey(symbol, interval, side));
+  return baseBlockedPatterns.has(getLearningPatternKey(symbol, interval, side)) || state.learningPolicy.blockedPatterns.includes(getLearningPatternKey(symbol, interval, side));
 }
 
 function isPatternPreferred(symbol, interval, side) {
-  return state.learningPolicy.preferredPatterns.includes(getLearningPatternKey(symbol, interval, side));
+  return basePreferredPatterns.has(getLearningPatternKey(symbol, interval, side)) || state.learningPolicy.preferredPatterns.includes(getLearningPatternKey(symbol, interval, side));
 }
 
 function calculateMonthlyGoalProgress() {
@@ -4993,6 +5029,7 @@ function runExchangePreflight(options = {}) {
     const tickSize = estimateBybitTickSize(entry);
     const qty = amount > 0 && entry > 0 ? amount / entry : 0;
     const rr = Math.abs(target2 - entry) / Math.max(0.00000001, Math.abs(entry - stop));
+    const minRequiredRr = options.scalping || context.strategyMode === "scalping" ? 0.8 : 2;
     const duplicate = state.paperTrades.some((trade) => isPaperTradeActive(trade) && trade.asset === context.asset && trade.side === scenario.side);
     const orderValue = qty * entry;
 
@@ -5001,7 +5038,7 @@ function runExchangePreflight(options = {}) {
     add(orderValue >= 10, "Min notional", `${orderValue.toFixed(2)} USDT >= 10`);
     add(Number.isFinite(entry) && entry > 0 && Number.isFinite(stop) && stop > 0, "Entry/Stop", `${formatPrice(entry)} / ${formatPrice(stop)}`);
     add(Number.isFinite(target1) && target1 > 0 && Number.isFinite(target2) && target2 > 0, "TP/SL", `T1 ${formatPrice(target1)}, T2 ${formatPrice(target2)}`);
-    add(rr >= 1.2, "Risk/Reward", `RR ${rr.toFixed(2)}`);
+    add(rr >= minRequiredRr, "Risk/Reward", `RR ${rr.toFixed(2)} / min ${minRequiredRr.toFixed(1)}`);
     add(!duplicate, "Дубли", duplicate ? "уже есть активная сделка по этой монете и стороне" : "дублей нет");
     add(live.active, "Bybit market data", live.active ? `${live.exchange} ${formatPrice(live.lastPrice)}` : "live-данные выключены или еще не пришли", "warn");
     add(!live.active || live.spreadPct <= 0.12, "Spread", live.active ? `${live.spreadPct.toFixed(3)}%` : "нет live-spread", "warn");
@@ -5527,6 +5564,7 @@ async function syncRemoteJournal(force = false) {
     mergeRemoteJournalTrades(remoteTrades);
     state.remoteJournal.lastSyncAt = Date.now();
     setRemoteJournalStatus(`shared ${state.paperTrades.length}`);
+    state.paperTrades = state.paperTrades.map(compactPaperTradeForStorage);
     localStorage.setItem(paperJournalKey, JSON.stringify({ trades: state.paperTrades }));
     renderTradeJournal();
     updatePaperTrades();
@@ -5539,7 +5577,7 @@ async function syncRemoteJournal(force = false) {
 }
 
 async function pushRemoteJournalTrades() {
-  const rows = state.paperTrades.map((trade) => ({
+  const rows = state.paperTrades.map(compactPaperTradeForStorage).map((trade) => ({
     id: trade.id,
     client_id: currentClientId,
     session_id: trade.sessionId,
@@ -5564,8 +5602,8 @@ async function pushRemoteJournalTrades() {
 
 async function fetchRemoteJournalTrades() {
   const table = encodeURIComponent(state.remoteJournal.config.table);
-  const rows = await remoteJournalFetch(`/${table}?select=*&order=updated_at.desc&limit=5000`);
-  return Array.isArray(rows) ? rows.map((row) => row.trade).filter(Boolean) : [];
+  const rows = await remoteJournalFetch(`/${table}?select=*&order=updated_at.desc&limit=1200`);
+  return Array.isArray(rows) ? rows.map((row) => row.trade).filter(Boolean).map(compactPaperTradeForStorage) : [];
 }
 
 async function remoteJournalFetch(path, options = {}) {

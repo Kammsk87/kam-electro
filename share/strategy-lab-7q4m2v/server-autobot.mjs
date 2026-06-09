@@ -10,41 +10,41 @@ const requestedProfile = getArgValue("--profile") || process.env.BOTALIN_SERVER_
 const serverProfiles = {
   protective: {
     label: "Осторожный",
-    minScore: 78,
+    minScore: 82,
     maxTradePct: 3,
     maxPortfolioPct: 18,
     maxEntriesPerRun: 1,
     duplicateCooldownMs: 120 * 60 * 1000,
     minVolumeRatio: 0.95,
     minScalpingVolumeRatio: 1.45,
-    minExpectedNetPct: 0.25,
-    minScalpingExpectedNetPct: 0.16,
+    minExpectedNetPct: 0.35,
+    minScalpingExpectedNetPct: 0.2,
     blockedAssetMode: "strict"
   },
   balanced: {
     label: "Баланс",
-    minScore: 72,
+    minScore: 78,
     maxTradePct: 3,
     maxPortfolioPct: 24,
     maxEntriesPerRun: 2,
     duplicateCooldownMs: 45 * 60 * 1000,
     minVolumeRatio: 0.75,
     minScalpingVolumeRatio: 1.15,
-    minExpectedNetPct: 0.14,
-    minScalpingExpectedNetPct: 0.1,
+    minExpectedNetPct: 0.25,
+    minScalpingExpectedNetPct: 0.14,
     blockedAssetMode: "hard-only"
   },
   active: {
     label: "Активный",
-    minScore: 68,
+    minScore: 74,
     maxTradePct: 2,
     maxPortfolioPct: 30,
     maxEntriesPerRun: 3,
     duplicateCooldownMs: 25 * 60 * 1000,
     minVolumeRatio: 0.65,
     minScalpingVolumeRatio: 1.05,
-    minExpectedNetPct: 0.1,
-    minScalpingExpectedNetPct: 0.08,
+    minExpectedNetPct: 0.18,
+    minScalpingExpectedNetPct: 0.1,
     blockedAssetMode: "hard-only"
   }
 };
@@ -250,7 +250,7 @@ function normalizeTradeRow(row) {
 }
 
 async function upsertTrades(trades) {
-  const rows = trades.map((trade) => ({
+  const rows = trades.map(compactTradeForStorage).map((trade) => ({
     id: trade.id,
     client_id: "server-autobot",
     session_id: trade.sessionId,
@@ -1119,7 +1119,8 @@ function normalizeTrade(trade) {
   return {
     history: [],
     remainingQuantity: Number.isFinite(Number(trade.remainingQuantity)) ? Number(trade.remainingQuantity) : Number(trade.quantity) || 0,
-    ...trade
+    ...trade,
+    history: trimTradeHistory(trade.history)
   };
 }
 
@@ -1128,7 +1129,27 @@ function appendPoint(trade, price, pnl, pnlPct, time = Date.now()) {
   const last = trade.history[trade.history.length - 1];
   if (last && Math.abs(Number(last.price) - price) <= price * 0.000001 && Math.abs(Number(last.time) - time) < 1000) return;
   trade.history.push({ time, price, pnl, pnlPct });
-  if (trade.history.length > 180) trade.history = trade.history.slice(-180);
+  trade.history = trimTradeHistory(trade.history);
+}
+
+function trimTradeHistory(history, limit = 120) {
+  if (!Array.isArray(history)) return [];
+  const compact = history
+    .map((point) => ({
+      time: Number(point.time) || Date.now(),
+      price: Number(point.price) || 0,
+      pnl: Number(point.pnl) || 0,
+      pnlPct: Number(point.pnlPct) || 0
+    }))
+    .filter((point) => point.price > 0);
+  return compact.length > limit ? compact.slice(-limit) : compact;
+}
+
+function compactTradeForStorage(trade) {
+  return {
+    ...trade,
+    history: trimTradeHistory(trade.history)
+  };
 }
 
 function calculateEma(values, period) {

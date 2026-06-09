@@ -44,6 +44,8 @@ Manual checks:
   `node share/strategy-lab-7q4m2v/server-autobot.mjs --dry-run --profile=balanced`
 - Check infrastructure:
   `node share/strategy-lab-7q4m2v/server-health.mjs`
+- Analyze weak and strong journal patterns:
+  `node share/strategy-lab-7q4m2v/journal-analysis.mjs`
 
 Supabase 522/timeouts:
 
