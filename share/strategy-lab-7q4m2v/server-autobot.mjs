@@ -155,12 +155,11 @@ async function main() {
     return;
   }
 
-  const rows = await fetchRemoteRows();
+  const [rows, remotePolicy] = await Promise.all([
+    fetchRemoteRows(),
+    fetchSharedLearningPolicy().catch((error) => { log(`shared learning fallback: ${error.message}`); return null; })
+  ]);
   const trades = rows.map((row) => normalizeTrade(row.trade)).filter(Boolean);
-  const remotePolicy = await fetchSharedLearningPolicy().catch((error) => {
-    log(`shared learning fallback: ${error.message}`);
-    return null;
-  });
   const journalPolicy = createLearningPolicyFromTrades(trades);
   const learningPolicy = mergeLearningPolicies(remotePolicy, journalPolicy);
   const changedTrades = await updateActiveTrades(trades);
@@ -170,7 +169,7 @@ async function main() {
   const newTrades = [];
 
   for (const candidate of entryCandidates) {
-    const trade = buildServerTrade(candidate, [...trades, ...newTrades]);
+    const trade = await buildServerTrade(candidate, [...trades, ...newTrades]);
     if (trade) newTrades.push(trade);
   }
 
@@ -317,15 +316,15 @@ async function remoteFetch(path, options = {}, attempt = 1) {
 }
 
 async function updateActiveTrades(trades) {
-  const changed = [];
-  for (const trade of trades.filter(isActiveTrade)) {
-    const next = await replayTradeFromCandles(trade).catch((error) => {
+  const active = trades.filter(isActiveTrade);
+  const results = await mapLimit(active, 4, async (trade) => {
+    const changed = await replayTradeFromCandles(trade).catch((error) => {
       log(`skip update ${trade.id}: ${error.message}`);
       return false;
     });
-    if (next) changed.push(trade);
-  }
-  return changed;
+    return changed ? trade : null;
+  });
+  return results.filter(Boolean);
 }
 
 async function replayTradeFromCandles(trade) {
@@ -341,6 +340,32 @@ async function replayTradeFromCandles(trade) {
     trade.lastCheckedAt = candle.closeTime;
     trade.updatedAt = Date.now();
   }
+
+  // Live price check: catch TP/SL hits inside the current incomplete candle
+  if (isActiveTrade(trade)) {
+    const livePrice = await fetchLivePrice(trade.asset).catch(() => null);
+    if (livePrice && Number.isFinite(livePrice)) {
+      const now = Date.now();
+      const hitStop = trade.side === "LONG" ? livePrice <= trade.stop : livePrice >= trade.stop;
+      const hitT1 = trade.status === "open" && (trade.side === "LONG" ? livePrice >= trade.target1 : livePrice <= trade.target1);
+      const hitT2 = trade.side === "LONG" ? livePrice >= trade.target : livePrice <= trade.target;
+      if (hitStop) {
+        closeTrade(trade, "stop", trade.stop, now);
+        changed = true;
+      } else {
+        if (hitT1) { takePartialProfit(trade, now); changed = true; }
+        if (["open", "partial"].includes(trade.status) && hitT2) { closeTrade(trade, "target", trade.target, now); changed = true; }
+      }
+      if (!changed) {
+        const pnl = calculatePnl(trade, livePrice);
+        trade.pnl = pnl;
+        trade.pnlPct = trade.amount > 0 ? (pnl / trade.amount) * 100 : 0;
+        appendPoint(trade, livePrice, pnl, trade.pnlPct, now);
+        changed = true;
+      }
+    }
+  }
+
   return changed;
 }
 
@@ -404,7 +429,7 @@ async function scanCandidates(trades, learningPolicy) {
     }
   }
 
-  const groups = await mapLimit(scanTasks, 6, async ({ symbol, interval, strategies }) => {
+  const groups = await mapLimit(scanTasks, 12, async ({ symbol, interval, strategies }) => {
     const needsStandardHistory = strategies.some((strategy) => strategy.kind !== "scalping");
     const candles = await fetchCandles(symbol, interval, needsStandardHistory ? 220 : 160).catch(() => []);
     if (candles.length < (needsStandardHistory ? 90 : 60)) return [];
@@ -689,12 +714,22 @@ function estimateScenarioExpectedNet(scenario, scalping) {
   };
 }
 
-function buildServerTrade(candidate, trades) {
+async function buildServerTrade(candidate, trades) {
   const wallet = getWalletState(trades);
   const maxBySingle = config.depositUsdt * (config.maxTradePct / 100);
   const maxByPortfolio = Math.max(0, config.depositUsdt * (config.maxPortfolioPct / 100) - wallet.reserved);
   const amount = Math.min(maxBySingle, maxByPortfolio, wallet.free);
   if (amount < config.minNotionalUsdt) return null;
+
+  // Reject stale signals: price moved too far since the signal candle closed
+  const livePrice = await fetchLivePrice(candidate.symbol).catch(() => null);
+  if (livePrice && Number.isFinite(livePrice)) {
+    const drift = Math.abs(livePrice - candidate.price) / candidate.price;
+    if (drift > 0.008) {
+      log(`skip entry ${candidate.symbol} ${candidate.side}: price drifted ${(drift * 100).toFixed(2)}% from signal`);
+      return null;
+    }
+  }
 
   const now = Date.now();
   const scenario = candidate.scenario;
@@ -841,6 +876,17 @@ function buildStrategySnapshot(candidate, amount) {
     ],
     outcome: null
   };
+}
+
+async function fetchLivePrice(symbol) {
+  const params = new URLSearchParams({ category: "spot", symbol: toBybitSymbol(symbol) });
+  const response = await fetchWithTimeout(`https://api.bybit.com/v5/market/tickers?${params.toString()}`, {}, 4_000);
+  if (!response.ok) throw new Error(`ticker ${response.status}`);
+  const data = await response.json();
+  if (data.retCode !== 0) throw new Error(data.retMsg || "ticker failed");
+  const price = Number(data.result?.list?.[0]?.lastPrice);
+  if (!price || !Number.isFinite(price)) throw new Error("no price");
+  return price;
 }
 
 async function fetchCandles(symbol, interval, limit = 220, start = null) {
