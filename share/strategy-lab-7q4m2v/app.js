@@ -816,6 +816,9 @@ const paperPnl = document.querySelector("[data-paper-pnl]");
 const paperResult = document.querySelector("[data-paper-result]");
 const walletFree = document.querySelector("[data-wallet-free]");
 const walletReserved = document.querySelector("[data-wallet-reserved]");
+const walletServerEquity = document.querySelector("[data-server-wallet-equity]");
+const walletServerFree = document.querySelector("[data-server-wallet-free]");
+const walletServerReserved = document.querySelector("[data-server-wallet-reserved]");
 const paperEnter = document.querySelector("[data-paper-enter]");
 const paperReset = document.querySelector("[data-paper-reset]");
 const paperClear = document.querySelector("[data-paper-clear]");
@@ -1601,6 +1604,7 @@ function adjustDepositValue(delta, options = {}) {
 function getReservedPaperBudget() {
   return state.paperTrades
     .filter(isPaperTradeActive)
+    .filter((trade) => trade.sessionId !== "server-autobot")
     .reduce((sum, trade) => sum + Math.max(0, (Number(trade.reservedAmount) || 0) - (Number(trade.releasedAmount) || 0)), 0);
 }
 
@@ -1631,6 +1635,28 @@ function renderWalletReadout() {
   if (paperAmount) {
     paperAmount.max = String(getMaxTradeAmountByWallet());
   }
+  renderServerWalletReadout();
+}
+
+function getServerWalletState() {
+  const serverTrades = state.paperTrades.filter((trade) => trade.sessionId === "server-autobot");
+  const depositBase = serverTrades.reduce((max, trade) => Math.max(max, Number(trade.deposit) || 0), 10000);
+  const reserved = serverTrades
+    .filter(isPaperTradeActive)
+    .reduce((sum, trade) => sum + Math.max(0, (Number(trade.reservedAmount) || 0) - (Number(trade.releasedAmount) || 0)), 0);
+  const closedPnl = serverTrades
+    .filter((trade) => !isPaperTradeActive(trade) && trade.status !== "cancelled")
+    .reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0);
+  const equity = depositBase + closedPnl;
+  const free = Math.max(0, equity - reserved);
+  return { depositBase, reserved, closedPnl, equity, free };
+}
+
+function renderServerWalletReadout() {
+  const s = getServerWalletState();
+  if (walletServerEquity) walletServerEquity.textContent = `${s.equity.toFixed(2)} USDT`;
+  if (walletServerFree) walletServerFree.textContent = `${s.free.toFixed(2)} USDT`;
+  if (walletServerReserved) walletServerReserved.textContent = `${s.reserved.toFixed(2)} USDT`;
 }
 
 function reservePaperBudget(amount) {
@@ -5974,7 +6000,7 @@ function executePartialTakeProfit(trade) {
   trade.tp1Order.leavesQty = 0;
   trade.tp2Order.orderStatus = trade.remainingQuantity > 0 ? "Untriggered" : "Cancelled";
   trade.tpOrder = trade.tp2Order;
-  settlePaperBudget(trade, releasedReserve, partialPnl);
+  if (trade.sessionId !== "server-autobot") settlePaperBudget(trade, releasedReserve, partialPnl);
   updateStrategySnapshotOutcome(trade, "partial");
   appendPaperPoint(trade, trade.target1, trade.pnl, trade.pnlPct);
 }
@@ -6022,7 +6048,7 @@ function closePaperPositionByTpsl(trade, closeType, overrideExitPrice = null) {
   }
   trade.tpOrder = trade.tp2Order;
   if (!trade.walletSettled) {
-    settlePaperBudget(trade, remainingReserve, remainingPnl);
+    if (trade.sessionId !== "server-autobot") settlePaperBudget(trade, remainingReserve, remainingPnl);
     trade.walletSettled = true;
   }
   updateStrategySnapshotOutcome(trade, closeType);
@@ -6129,7 +6155,7 @@ function cancelPaperPendingOrder(trade, reason, currentPrice = null, cancelledAt
   trade.tpOrder = trade.tp2Order;
   trade.slOrder.orderStatus = "Cancelled";
   if (!trade.walletSettled) {
-    settlePaperBudget(trade, releaseAmount, 0);
+    if (trade.sessionId !== "server-autobot") settlePaperBudget(trade, releaseAmount, 0);
     trade.walletSettled = true;
   }
   updateStrategySnapshotOutcome(trade, "cancelled");

@@ -60,7 +60,7 @@ const serverStrategies = {
     kind: "trend",
     strategyMode: "standard",
     signalTemplate: "intraday",
-    timeframes: ["15m", "1h", "4h"],
+    timeframes: ["15m", "1h"],
     minScoreOffset: 0,
     maxEntriesPerRun: 1
   },
@@ -71,7 +71,7 @@ const serverStrategies = {
     kind: "pullback",
     strategyMode: "pullback",
     signalTemplate: "swing",
-    timeframes: ["15m", "1h", "4h"],
+    timeframes: ["15m", "1h"],
     minScoreOffset: 2,
     maxEntriesPerRun: 1
   },
@@ -121,7 +121,7 @@ const config = {
     "SUI/USDT", "ARB/USDT", "OP/USDT", "NEAR/USDT", "ATOM/USDT", "INJ/USDT",
     "FIL/USDT", "ETC/USDT", "SEI/USDT", "TIA/USDT", "TWT/USDT"
   ],
-  timeframes: ["5m", "15m", "1h", "4h"],
+  timeframes: ["5m", "15m", "1h"],
   scalpingTimeframes: ["5m", "15m"]
 };
 
@@ -394,6 +394,7 @@ async function scanCandidates(trades, learningPolicy) {
   const dailyRisk = getDailyRisk(trades);
   if (dailyRisk.blocked) return [];
 
+  const btcTrend = await getBtcTrend();
   const strategiesByInterval = groupStrategiesByInterval(enabledStrategies);
   const scanTasks = [];
   for (const symbol of config.assets) {
@@ -409,7 +410,7 @@ async function scanCandidates(trades, learningPolicy) {
     if (candles.length < (needsStandardHistory ? 90 : 60)) return [];
     return strategies
       .filter((strategy) => candles.length >= (strategy.kind === "scalping" ? 60 : 90))
-      .map((strategy) => evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy))
+      .map((strategy) => evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend))
       .filter((candidate) => candidate && !activeKeys.has(getCandidateStrategyExposureKey(candidate)));
   });
 
@@ -466,7 +467,7 @@ function selectEntryCandidates(candidates, trades) {
   return selected;
 }
 
-function evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy) {
+function evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend = "NEUTRAL") {
   const scalping = strategy.kind === "scalping";
   const closes = candles.map((candle) => candle.close);
   const last = candles[candles.length - 1];
@@ -498,6 +499,7 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
   const side = trend;
   const patternKey = getLearningPatternKey(symbol, interval, side, strategy.id);
   if (isAssetBlockedByPolicy(symbol, learningPolicy) || learningPolicy?.blockedPatterns?.includes(patternKey)) return null;
+  if (learningPolicy?.blockedAssetSides?.includes(`${symbol}|${side}`)) return null;
   let score = 45;
   score += side === "LONG" ? Math.max(-10, Math.min(14, slopePct * 8)) : Math.max(-10, Math.min(14, -slopePct * 8));
   if (side === "LONG" && rsi >= 48 && rsi <= 66) score += 15;
@@ -507,6 +509,23 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
   if (atrPct >= 0.25 && atrPct <= 1.8) score += 10;
   if (Math.abs(impulsePct) > 3.2) score -= 12;
   if (interval === "5m" || interval === "15m") score += 3;
+  const higherTfTrend = getHigherTfTrend(candles, interval);
+  if (higherTfTrend !== "NEUTRAL" && higherTfTrend !== side) score -= 15;
+  else if (higherTfTrend === side) score += 8;
+  const crossoverAge = getEmaCrossoverAge(ema34, ema89);
+  if (crossoverAge <= 5) score += 10;
+  else if (crossoverAge <= 15) score += 3;
+  else if (crossoverAge > 25) score -= 5;
+  const recentVols = candles.slice(-4, -1).map((c) => c.volume);
+  if (recentVols.length >= 3 && recentVols[2] > recentVols[0] * 1.12) score += 5;
+  if (learningPolicy?.sideBias === -1 && side === "LONG") score -= 12;
+  else if (learningPolicy?.sideBias === 1 && side === "SHORT") score -= 12;
+  if (symbol !== "BTC/USDT" && btcTrend !== "NEUTRAL") {
+    if (btcTrend === "SHORT" && side === "LONG") score -= 10;
+    else if (btcTrend === "SHORT" && side === "SHORT") score += 6;
+    else if (btcTrend === "LONG" && side === "LONG") score += 5;
+    else if (btcTrend === "LONG" && side === "SHORT") score -= 5;
+  }
   if (strategy.kind === "pullback") {
     const pullback = evaluatePullback(closes, candles, side, rsi, atrPct, volumeRatio);
     if (!pullback.ok) return null;
@@ -517,7 +536,7 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
     if (!scalp.ok) return null;
     score = Math.max(score, scalp.score);
   }
-  if (history.trades >= 3) score += history.winRate >= 60 && history.avgPnlPct > 0 ? 10 : -18;
+  if (history.trades >= 3) score += history.winRate >= 60 && history.avgPnlPct > 0 ? 10 : -25;
 
   const riskDistance = last.close * Math.max(scalping ? 0.0015 : 0.0035, Math.min(scalping ? 0.005 : 0.025, atrPct / 100 * (scalping ? 0.58 : 0.75)));
   const rr1 = scalping ? 0.55 : strategy.kind === "pullback" ? 1.35 : 1.6;
@@ -541,7 +560,7 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
   const expected = estimateScenarioExpectedNet(scenario, scalping);
   if (expected.weightedNetPct < (scalping ? config.minScalpingExpectedNetPct : config.minExpectedNetPct)) return null;
   if (expected.target2NetPct <= 0) return null;
-  if (learningPolicy?.preferredPatterns?.includes(patternKey)) score += 8;
+  if (learningPolicy?.preferredPatterns?.includes(patternKey)) score += 14;
 
   return {
     symbol,
@@ -564,7 +583,7 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
     scenario,
     expected,
     patternKey,
-    reason: `${strategy.label}: EMA34/89 ${side}, RSI ${rsi.toFixed(1)}, volume x${volumeRatio.toFixed(2)}, ATR ${atrPct.toFixed(2)}%, чистая цель ${expected.weightedNetPct.toFixed(2)}%`
+    reason: `${strategy.label}: EMA34/89 ${side}, RSI ${rsi.toFixed(1)}, volume x${volumeRatio.toFixed(2)}, ATR ${atrPct.toFixed(2)}%, чистая цель ${expected.weightedNetPct.toFixed(2)}%, BTC ${btcTrend}`
   };
 }
 
@@ -603,6 +622,49 @@ function evaluateScalp(closes, candles, side, rsi, atrPct, volumeRatio) {
   const lastRangePct = candles[i].close > 0 ? ((candles[i].high - candles[i].low) / candles[i].close) * 100 : 0;
   if (lastRangePct <= 1.8) score += 4;
   return { ok: (longOk || shortOk) && score >= 72, score: Math.round(score) };
+}
+
+function getHigherTfTrend(candles, interval) {
+  const step = interval === "5m" ? 4 : interval === "15m" ? 4 : interval === "1h" ? 4 : 0;
+  if (!step || candles.length < step * 30) return "NEUTRAL";
+  const sampled = candles.filter((_, i) => i % step === 0);
+  if (sampled.length < 25) return "NEUTRAL";
+  const closes = sampled.map((c) => c.close);
+  const ema21 = calculateEma(closes, 21);
+  const ema55 = calculateEma(closes, 55);
+  const i = closes.length - 1;
+  if (!Number.isFinite(ema21[i]) || !Number.isFinite(ema55[i])) return "NEUTRAL";
+  if (ema21[i] > ema55[i] * 1.002) return "LONG";
+  if (ema21[i] < ema55[i] * 0.998) return "SHORT";
+  return "NEUTRAL";
+}
+
+async function getBtcTrend() {
+  try {
+    const candles = await fetchCandles("BTC/USDT", "1h", 200);
+    if (candles.length < 90) return "NEUTRAL";
+    const closes = candles.map((c) => c.close);
+    const ema34 = calculateEma(closes, 34);
+    const ema89 = calculateEma(closes, 89);
+    const i = closes.length - 1;
+    if (!Number.isFinite(ema34[i]) || !Number.isFinite(ema89[i])) return "NEUTRAL";
+    if (ema34[i] > ema89[i] * 1.003) return "LONG";
+    if (ema34[i] < ema89[i] * 0.997) return "SHORT";
+    return "NEUTRAL";
+  } catch {
+    return "NEUTRAL";
+  }
+}
+
+function getEmaCrossoverAge(ema34, ema89) {
+  const n = Math.min(ema34.length, ema89.length);
+  if (n < 3) return 99;
+  const currentTrend = ema34[n - 1] > ema89[n - 1] ? 1 : -1;
+  for (let i = n - 2; i >= Math.max(0, n - 30); i--) {
+    if (!Number.isFinite(ema34[i]) || !Number.isFinite(ema89[i])) continue;
+    if ((ema34[i] > ema89[i] ? 1 : -1) !== currentTrend) return n - 1 - i;
+  }
+  return 30;
 }
 
 function estimateScenarioExpectedNet(scenario, scalping) {
@@ -960,36 +1022,73 @@ function isAssetBlockedByPolicy(symbol, learningPolicy) {
 
 function createLearningPolicyFromTrades(trades) {
   const closed = trades.filter((trade) => !isActiveTrade(trade) && trade.status !== "cancelled");
-  const assetStats = buildGroupStats(closed, (trade) => trade.asset);
-  const patternStats = buildGroupStats(closed, (trade) => getLearningPatternKey(trade.asset, trade.timeframe, trade.side, getTradeStrategyId(trade)));
+  const assetStats = buildGroupStatsWeighted(closed, (trade) => trade.asset);
+  const assetSideStats = buildGroupStatsWeighted(closed, (trade) => `${trade.asset}|${trade.side}`);
+  const patternStats = buildGroupStatsWeighted(closed, (trade) => getLearningPatternKey(trade.asset, trade.timeframe, trade.side, getTradeStrategyId(trade)));
   const strategyStats = buildGroupStats(closed.filter((trade) => trade.autopilot || trade.userLogin === config.userLogin), getTradeStrategyId);
   const blockedAssets = Object.values(assetStats)
-    .filter((item) => item.trades >= 8 && item.winRate < 35 && item.avgPnl <= -2)
+    .filter((item) => item.trades >= 5 && item.winRate < 35 && item.avgPnl <= -2)
     .map((item) => item.key);
-  const hardBlockedAssets = blockedAssets;
+  const hardBlockedAssets = Object.values(assetStats)
+    .filter((item) => item.trades >= 8 && item.winRate < 25 && item.avgPnl <= -3)
+    .map((item) => item.key);
+  const blockedAssetSides = Object.values(assetSideStats)
+    .filter((item) => item.trades >= 6 && item.winRate < 30 && item.avgPnl <= -2)
+    .map((item) => item.key);
   const blockedPatterns = Object.values(patternStats)
-    .filter((item) => item.trades >= 3 && (item.winRate < 50 || item.avgPnl <= 0))
+    .filter((item) => item.trades >= 5 && item.winRate < 40 && item.avgPnl <= 0)
     .map((item) => item.key);
   const preferredPatterns = Object.values(patternStats)
-    .filter((item) => item.trades >= 5 && item.winRate >= 60 && item.avgPnl > 0)
+    .filter((item) => item.trades >= 4 && item.winRate >= 60 && item.avgPnl > 0)
     .sort((a, b) => b.avgPnl - a.avgPnl)
     .slice(0, 20)
     .map((item) => item.key);
+  const sideStats = buildGroupStatsWeighted(closed, (trade) => trade.side);
+  const longS = sideStats["LONG"];
+  const shortS = sideStats["SHORT"];
+  let sideBias = 0;
+  if (longS && shortS && longS.trades >= 15 && shortS.trades >= 15) {
+    if (longS.winRate < shortS.winRate - 20 && longS.avgPnl < 0) sideBias = -1;
+    else if (shortS.winRate < longS.winRate - 20 && shortS.avgPnl < 0) sideBias = 1;
+  }
   return normalizeLearningPolicy({
     lastReviewDate: getDateKey(),
     reviewedAt: Date.now(),
     blockedAssets,
     hardBlockedAssets,
+    blockedAssetSides,
     blockedPatterns,
     preferredPatterns,
+    sideBias,
     notes: [
       `Server-самоанализ: ${closed.length} закрытых сделок.`,
-      `Блок монет: ${blockedAssets.length}.`,
+      `Блок монет (soft: ${blockedAssets.length}, hard: ${hardBlockedAssets.length}).`,
+      `Блок asset+side: ${blockedAssetSides.length}. Уклон: ${sideBias === -1 ? "SHORT (LONG слаб)" : sideBias === 1 ? "LONG (SHORT слаб)" : "нейтральный"}.`,
       `Блок связок: ${blockedPatterns.length}.`,
       `Приоритет связок: ${preferredPatterns.length}.`,
       formatBestStrategyNote(strategyStats)
     ]
   });
+}
+
+function buildGroupStatsWeighted(trades, keyFn) {
+  const now = Date.now();
+  const sevenDays = 7 * 24 * 60 * 60 * 1000;
+  return trades.reduce((acc, trade) => {
+    const key = keyFn(trade);
+    if (!key) return acc;
+    acc[key] ||= { key, trades: 0, weightedTotal: 0, wins: 0, pnl: 0, avgPnl: 0, winRate: 0 };
+    const item = acc[key];
+    const age = now - (Number(trade.closedAt) || Number(trade.openedAt) || 0);
+    const weight = age > sevenDays ? 0.5 : 1.0;
+    item.trades += 1;
+    item.weightedTotal += weight;
+    item.pnl += (Number(trade.pnl) || 0) * weight;
+    if ((Number(trade.pnl) || 0) > 0) item.wins += weight;
+    item.avgPnl = item.weightedTotal > 0 ? item.pnl / item.weightedTotal : 0;
+    item.winRate = item.weightedTotal > 0 ? (item.wins / item.weightedTotal) * 100 : 0;
+    return acc;
+  }, {});
 }
 
 function buildGroupStats(trades, keyFn) {
@@ -1014,8 +1113,10 @@ function normalizeLearningPolicy(policy) {
     reviewedAt: Number(policy?.reviewedAt) || 0,
     blockedAssets: Array.isArray(policy?.blockedAssets) ? policy.blockedAssets.map(String) : [],
     hardBlockedAssets: Array.isArray(policy?.hardBlockedAssets) ? policy.hardBlockedAssets.map(String) : [],
+    blockedAssetSides: Array.isArray(policy?.blockedAssetSides) ? policy.blockedAssetSides.map(String) : [],
     blockedPatterns: Array.isArray(policy?.blockedPatterns) ? policy.blockedPatterns.map(String) : [],
     preferredPatterns: Array.isArray(policy?.preferredPatterns) ? policy.preferredPatterns.map(String) : [],
+    sideBias: Number(policy?.sideBias) || 0,
     notes: Array.isArray(policy?.notes) ? policy.notes.map(String) : []
   };
 }
@@ -1023,13 +1124,16 @@ function normalizeLearningPolicy(policy) {
 function mergeLearningPolicies(...policies) {
   const normalized = policies.filter(Boolean).map(normalizeLearningPolicy);
   if (!normalized.length) return normalizeLearningPolicy(null);
+  const mostBiased = normalized.reduce((prev, cur) => Math.abs(cur.sideBias) > Math.abs(prev.sideBias) ? cur : prev, normalized[0]);
   return normalizeLearningPolicy({
     lastReviewDate: normalized.sort((a, b) => (b.reviewedAt || 0) - (a.reviewedAt || 0))[0]?.lastReviewDate || "",
     reviewedAt: Math.max(...normalized.map((policy) => Number(policy.reviewedAt) || 0)),
     blockedAssets: uniqueFlat(normalized.map((policy) => policy.blockedAssets)),
     hardBlockedAssets: uniqueFlat(normalized.map((policy) => policy.hardBlockedAssets)),
+    blockedAssetSides: uniqueFlat(normalized.map((policy) => policy.blockedAssetSides)),
     blockedPatterns: uniqueFlat(normalized.map((policy) => policy.blockedPatterns)),
     preferredPatterns: uniqueFlat(normalized.map((policy) => policy.preferredPatterns)),
+    sideBias: mostBiased.sideBias,
     notes: uniqueFlat(normalized.map((policy) => policy.notes)).slice(-12)
   });
 }
@@ -1043,8 +1147,10 @@ function summarizeLearningPolicy(policy) {
     reviewedAt: policy?.reviewedAt || 0,
     blockedAssets: policy?.blockedAssets?.length || 0,
     hardBlockedAssets: policy?.hardBlockedAssets?.length || 0,
+    blockedAssetSides: policy?.blockedAssetSides || [],
     blockedPatterns: policy?.blockedPatterns?.length || 0,
-    preferredPatterns: policy?.preferredPatterns?.length || 0
+    preferredPatterns: policy?.preferredPatterns?.length || 0,
+    sideBias: policy?.sideBias || 0
   };
 }
 
