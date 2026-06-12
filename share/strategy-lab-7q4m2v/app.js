@@ -3573,6 +3573,9 @@ function evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan =
   if (intel?.marketStructure?.atrPct > 4.5) {
     return { ok: false, reason: `ATR ${intel.marketStructure.atrPct.toFixed(2)}% выше лимита умеренного риска`, score: best.score - 30 };
   }
+  if (context.mode === "high-volatility") {
+    return { ok: false, reason: "высокая волатильность: автобот не входит, жди нормального ATR", score: best.score - 40 };
+  }
   if (intel?.higherTimeframe?.direction && !["NEUTRAL", "UNKNOWN", best.side].includes(intel.higherTimeframe.direction)) {
     return softGate(`старший таймфрейм против ${best.side}`, 42);
   }
@@ -5001,7 +5004,7 @@ function getVolatilityPct(context) {
     "4h": 0.022,
     "1d": 0.035
   };
-  const modeBoost = context.mode === "high-volatility" ? 1.35 : context.mode === "range" ? 0.82 : 1;
+  const modeBoost = context.mode === "high-volatility" ? 0.7 : context.mode === "range" ? 0.82 : 1;
   return byFrame[context.timeframe] * modeBoost;
 }
 
