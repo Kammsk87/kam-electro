@@ -1563,11 +1563,22 @@ function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+const BYBIT_HEADERS = {
+  "Accept": "application/json",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Cache-Control": "no-cache",
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Referer": "https://www.bybit.com/",
+  "Origin": "https://www.bybit.com"
+};
+
 async function fetchWithTimeout(url, options = {}, timeoutMs = 10_000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const isBybit = url.includes("bybit.com");
+  const headers = isBybit ? { ...BYBIT_HEADERS, ...(options.headers || {}) } : (options.headers || {});
   try {
-    return await fetch(url, { ...options, signal: controller.signal });
+    return await fetch(url, { ...options, headers, signal: controller.signal });
   } finally {
     clearTimeout(timer);
   }
