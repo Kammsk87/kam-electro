@@ -4,10 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Боталин</title>
-    <meta
-      name="description"
-      content="Боталин — бот для торговой стратегии."
-    >
+    <meta name="description" content="Боталин — бот для торговой стратегии.">
     <meta name="robots" content="noindex, nofollow">
     <link rel="stylesheet" href="styles.css">
     <script src="remote-journal-config.js"></script>
@@ -15,980 +12,712 @@
     <script src="app.js" defer></script>
   </head>
   <body class="auth-locked">
+
+    <!-- ─── Auth ─────────────────────────────────────────────── -->
     <section class="auth-screen" data-auth-screen>
       <form class="auth-card" data-auth-form>
         <span class="brand-mark">БТ</span>
         <h1>Боталин</h1>
         <p>Бот для торговой стратегии</p>
-        <label>
-          Логин
-          <input id="authLogin" type="text" autocomplete="username" autofocus>
-        </label>
-        <label>
-          Пароль
-          <input id="authPassword" type="password" autocomplete="current-password">
-        </label>
+        <label>Логин<input id="authLogin" type="text" autocomplete="username" autofocus></label>
+        <label>Пароль<input id="authPassword" type="password" autocomplete="current-password"></label>
         <button class="primary-action full-width" type="submit">Войти</button>
         <div class="auth-error" data-auth-error></div>
       </form>
     </section>
 
-    <main class="app-shell" aria-hidden="true">
-      <aside class="side-panel" aria-label="Настройки стратегии">
+    <!-- ─── App shell ─────────────────────────────────────────── -->
+    <div class="app-shell" aria-hidden="true">
+
+      <!-- Fixed header -->
+      <header class="dash-header">
         <a class="brand" href="./" aria-label="Боталин">
           <span class="brand-mark">БТ</span>
-          <span>
-            <strong>Боталин</strong>
-            <small>Бот для торговой стратегии</small>
-          </span>
+          <strong>Боталин</strong>
         </a>
-        <div class="auth-user-pill">
-          <span>Пользователь</span>
-          <strong data-auth-user>не вошел</strong>
-        </div>
-        <button class="text-button full-width" type="button" data-auth-logout>Выйти</button>
 
-        <section class="panel-section">
-          <div class="section-title">
+        <nav class="tab-nav" role="tablist">
+          <button class="tab-btn is-active" data-tab="positions" role="tab">Позиции</button>
+          <button class="tab-btn" data-tab="signals" role="tab">Радар</button>
+          <button class="tab-btn" data-tab="strategy" role="tab">Стратегия</button>
+          <button class="tab-btn" data-tab="journal" role="tab">История</button>
+          <button class="tab-btn" data-tab="settings" role="tab">Настройки</button>
+        </nav>
+
+        <div class="hdr-stats">
+          <div class="hs hs--bot">
+            <span class="bot-dot" data-sb-bot-status title="Статус бота">●</span>
+            <strong data-autopilot-status>наблюдает</strong>
+          </div>
+          <div class="hs">
+            <span>Позиций</span>
+            <strong data-sb-active>0</strong>
+          </div>
+          <div class="hs">
+            <span>PnL день</span>
+            <strong data-sb-pnl>—</strong>
+          </div>
+          <div class="hs hs--risk">
+            <span>Риск</span>
+            <strong data-sb-risk>OK</strong>
+          </div>
+          <div class="hs">
             <span>Рынок</span>
-            <button class="icon-button" type="button" data-randomize title="Случайный сценарий" aria-label="Случайный сценарий">↻</button>
+            <strong data-sb-market>нет данных</strong>
           </div>
-
-          <label>
-            Актив
-            <select id="asset">
-              <optgroup label="Крупные активы">
-                <option value="BTC/USDT">Bitcoin (BTC)</option>
-                <option value="ETH/USDT">Ethereum (ETH)</option>
-                <option value="SOL/USDT">Solana (SOL)</option>
-                <option value="BNB/USDT">BNB</option>
-                <option value="XRP/USDT">XRP</option>
-                <option value="TON/USDT">Toncoin (TON)</option>
-              </optgroup>
-              <optgroup label="Активно торгуемые альткоины">
-                <option value="ADA/USDT">Cardano (ADA)</option>
-                <option value="DOGE/USDT">Dogecoin (DOGE)</option>
-                <option value="TRX/USDT">TRON (TRX)</option>
-                <option value="AVAX/USDT">Avalanche (AVAX)</option>
-                <option value="LINK/USDT">Chainlink (LINK)</option>
-                <option value="DOT/USDT">Polkadot (DOT)</option>
-                <option value="MATIC/USDT">Polygon (MATIC)</option>
-                <option value="LTC/USDT">Litecoin (LTC)</option>
-                <option value="BCH/USDT">Bitcoin Cash (BCH)</option>
-                <option value="UNI/USDT">Uniswap (UNI)</option>
-                <option value="AAVE/USDT">Aave (AAVE)</option>
-                <option value="APT/USDT">Aptos (APT)</option>
-                <option value="SUI/USDT">Sui (SUI)</option>
-                <option value="ARB/USDT">Arbitrum (ARB)</option>
-                <option value="OP/USDT">Optimism (OP)</option>
-                <option value="NEAR/USDT">NEAR Protocol (NEAR)</option>
-                <option value="ATOM/USDT">Cosmos (ATOM)</option>
-                <option value="INJ/USDT">Injective (INJ)</option>
-                <option value="FIL/USDT">Filecoin (FIL)</option>
-                <option value="ETC/USDT">Ethereum Classic (ETC)</option>
-                <option value="SEI/USDT">Sei (SEI)</option>
-                <option value="TIA/USDT">Celestia (TIA)</option>
-                <option value="TWT/USDT">Trust Wallet Token (TWT)</option>
-              </optgroup>
-            </select>
-          </label>
-
-          <label>
-            Таймфрейм
-            <select id="timeframe">
-              <option>5m</option>
-              <option selected>15m</option>
-              <option>1h</option>
-              <option>4h</option>
-              <option>1d</option>
-            </select>
-          </label>
-
-          <label>
-            Рыночный режим
-            <select id="marketMode">
-              <option value="auto" selected>Автоматически по графику</option>
-              <option value="trend">Тренд</option>
-              <option value="range">Боковик</option>
-              <option value="breakout">Пробой</option>
-              <option value="pullback">Откат</option>
-              <option value="high-volatility">Высокая волатильность</option>
-            </select>
-          </label>
-
-          <label>
-            Риск на сделку: <output id="riskValue">1.0%</output>
-            <input id="risk" type="range" min="0.25" max="2" step="0.25" value="1">
-          </label>
-
-          <label>
-            Мой депозит (ручной + браузер-бот), USDT
-            <input id="deposit" type="number" min="0" step="10" value="10000">
-          </label>
-
-          <fieldset>
-            <legend>Стиль</legend>
-            <label class="check-row">
-              <input type="checkbox" id="conservative" checked>
-              <span>консервативный вход</span>
-            </label>
-            <label class="check-row">
-              <input type="checkbox" id="includeLongs" checked>
-              <span>long-сценарий</span>
-            </label>
-            <label class="check-row">
-              <input type="checkbox" id="includeShorts" checked>
-              <span>short-сценарий</span>
-            </label>
-          </fieldset>
-        </section>
-
-        <section class="panel-section">
-          <div class="section-title">
-            <span>Радар CMC</span>
-            <span class="mini-counter" data-cmc-status>off</span>
+          <div class="hs">
+            <span>Свободно</span>
+            <strong data-sb-free>—</strong>
           </div>
-          <label>
-            CMC API key
-            <input id="cmcApiKey" type="password" placeholder="CoinMarketCap API key">
-          </label>
-          <label>
-            CMC proxy URL
-            <input id="cmcProxyUrl" type="url" placeholder="опционально, если браузер блокирует API">
-          </label>
-          <div class="radar-grid">
-            <label>
-              Топ
-              <select id="cmcLimit">
-                <option value="50">50</option>
-                <option value="100" selected>100</option>
-                <option value="200">200</option>
-              </select>
-            </label>
-            <label>
-              Мин. объем
-              <input id="cmcMinVolume" type="number" min="0" step="1000000" value="50000000">
-            </label>
-          </div>
-          <div class="remote-actions">
-            <button class="primary-action" type="button" data-cmc-save>Сохранить</button>
-            <button class="secondary-action" type="button" data-cmc-refresh>Обновить</button>
-          </div>
-          <div class="radar-list" data-cmc-radar-list>
-            <span>CMC выбирает монеты для наблюдения, входы остаются по Bybit.</span>
-          </div>
-        </section>
-
-        <section class="panel-section">
-          <div class="section-title">
-            <span>Новостной фон</span>
-            <span class="mini-counter" data-news-status>off</span>
-          </div>
-          <label>
-            Биржевая лента URL
-            <input id="exchangeNewsUrl" type="url" placeholder="Bybit/биржа news proxy URL">
-          </label>
-          <label>
-            CMC News API key
-            <input id="cmcNewsApiKey" type="password" placeholder="если пусто, берется CMC radar key">
-          </label>
-          <label>
-            CMC News proxy URL
-            <input id="cmcNewsProxyUrl" type="url" placeholder="опционально для /v1/content/latest">
-          </label>
-          <label>
-            CFTC COT URL
-            <input id="cftcNewsUrl" type="url" placeholder="https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm">
-          </label>
-          <label>
-            Ручные новости
-            <textarea id="manualNewsInput" rows="4" placeholder="BTC bullish ETF inflows grow&#10;CFTC bearish leveraged funds reduce longs"></textarea>
-          </label>
-          <div class="remote-actions">
-            <button class="primary-action" type="button" data-news-save>Сохранить</button>
-            <button class="secondary-action" type="button" data-news-refresh>Обновить</button>
-          </div>
-          <div class="radar-list news-list" data-news-list>
-            <span>Новости добавят бычий/медвежий фильтр к стратегии и автоботу.</span>
-          </div>
-        </section>
-
-        <section class="panel-section">
-          <div class="section-title">
-            <span>RSI индикаторы</span>
-            <span class="mini-counter" data-rsi-asset>BTC</span>
-          </div>
-          <div class="indicator-list" data-rsi-controls></div>
-        </section>
-
-        <section class="panel-section">
-          <div class="section-title">
-            <span>EMA Фибоначчи</span>
-            <span class="mini-counter">34 / 89</span>
-          </div>
-          <div class="indicator-list" data-ema-controls></div>
-        </section>
-
-        <section class="panel-section">
-          <div class="section-title">
-            <span>Live рынок</span>
-            <span class="mini-counter" data-live-status>offline</span>
-          </div>
-          <button class="primary-action full-width" type="button" data-live-toggle>Включить live</button>
-          <div class="live-readout">
-            <div>
-              <span>Источник</span>
-              <strong data-live-source>Bybit V5 public WS</strong>
-            </div>
-            <div>
-              <span>Цена</span>
-              <strong data-live-price>нет данных</strong>
-            </div>
-            <div>
-              <span>Bid / Ask</span>
-              <strong data-live-book>нет данных</strong>
-            </div>
-            <div>
-              <span>Спред</span>
-              <strong data-live-spread>нет данных</strong>
-            </div>
-            <div>
-              <span>24h объем</span>
-              <strong data-live-volume>нет данных</strong>
-            </div>
-            <div>
-              <span>Обновлено</span>
-              <strong data-live-updated>нет данных</strong>
-            </div>
-          </div>
-        </section>
-
-        <section class="panel-section">
-          <div class="section-title">
-            <span>Общий журнал</span>
-            <span class="mini-counter" data-remote-status>local</span>
-          </div>
-          <label>
-            Supabase URL
-            <input id="remoteUrl" type="url" placeholder="https://project.supabase.co">
-          </label>
-          <label>
-            Anon key
-            <input id="remoteKey" type="password" placeholder="public anon key">
-          </label>
-          <label>
-            Таблица
-            <input id="remoteTable" type="text" value="crypto_strategy_trades">
-          </label>
-          <div class="remote-actions">
-            <button class="primary-action" type="button" data-remote-save>Сохранить</button>
-            <button class="secondary-action" type="button" data-remote-sync>Синхронизировать</button>
-          </div>
-        </section>
-
-        <section class="panel-section">
-          <div class="section-title">
-            <span>Обучающая база</span>
-            <button class="text-button" type="button" data-reset-training>Сброс</button>
-          </div>
-          <textarea id="trainingInput" rows="5" placeholder="Например: Не торговать пробой без ретеста. После 3 стопов подряд снижать риск вдвое."></textarea>
-          <button class="primary-action" type="button" data-add-training>Добавить правило</button>
-          <div class="rule-list" data-rules></div>
-        </section>
-
-        <section class="panel-section">
-          <div class="section-title">
-            <span>Книжная база</span>
-            <span class="mini-counter" data-source-count>0 источников</span>
-          </div>
-          <div class="source-list" data-sources></div>
-        </section>
-      </aside>
-
-      <section class="workspace" aria-label="Рабочая область бота">
-        <div class="workspace-header">
-          <header class="top-bar">
-            <div>
-              <p class="eyebrow">Бот для торговой стратегии</p>
-              <h1>Боталин</h1>
-            </div>
-            <div class="top-actions">
-              <button class="secondary-action" type="button" data-copy>Копировать стратегию</button>
-              <button class="primary-action" type="button" data-generate>Сгенерировать</button>
-            </div>
-          </header>
-          <div class="status-bar">
-            <div class="sb-item">
-              <span>Бот</span>
-              <strong data-sb-bot-status>standby</strong>
-            </div>
-            <div class="sb-item">
-              <span>Свободно</span>
-              <strong data-sb-free>— USDT</strong>
-            </div>
-            <div class="sb-item">
-              <span>В рынке</span>
-              <strong data-sb-reserved>— USDT</strong>
-            </div>
-            <div class="sb-item">
-              <span>День PnL</span>
-              <strong data-sb-pnl>—</strong>
-            </div>
-            <div class="sb-item">
-              <span>Активных</span>
-              <strong data-sb-active>0</strong>
-            </div>
-            <div class="sb-item">
-              <span>Риск лимит</span>
-              <strong data-sb-risk>OK</strong>
-            </div>
-            <div class="sb-item sb-item--wide">
-              <span>Рынок</span>
-              <strong data-sb-market>нет данных</strong>
-            </div>
+          <div class="hs">
+            <span>В рынке</span>
+            <strong data-sb-reserved>—</strong>
           </div>
         </div>
 
-        <section class="strategy-grid">
-          <div class="strategy-output" aria-live="polite">
-            <div class="output-header">
-              <span>Ответ бота</span>
-              <span class="status-pill" data-confidence>готов к обучению</span>
+        <div class="hdr-user">
+          <strong data-auth-user>гость</strong>
+          <button class="text-button" type="button" data-auth-logout>Выйти</button>
+        </div>
+      </header>
+
+      <!-- Tab content -->
+      <main class="dash-main">
+
+        <!-- ═══ TAB: Позиции ═══════════════════════════════════ -->
+        <div class="tab-pane is-active" data-tab-pane="positions">
+
+          <div class="pos-layout">
+
+            <!-- Server bot block -->
+            <div class="pos-bot-block">
+              <div class="pane-section">
+                <div class="pane-header">
+                  <div class="pane-title-group">
+                    <span class="bot-badge server-badge">SERVER</span>
+                    <h2>Серверный бот</h2>
+                    <span class="live-chip" data-bot-health-status>health</span>
+                  </div>
+                  <div class="pane-actions">
+                    <button class="text-button" type="button" data-intel-refresh>Обновить</button>
+                  </div>
+                </div>
+
+                <div class="bot-stat-row">
+                  <div class="bstat"><span>Бэктест</span><strong data-backtest-score>—</strong></div>
+                  <div class="bstat"><span>Обучение</span><strong data-learning-score>—</strong></div>
+                  <div class="bstat"><span>10%/мес</span><strong data-monthly-goal>—</strong></div>
+                  <div class="bstat"><span>Деривативы</span><strong data-derivatives-score>—</strong></div>
+                </div>
+
+                <div class="health-strip">
+                  <div><span>Капитал</span><strong data-server-wallet-equity>10000.00 USDT</strong></div>
+                  <div><span>Свободно</span><strong data-server-wallet-free>10000.00 USDT</strong></div>
+                  <div><span>В рынке</span><strong data-server-wallet-reserved>0.00 USDT</strong></div>
+                </div>
+
+                <p class="pos-hint">Здоровье и решения бота → вкладка <strong>Радар</strong></p>
+              </div>
             </div>
-            <article class="strategy-card" data-strategy>
-              <h2>Запусти генерацию стратегии</h2>
-              <p>
-                Выбери актив, режим рынка и риск. Добавь правила, по которым хочешь обучать бота:
-                фильтры входа, риск-менеджмент, запреты, любимые индикаторы и стиль сопровождения.
-              </p>
-            </article>
+
+            <!-- Browser bot block -->
+            <div class="pos-bot-block">
+              <div class="pane-section">
+                <div class="pane-header">
+                  <div class="pane-title-group">
+                    <span class="bot-badge browser-badge">BROWSER</span>
+                    <h2>Браузерный бот</h2>
+                  </div>
+                  <div class="pane-actions">
+                    <button class="text-button" type="button" data-export-journal>Excel</button>
+                    <button class="text-button" type="button" data-paper-clear>Очистить</button>
+                  </div>
+                </div>
+
+                <div class="bot-stat-row">
+                  <div class="bstat"><span>Открыто</span><strong data-journal-open>0</strong></div>
+                  <div class="bstat"><span>Закрыто</span><strong data-journal-closed>0</strong></div>
+                  <div class="bstat"><span>PnL</span><strong data-journal-pnl>0.00 USDT</strong></div>
+                  <div class="bstat"><span>Win/Loss</span><strong data-journal-winloss>0/0</strong></div>
+                  <div class="bstat"><span>Свободно</span><strong data-wallet-free>10000.00</strong></div>
+                  <div class="bstat"><span>В сделках</span><strong data-wallet-reserved>0.00</strong></div>
+                </div>
+
+                <div class="journal-table-wrap">
+                  <table class="journal-table">
+                    <thead>
+                      <tr>
+                        <th>№</th><th>Время</th><th>Монета</th><th>L/S</th>
+                        <th>Entry</th><th>Размер</th><th>Выход</th>
+                        <th>USDT</th><th>%</th><th>Статус</th>
+                      </tr>
+                    </thead>
+                    <tbody data-journal-rows>
+                      <tr><td colspan="10">Активных сделок нет</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Paper trade entry -->
+              <div class="pane-section">
+                <div class="pane-header">
+                  <div class="pane-title-group">
+                    <h2>Войти в сделку</h2>
+                    <span class="live-chip" data-paper-status>ожидает вход</span>
+                  </div>
+                </div>
+
+                <canvas id="paperChart" width="900" height="80" aria-label="График демо-сделки"></canvas>
+
+                <div class="paper-enter-row">
+                  <label>
+                    USDT
+                    <input id="paperAmount" type="number" min="10" step="10" value="1000">
+                  </label>
+                  <label>
+                    Сторона
+                    <select id="paperSide">
+                      <option value="LONG">LONG</option>
+                      <option value="SHORT">SHORT</option>
+                    </select>
+                  </label>
+                  <button class="primary-action" type="button" data-paper-enter>Войти</button>
+                  <button class="secondary-action" type="button" data-paper-reset>Сброс</button>
+                </div>
+
+                <div class="paper-metrics">
+                  <div><span>Entry</span><strong data-paper-entry>нет данных</strong></div>
+                  <div><span>Текущая</span><strong data-paper-current>нет данных</strong></div>
+                  <div><span>PnL</span><strong data-paper-pnl>0.00 USDT</strong></div>
+                  <div><span>Итог</span><strong data-paper-result>нет сделки</strong></div>
+                </div>
+              </div>
+
+              <!-- Battle gate summary (mirrored from History tab) -->
+              <div class="pane-section">
+                <div class="pane-header"><h2>Допуск к боевому режиму</h2></div>
+                <div class="gate-grid">
+                  <div><span>Прогресс</span><strong data-battle-score-pos>0/100</strong></div>
+                  <div><span>Winrate</span><strong data-battle-winrate-pos>0%</strong></div>
+                  <div><span>Profit factor</span><strong data-battle-profit-factor-pos>0.00</strong></div>
+                  <div><span>Статус</span><strong data-battle-status-pos>не готов</strong></div>
+                </div>
+              </div>
+            </div>
+
           </div>
 
-          <div class="market-lab">
-            <div class="chart-panel">
-              <div class="output-header">
-                <span data-chart-title>Сценарий цены</span>
-                <span data-chart-label>BTC/USDT · 15m</span>
-              </div>
-              <canvas id="marketChart" width="1080" height="220" aria-label="Схематичный график рынка"></canvas>
-            </div>
+        </div>
 
-            <div class="metrics">
-              <div>
-                <span>Risk / Reward</span>
-                <strong data-rr>1 : 2.2</strong>
-              </div>
-              <div>
-                <span>Макс. риск</span>
-                <strong data-max-risk>1.0%</strong>
-              </div>
-              <div>
-                <span>Фильтров</span>
-                <strong data-filter-count>4</strong>
-              </div>
-              <div>
-                <span>Качество</span>
-                <strong data-signal-score>--</strong>
-              </div>
-            </div>
+        <!-- ═══ TAB: Радар ════════════════════════════════════ -->
+        <div class="tab-pane" data-tab-pane="signals">
 
-            <div class="trade-plan-strip">
-              <div>
-                <span>План</span>
-                <strong data-plan-side>LONG / SHORT</strong>
-              </div>
-              <div>
-                <span>Entry</span>
-                <strong data-plan-entry>нет данных</strong>
-              </div>
-              <div>
-                <span>Stop</span>
-                <strong data-plan-stop>нет данных</strong>
-              </div>
-              <div>
-                <span>Target</span>
-                <strong data-plan-target>нет данных</strong>
-              </div>
-            </div>
+          <div class="radar-layout">
 
-            <div class="strategy-intel">
-              <div class="output-header">
-                <span>Точность стратегии</span>
-                <div class="journal-actions">
-                  <button class="text-button" type="button" data-intel-refresh>Обновить</button>
-                  <button class="text-button" type="button" data-autopilot-toggle>Авто-бот: выкл</button>
-                </div>
-              </div>
-              <label class="check-row scalping-toggle">
-                <input type="checkbox" id="scalpingMode">
-                <span>скальпинг-стратегия для автобота</span>
-              </label>
-              <label class="profile-row">
-                <span>Профиль автобота</span>
-                <select id="autopilotProfile">
-                  <option value="auto">Авто-тест</option>
-                  <option value="protective">Защитный</option>
-                  <option value="balanced">Баланс</option>
-                  <option value="active">Активный</option>
-                </select>
-              </label>
-              <div class="intel-grid">
-                <div>
-                  <span>Бэктест</span>
-                  <strong data-backtest-score>нет данных</strong>
-                </div>
-                <div>
-                  <span>Цель 10%/мес</span>
-                  <strong data-monthly-goal>нет данных</strong>
-                </div>
-                <div>
-                  <span>Деривативы</span>
-                  <strong data-derivatives-score>нет данных</strong>
-                </div>
-                <div>
-                  <span>Самообучение</span>
-                  <strong data-learning-score>нет данных</strong>
-                </div>
-                <div>
-                  <span>Автопилот</span>
-                  <strong data-autopilot-status>наблюдает</strong>
-                </div>
-              </div>
-              <div class="intel-details" data-intel-details>
-                Ожидаю live/исторические данные для расчета качества.
-              </div>
-            </div>
-
-            <div class="signal-center">
-              <div class="output-header">
-                <span>Сигнальные стратегии</span>
-                <span class="status-pill" data-signal-mode>внутридневной</span>
-              </div>
-              <div class="signal-strategy-grid">
-                <button type="button" data-signal-template="scalper">
-                  <strong>Скальпер</strong>
-                  <span>1-5m · быстрые сигналы</span>
-                </button>
-                <button type="button" data-signal-template="intraday" class="is-active">
-                  <strong>Внутридневной</strong>
-                  <span>15-30m · среднее удержание</span>
-                </button>
-                <button type="button" data-signal-template="swing">
-                  <strong>Среднесрочный</strong>
-                  <span>1h-1d · редкие входы</span>
-                </button>
-              </div>
-              <div class="signal-summary" data-signal-summary>
-                Сигнал будет формироваться из текущей монеты, таймфрейма и лучшего LONG/SHORT сценария.
-              </div>
-              <div class="signal-table-wrap">
-                <table class="signal-table">
-                  <thead>
-                    <tr>
-                      <th>Дата</th>
-                      <th>Монета</th>
-                      <th>ТФ</th>
-                      <th>L/S</th>
-                      <th>Источник</th>
-                      <th>Score</th>
-                      <th>Результат</th>
-                    </tr>
-                  </thead>
-                  <tbody data-signal-rows>
-                    <tr>
-                      <td colspan="7">Сигналов пока нет</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div class="bot-control-suite">
-              <div class="output-header">
-                <span>Профиль и контроль автобота</span>
-                <span class="status-pill" data-bot-health-status>health check</span>
-              </div>
-
-              <div class="bot-preset-grid" data-bot-presets></div>
-
-              <div class="bot-control-grid">
-                <div class="bot-control-panel">
-                  <div class="mini-title">Условия входа</div>
-                  <label class="check-row">
-                    <input type="checkbox" data-entry-condition="rsi" checked>
-                    <span>RSI подтверждает сторону</span>
-                  </label>
-                  <label class="check-row">
-                    <input type="checkbox" data-entry-condition="ema" checked>
-                    <span>EMA 34/89 по направлению</span>
-                  </label>
-                  <label class="check-row">
-                    <input type="checkbox" data-entry-condition="volume" checked>
-                    <span>Объем выше среднего</span>
-                  </label>
-                  <label class="check-row">
-                    <input type="checkbox" data-entry-condition="news" checked>
-                    <span>Новостной фон не против</span>
-                  </label>
-                  <label class="check-row">
-                    <input type="checkbox" data-entry-condition="higherTf" checked>
-                    <span>Старший ТФ подтверждает</span>
-                  </label>
-                  <label class="check-row">
-                    <input type="checkbox" data-entry-condition="history" checked>
-                    <span>История похожих сделок не слабая</span>
-                  </label>
+            <div class="radar-main">
+              <div class="pane-section">
+                <div class="pane-header">
+                  <div class="pane-title-group">
+                    <h2>Сигнальные стратегии</h2>
+                    <span class="live-chip" data-signal-mode>внутридневной</span>
+                  </div>
+                  <div class="pane-actions">
+                    <label class="check-row">
+                      <input type="checkbox" id="scalpingMode">
+                      <span>скальпинг</span>
+                    </label>
+                    <button class="primary-action" type="button" data-autopilot-toggle>Авто-бот: выкл</button>
+                  </div>
                 </div>
 
-                <div class="bot-control-panel">
-                  <div class="mini-title">Условия выхода</div>
-                  <label class="check-row">
-                    <input type="checkbox" data-exit-rule="breakevenAfterT1" checked>
-                    <span>Безубыток после T1</span>
-                  </label>
-                  <label class="check-row">
-                    <input type="checkbox" data-exit-rule="trailingStop">
-                    <span>Trailing stop после импульса</span>
-                  </label>
-                  <label class="check-row">
-                    <input type="checkbox" data-exit-rule="emaFlip">
-                    <span>Закрыть при развороте EMA</span>
-                  </label>
-                  <label class="check-row">
-                    <input type="checkbox" data-exit-rule="newsFlip">
-                    <span>Закрыть при ухудшении новости</span>
-                  </label>
-                  <label class="check-row">
-                    <input type="checkbox" data-exit-rule="tradeTimeout" checked>
-                    <span>Тайм-аут сделки</span>
-                  </label>
+                <div class="signal-strategy-grid">
+                  <button type="button" data-signal-template="scalper">
+                    <strong>Скальпер</strong>
+                    <span>1-5m · быстрые</span>
+                  </button>
+                  <button type="button" data-signal-template="intraday" class="is-active">
+                    <strong>Внутридневной</strong>
+                    <span>15-30m · среднее</span>
+                  </button>
+                  <button type="button" data-signal-template="swing">
+                    <strong>Среднесрочный</strong>
+                    <span>1h-1d · редкие</span>
+                  </button>
                 </div>
 
-                <div class="bot-control-panel">
-                  <div class="mini-title">Сетка и TTL</div>
-                  <label class="check-row">
-                    <input type="checkbox" data-grid-enabled>
-                    <span>Сетка добора вручную</span>
-                  </label>
-                  <label>
-                    Макс. доборов
-                    <input type="number" min="1" max="3" step="1" value="2" data-grid-orders>
-                  </label>
-                  <label>
-                    TTL pending, мин
-                    <input type="number" min="1" max="120" step="1" value="30" data-pending-ttl>
-                  </label>
-                  <label>
-                    TTL scalping, мин
-                    <input type="number" min="1" max="30" step="1" value="5" data-scalping-ttl>
-                  </label>
+                <div class="signal-summary" data-signal-summary>
+                  Сигнал формируется из текущей монеты, таймфрейма и лучшего LONG/SHORT сценария.
                 </div>
-              </div>
 
-              <div class="bot-market-grid">
-                <div class="bot-control-panel">
-                  <div class="mini-title">Маркет стратегий</div>
-                  <div class="strategy-market" data-strategy-market></div>
-                </div>
-                <div class="bot-control-panel">
-                  <div class="mini-title">Проверка перед запуском</div>
-                  <button class="secondary-action full-width" type="button" data-strategy-precheck>Проверить стратегию</button>
-                  <div class="bot-control-report" data-strategy-precheck-report>Проверка еще не запускалась</div>
-                </div>
-                <div class="bot-control-panel">
-                  <div class="mini-title">Почему вошел / не вошел</div>
-                  <div class="bot-control-report" data-decision-log>Жду новых решений автобота</div>
-                </div>
-              </div>
-
-              <div class="bot-health-grid">
-                <div>
-                  <span>Свободно</span>
-                  <strong data-health-free>0 USDT</strong>
-                </div>
-                <div>
-                  <span>В рынке</span>
-                  <strong data-health-reserved>0 USDT</strong>
-                </div>
-                <div>
-                  <span>День PnL</span>
-                  <strong data-health-day-pnl>0 USDT</strong>
-                </div>
-                <div>
-                  <span>Лимит риска</span>
-                  <strong data-health-risk-limit>OK</strong>
-                </div>
-                <div>
-                  <span>Активные</span>
-                  <strong data-health-active>0</strong>
-                </div>
-                <div>
-                  <span>Качество рынка</span>
-                  <strong data-health-market>нет данных</strong>
+                <div class="signal-table-wrap">
+                  <table class="signal-table">
+                    <thead>
+                      <tr>
+                        <th>Дата</th><th>Монета</th><th>ТФ</th><th>L/S</th>
+                        <th>Источник</th><th>Score</th><th>Результат</th>
+                      </tr>
+                    </thead>
+                    <tbody data-signal-rows>
+                      <tr><td colspan="7">Сигналов пока нет</td></tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
 
-            <div class="paper-panel">
-              <div class="paper-chart-wrap">
-                <div class="output-header">
-                  <span>Демо-сделка</span>
-                  <span class="status-pill" data-paper-status>ожидает вход</span>
-                </div>
-                <canvas id="paperChart" width="1080" height="92" aria-label="График проверки демо-сделки"></canvas>
-              </div>
+            <div class="radar-side">
 
-              <div class="paper-trade-box">
-                <label>
-                  Сумма, USDT · до 10% бюджета
-                  <input id="paperAmount" type="number" min="10" step="10" value="1000">
-                </label>
-                <label>
-                  Направление
-                  <select id="paperSide">
-                    <option value="LONG">LONG</option>
-                    <option value="SHORT">SHORT</option>
+              <div class="pane-section">
+                <div class="pane-header">
+                  <h2>Профиль автобота</h2>
+                </div>
+                <label class="profile-row">
+                  <select id="autopilotProfile">
+                    <option value="auto">Авто-тест</option>
+                    <option value="protective">Защитный</option>
+                    <option value="balanced">Баланс</option>
+                    <option value="active">Активный</option>
                   </select>
                 </label>
-                <button class="primary-action full-width" type="button" data-paper-enter>Войти в стратегию</button>
-                <button class="secondary-action full-width" type="button" data-paper-reset>Сброс графика</button>
-                <div class="paper-metrics">
-                  <div>
-                    <span>Entry</span>
-                    <strong data-paper-entry>нет данных</strong>
-                  </div>
-                  <div>
-                    <span>Текущая</span>
-                    <strong data-paper-current>нет данных</strong>
-                  </div>
-                  <div>
-                    <span>PnL</span>
-                    <strong data-paper-pnl>0.00 USDT</strong>
-                  </div>
-                  <div>
-                    <span>Итог</span>
-                    <strong data-paper-result>нет сделки</strong>
-                  </div>
-                  <div>
-                    <span>Мой свободно</span>
-                    <strong data-wallet-free>10000.00 USDT</strong>
-                  </div>
-                  <div>
-                    <span>Мой в сделках</span>
-                    <strong data-wallet-reserved>0.00 USDT</strong>
-                  </div>
-                  <div>
-                    <span>Сервер капитал</span>
-                    <strong data-server-wallet-equity>10000.00 USDT</strong>
-                  </div>
-                  <div>
-                    <span>Сервер свободно</span>
-                    <strong data-server-wallet-free>10000.00 USDT</strong>
-                  </div>
-                  <div>
-                    <span>Сервер в рынке</span>
-                    <strong data-server-wallet-reserved>0.00 USDT</strong>
-                  </div>
+                <div class="intel-grid">
+                  <div><span>Бэктест</span><strong data-backtest-score-2>—</strong></div>
+                  <div><span>Самообучение</span><strong data-learning-score-2>—</strong></div>
+                </div>
+                <div class="intel-details-2" data-intel-details-2></div>
+                <div class="bot-health-grid">
+                  <div><span>Свободно</span><strong data-health-free>0 USDT</strong></div>
+                  <div><span>В рынке</span><strong data-health-reserved>0 USDT</strong></div>
+                  <div><span>День PnL</span><strong data-health-day-pnl>0 USDT</strong></div>
+                  <div><span>Лимит</span><strong data-health-risk-limit>OK</strong></div>
+                  <div><span>Активные</span><strong data-health-active>0</strong></div>
+                  <div><span>Рынок</span><strong data-health-market>нет данных</strong></div>
                 </div>
               </div>
+
+              <div class="pane-section">
+                <div class="pane-header"><h2>Решение бота</h2></div>
+                <div class="bot-control-report" data-decision-log>Жду новых решений автобота</div>
+              </div>
+
+              <div class="pane-section">
+                <div class="pane-header"><h2>Пресеты</h2></div>
+                <div class="bot-preset-grid" data-bot-presets></div>
+              </div>
+
+              <div class="pane-section">
+                <div class="pane-header"><h2>Маркет стратегий</h2></div>
+                <div class="strategy-market" data-strategy-market></div>
+              </div>
+
             </div>
-
-            <div class="exchange-sim">
-              <div class="output-header">
-                <span>Боевой симулятор Bybit</span>
-                <span class="status-pill" data-exchange-sim-status>dry-run</span>
-              </div>
-              <div class="sim-actions">
-                <button class="secondary-action" type="button" data-preflight-check>Pre-flight</button>
-                <button class="secondary-action" type="button" data-dry-run-order>Dry-run ордер</button>
-                <button class="danger-action" type="button" data-kill-switch>Kill switch</button>
-              </div>
-              <div class="sim-grid">
-                <div>
-                  <span>Готовность</span>
-                  <strong data-preflight-score>не проверено</strong>
-                </div>
-                <div>
-                  <span>Режим</span>
-                  <strong>без реальных ключей</strong>
-                </div>
-                <div>
-                  <span>Действие</span>
-                  <strong data-preflight-action>ожидает проверки</strong>
-                </div>
-              </div>
-              <div class="sim-report" data-preflight-report>
-                Pre-flight проверит баланс, размер ордера, spread, tick size, TP/SL, risk limits, дубли и готовность к testnet.
-              </div>
-            </div>
-
-            <div class="battle-gate">
-              <div class="output-header">
-                <span>Допуск к боевому режиму</span>
-                <span class="status-pill" data-battle-status>не готов</span>
-              </div>
-              <div class="gate-grid">
-                <div>
-                  <span>Прогресс</span>
-                  <strong data-battle-score>0/100</strong>
-                </div>
-                <div>
-                  <span>Winrate</span>
-                  <strong data-battle-winrate>0%</strong>
-                </div>
-                <div>
-                  <span>Profit factor</span>
-                  <strong data-battle-profit-factor>0.00</strong>
-                </div>
-                <div>
-                  <span>Walk-forward</span>
-                  <strong data-battle-walk-forward>нет данных</strong>
-                </div>
-              </div>
-              <div class="gate-report" data-battle-report>
-                Нужно накопить статистику демо/dry-run, прежде чем разрешать testnet и реальный кабинет.
-              </div>
-            </div>
-
-            <div class="trade-journal">
-              <div class="output-header">
-                <span>Журнал операций</span>
-                <div class="journal-actions">
-                  <button class="text-button" type="button" data-export-journal>Excel</button>
-                  <button class="text-button" type="button" data-paper-clear>Очистить журнал</button>
-                </div>
-              </div>
-              <div class="journal-summary">
-                <div>
-                  <span>Открыто</span>
-                  <strong data-journal-open>0</strong>
-                </div>
-                <div>
-                  <span>Закрыто</span>
-                  <strong data-journal-closed>0</strong>
-                </div>
-                <div>
-                  <span>Итог PnL</span>
-                  <strong data-journal-pnl>0.00 USDT</strong>
-                </div>
-                <div>
-                  <span>Win / Loss</span>
-                  <strong data-journal-winloss>0 / 0</strong>
-                </div>
-              </div>
-              <div class="journal-table-wrap">
-                <table class="journal-table">
-                  <thead>
-                    <tr>
-                      <th>№</th>
-                      <th>Время</th>
-                      <th>Монета</th>
-                      <th>L/S</th>
-                      <th>Entry</th>
-                      <th>Размер</th>
-                      <th>Текущая / выход</th>
-                      <th>Profit USDT</th>
-                      <th>Profit %</th>
-                      <th>Статус</th>
-                    </tr>
-                  </thead>
-                  <tbody data-journal-rows>
-                    <tr>
-                      <td colspan="10">Сделок пока нет</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div class="trade-archive">
-              <div class="output-header">
-                <span>Все операции</span>
-                <div class="journal-actions">
-                  <button class="text-button" type="button" data-archive-refresh>Обновить</button>
-                  <button class="text-button" type="button" data-archive-toggle>Показать</button>
-                </div>
-              </div>
-              <div class="journal-summary archive-summary">
-                <div>
-                  <span>Всего</span>
-                  <strong data-archive-total>0</strong>
-                </div>
-                <div>
-                  <span>Ручные</span>
-                  <strong data-archive-manual>0</strong>
-                </div>
-                <div>
-                  <span>Авто</span>
-                  <strong data-archive-auto>0</strong>
-                </div>
-                <div>
-                  <span>Итог PnL</span>
-                  <strong data-archive-pnl>0.00 USDT</strong>
-                </div>
-                <div>
-                  <span>user1</span>
-                  <strong data-archive-user="user1">0</strong>
-                </div>
-                <div>
-                  <span>user2</span>
-                  <strong data-archive-user="user2">0</strong>
-                </div>
-                <div>
-                  <span>тестгость</span>
-                  <strong data-archive-user="тестгость">0</strong>
-                </div>
-                <div>
-                  <span>Server</span>
-                  <strong data-archive-user="server">0</strong>
-                </div>
-                <div>
-                  <span>Legacy</span>
-                  <strong data-archive-user="legacy">0</strong>
-                </div>
-              </div>
-              <div class="journal-table-wrap archive-table-wrap" data-archive-panel hidden>
-                <table class="journal-table archive-table">
-                  <thead>
-                    <tr>
-                      <th>№</th>
-                      <th>Дата</th>
-                      <th>Пользователь</th>
-                      <th>Источник</th>
-                      <th>Монета</th>
-                      <th>ТФ</th>
-                      <th>L/S</th>
-                      <th>Entry</th>
-                      <th>Выход / текущая</th>
-                      <th>Profit USDT</th>
-                      <th>Profit %</th>
-                      <th>Статус</th>
-                    </tr>
-                  </thead>
-                  <tbody data-archive-rows>
-                    <tr>
-                      <td colspan="12">Архив пока пуст</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <section class="instruction-panel" aria-label="Инструкция по Боталину">
-              <div class="output-header">
-                <span>Инструкция</span>
-                <span class="status-pill">простая схема работы</span>
-              </div>
-
-              <div class="instruction-grid">
-                <details open>
-                  <summary>Быстрый порядок действий</summary>
-                  <ol>
-                    <li>Войди под своим пользователем: <code>user1</code>, <code>user2</code> или <code>тестгость</code>.</li>
-                    <li>Проверь блок “Общий журнал”: статус должен быть <code>shared</code>, чтобы сделки и обучение брались из Supabase.</li>
-                    <li>Выбери актив, таймфрейм, риск и направления <code>long</code> / <code>short</code>.</li>
-                    <li>Нажми “Сгенерировать”, посмотри план Entry, Stop, Target и качество стратегии.</li>
-                    <li>Для ручной проверки укажи сумму в “Демо-сделке” и нажми “Войти в стратегию”.</li>
-                    <li>Для автоматической проверки включи “Авто-бот: вкл”. Он сам выберет монету, таймфрейм и сторону.</li>
-                    <li>Смотри результат в “Журнале операций” и в “Все операции”.</li>
-                  </ol>
-                </details>
-
-                <details>
-                  <summary>Что означают главные настройки</summary>
-                  <dl>
-                    <dt>Актив</dt>
-                    <dd>Монета или торговая пара, по которой строится ручная стратегия.</dd>
-                    <dt>Таймфрейм</dt>
-                    <dd>Размер свечей графика. <code>5m</code> и <code>15m</code> подходят для быстрых сделок, <code>1h</code> и <code>4h</code> для более спокойных.</dd>
-                    <dt>Рыночный режим</dt>
-                    <dd><code>Автоматически</code> определяет режим по графику. Ручной выбор нужен, если хочешь проверить конкретный сценарий.</dd>
-                    <dt>Риск на сделку</dt>
-                    <dd>Сколько депозита допускается потерять при стопе. Для осторожной торговли держи до <code>1%</code>.</dd>
-                    <dt>Депозит</dt>
-                    <dd>База для расчета бюджета, лимитов и размера демо-сделок.</dd>
-                    <dt>Long / Short</dt>
-                    <dd>Можно включить только long, только short или оба направления одновременно.</dd>
-                  </dl>
-                </details>
-
-                <details>
-                  <summary>Ручная торговля</summary>
-                  <ol>
-                    <li>Выбери монету и таймфрейм.</li>
-                    <li>Оставь включенным нужное направление: long, short или оба.</li>
-                    <li>Нажми “Сгенерировать”.</li>
-                    <li>Проверь, что нет блокеров: слабый объем, плохой журнал связки, риск-off, низкий score.</li>
-                    <li>Введи сумму сделки и нажми “Войти в стратегию”.</li>
-                    <li>Не меняй вручную уже открытую сделку: она дальше отслеживается по своей монете, цене входа и таймфрейму.</li>
-                  </ol>
-                </details>
-
-                <details>
-                  <summary>Авто-бот в браузере</summary>
-                  <p>
-                    Авто-бот в браузере работает только пока открыт сайт. Он сканирует все доступные монеты и таймфреймы,
-                    выбирает лучший сигнал и сам создает демо-сделку, если пройдены фильтры качества.
-                  </p>
-                  <ul>
-                    <li><code>Профиль автобота</code> меняет строгость входа.</li>
-                    <li><code>Скальпинг-стратегия</code> добавляет быстрые сделки, но теперь они проходят фильтр чистой прибыли после расходов.</li>
-                    <li><code>Почему вошел / не вошел</code> показывает причину решения автобота.</li>
-                  </ul>
-                </details>
-
-                <details>
-                  <summary>Серверный авто-бот</summary>
-                  <p>
-                    Серверный авто-бот работает отдельно от браузера через GitHub Actions. Он пишет сделки в общий журнал
-                    под пользователем <code>server</code>, использует Bybit-свечи и общую обучающую политику Supabase.
-                  </p>
-                  <ul>
-                    <li>Если компьютер выключен, браузерный бот не работает, но серверный режим может продолжать проверки по расписанию.</li>
-                    <li>Серверный бот не открывает реальные ордера, это пока демо/paper-режим.</li>
-                    <li>Он не берет сделки с отрицательной чистой целью после комиссии и проскальзывания.</li>
-                    <li><code>Осторожный</code> берет меньше сделок, <code>Баланс</code> торгует чаще с лимитами риска, <code>Активный</code> тестирует больше входов меньшей суммой.</li>
-                    <li>Сервер параллельно тестирует стратегии <code>Тренд EMA34/89</code>, <code>Откат к тренду</code> и <code>Скальпинг</code>; в журнале видно, какая стратегия открыла сделку.</li>
-                  </ul>
-                </details>
-
-                <details>
-                  <summary>Журнал, обучение и статусы пользователей</summary>
-                  <dl>
-                    <dt>Журнал операций</dt>
-                    <dd>Показывает текущую сессию и активные сделки.</dd>
-                    <dt>Все операции</dt>
-                    <dd>Общий архив всех сделок: ручных, автоматических, серверных и старых.</dd>
-                    <dt>user1 / user2 / тестгость</dt>
-                    <dd>Сделки конкретных пользователей.</dd>
-                    <dt>server</dt>
-                    <dd>Сделки серверного авто-бота.</dd>
-                    <dt>Legacy</dt>
-                    <dd>Старые сделки без сохраненного пользователя.</dd>
-                    <dt>Самообучение</dt>
-                    <dd>Бот анализирует закрытые сделки, блокирует слабые монеты/связки и усиливает успешные связки.</dd>
-                  </dl>
-                </details>
-
-                <details>
-                  <summary>Перед реальной торговлей</summary>
-                  <ul>
-                    <li>Смотри “Допуск к боевому режиму”: пока он не готов, реальный кабинет подключать рано.</li>
-                    <li>Нужен стабильный winrate выше <code>60%</code>, положительный profit factor и несколько прибыльных дней подряд.</li>
-                    <li>Сначала тестировать только demo/testnet, потом ограниченный реальный бюджет.</li>
-                    <li>Не использовать плечо и крупный процент депозита, пока статистика не стабильна.</li>
-                  </ul>
-                </details>
-              </div>
-            </section>
           </div>
-        </section>
 
-        <section class="chat-panel">
-          <div class="section-title">
-            <span>Диалог с ботом</span>
+        </div>
+
+        <!-- ═══ TAB: Стратегия ════════════════════════════════ -->
+        <div class="tab-pane" data-tab-pane="strategy">
+
+          <div class="strategy-layout">
+
+            <!-- Left column: controls -->
+            <div class="strat-controls">
+
+              <div class="pane-section">
+                <div class="pane-header">
+                  <h2>Рынок</h2>
+                  <button class="icon-button" type="button" data-randomize title="Случайный сценарий">↻</button>
+                </div>
+
+                <label>Актив
+                  <select id="asset">
+                    <optgroup label="Крупные активы">
+                      <option value="BTC/USDT">Bitcoin (BTC)</option>
+                      <option value="ETH/USDT">Ethereum (ETH)</option>
+                      <option value="SOL/USDT">Solana (SOL)</option>
+                      <option value="BNB/USDT">BNB</option>
+                      <option value="XRP/USDT">XRP</option>
+                      <option value="TON/USDT">Toncoin (TON)</option>
+                    </optgroup>
+                    <optgroup label="Альткоины">
+                      <option value="ADA/USDT">Cardano (ADA)</option>
+                      <option value="DOGE/USDT">Dogecoin (DOGE)</option>
+                      <option value="TRX/USDT">TRON (TRX)</option>
+                      <option value="AVAX/USDT">Avalanche (AVAX)</option>
+                      <option value="LINK/USDT">Chainlink (LINK)</option>
+                      <option value="DOT/USDT">Polkadot (DOT)</option>
+                      <option value="MATIC/USDT">Polygon (MATIC)</option>
+                      <option value="LTC/USDT">Litecoin (LTC)</option>
+                      <option value="BCH/USDT">Bitcoin Cash (BCH)</option>
+                      <option value="UNI/USDT">Uniswap (UNI)</option>
+                      <option value="AAVE/USDT">Aave (AAVE)</option>
+                      <option value="APT/USDT">Aptos (APT)</option>
+                      <option value="SUI/USDT">Sui (SUI)</option>
+                      <option value="ARB/USDT">Arbitrum (ARB)</option>
+                      <option value="OP/USDT">Optimism (OP)</option>
+                      <option value="NEAR/USDT">NEAR Protocol (NEAR)</option>
+                      <option value="ATOM/USDT">Cosmos (ATOM)</option>
+                      <option value="INJ/USDT">Injective (INJ)</option>
+                      <option value="FIL/USDT">Filecoin (FIL)</option>
+                      <option value="ETC/USDT">Ethereum Classic (ETC)</option>
+                      <option value="SEI/USDT">Sei (SEI)</option>
+                      <option value="TIA/USDT">Celestia (TIA)</option>
+                      <option value="TWT/USDT">Trust Wallet Token (TWT)</option>
+                    </optgroup>
+                  </select>
+                </label>
+
+                <label>Таймфрейм
+                  <select id="timeframe">
+                    <option>5m</option>
+                    <option selected>15m</option>
+                    <option>1h</option>
+                    <option>4h</option>
+                    <option>1d</option>
+                  </select>
+                </label>
+
+                <label>Режим рынка
+                  <select id="marketMode">
+                    <option value="auto" selected>Авто по графику</option>
+                    <option value="trend">Тренд</option>
+                    <option value="range">Боковик</option>
+                    <option value="breakout">Пробой</option>
+                    <option value="pullback">Откат</option>
+                    <option value="high-volatility">Высокая волатильность</option>
+                  </select>
+                </label>
+
+                <label>Риск: <output id="riskValue">1.0%</output>
+                  <input id="risk" type="range" min="0.25" max="2" step="0.25" value="1">
+                </label>
+
+                <label>Депозит USDT
+                  <input id="deposit" type="number" min="0" step="10" value="10000">
+                </label>
+
+                <fieldset>
+                  <legend>Стиль</legend>
+                  <label class="check-row"><input type="checkbox" id="conservative" checked><span>консервативный вход</span></label>
+                  <label class="check-row"><input type="checkbox" id="includeLongs" checked><span>LONG</span></label>
+                  <label class="check-row"><input type="checkbox" id="includeShorts" checked><span>SHORT</span></label>
+                </fieldset>
+              </div>
+
+              <div class="pane-section">
+                <div class="pane-header"><h2>Условия входа</h2></div>
+                <label class="check-row"><input type="checkbox" data-entry-condition="rsi" checked><span>RSI подтверждает сторону</span></label>
+                <label class="check-row"><input type="checkbox" data-entry-condition="ema" checked><span>EMA 34/89 по направлению</span></label>
+                <label class="check-row"><input type="checkbox" data-entry-condition="volume" checked><span>Объем выше среднего</span></label>
+                <label class="check-row"><input type="checkbox" data-entry-condition="news" checked><span>Новостной фон не против</span></label>
+                <label class="check-row"><input type="checkbox" data-entry-condition="higherTf" checked><span>Старший ТФ подтверждает</span></label>
+                <label class="check-row"><input type="checkbox" data-entry-condition="history" checked><span>История не слабая</span></label>
+              </div>
+
+              <div class="pane-section">
+                <div class="pane-header"><h2>Условия выхода</h2></div>
+                <label class="check-row"><input type="checkbox" data-exit-rule="breakevenAfterT1" checked><span>Безубыток после T1</span></label>
+                <label class="check-row"><input type="checkbox" data-exit-rule="trailingStop"><span>Trailing stop после импульса</span></label>
+                <label class="check-row"><input type="checkbox" data-exit-rule="emaFlip"><span>Закрыть при развороте EMA</span></label>
+                <label class="check-row"><input type="checkbox" data-exit-rule="newsFlip"><span>Закрыть при новости против</span></label>
+                <label class="check-row"><input type="checkbox" data-exit-rule="tradeTimeout" checked><span>Тайм-аут сделки</span></label>
+              </div>
+
+              <div class="pane-section">
+                <div class="pane-header"><h2>Сетка и TTL</h2></div>
+                <label class="check-row"><input type="checkbox" data-grid-enabled><span>Сетка добора вручную</span></label>
+                <label>Макс. доборов<input type="number" min="1" max="3" step="1" value="2" data-grid-orders></label>
+                <label>TTL pending, мин<input type="number" min="1" max="120" step="1" value="30" data-pending-ttl></label>
+                <label>TTL scalping, мин<input type="number" min="1" max="30" step="1" value="5" data-scalping-ttl></label>
+              </div>
+
+              <div class="pane-section">
+                <div class="pane-header"><h2>RSI индикаторы</h2><span class="mini-counter" data-rsi-asset>BTC</span></div>
+                <div class="indicator-list" data-rsi-controls></div>
+              </div>
+
+              <div class="pane-section">
+                <div class="pane-header"><h2>EMA Фибоначчи</h2><span class="mini-counter">34/89</span></div>
+                <div class="indicator-list" data-ema-controls></div>
+              </div>
+            </div>
+
+            <!-- Right column: chart + output -->
+            <div class="strat-canvas">
+
+              <div class="pane-section">
+                <div class="pane-header">
+                  <div class="pane-title-group">
+                    <h2 data-chart-title>Сценарий цены</h2>
+                    <span class="mini-counter" data-chart-label>BTC/USDT · 15m</span>
+                  </div>
+                  <div class="pane-actions">
+                    <button class="secondary-action" type="button" data-copy>Копировать</button>
+                    <button class="primary-action" type="button" data-generate>Сгенерировать</button>
+                  </div>
+                </div>
+
+                <canvas id="marketChart" width="1080" height="220" aria-label="Схематичный график рынка"></canvas>
+
+                <div class="metrics">
+                  <div><span>Risk/Reward</span><strong data-rr>1:2.2</strong></div>
+                  <div><span>Макс. риск</span><strong data-max-risk>1.0%</strong></div>
+                  <div><span>Фильтров</span><strong data-filter-count>4</strong></div>
+                  <div><span>Качество</span><strong data-signal-score>--</strong></div>
+                </div>
+
+                <div class="trade-plan-strip">
+                  <div><span>Сигнал</span><strong data-plan-side>LONG / SHORT</strong></div>
+                  <div><span>Entry</span><strong data-plan-entry>нет данных</strong></div>
+                  <div><span>Stop</span><strong data-plan-stop>нет данных</strong></div>
+                  <div><span>Target</span><strong data-plan-target>нет данных</strong></div>
+                </div>
+              </div>
+
+              <div class="pane-section">
+                <div class="pane-header">
+                  <div class="pane-title-group">
+                    <h2>Ответ бота</h2>
+                    <span class="status-pill" data-confidence>готов к обучению</span>
+                  </div>
+                </div>
+                <article class="strategy-card" data-strategy>
+                  <h2>Запусти генерацию стратегии</h2>
+                  <p>Выбери актив, режим рынка и риск. Добавь правила — нажми «Сгенерировать».</p>
+                </article>
+              </div>
+
+              <div class="strat-bottom-row">
+                <div class="pane-section">
+                  <div class="pane-header">
+                    <div class="pane-title-group">
+                      <h2>Симулятор</h2>
+                      <span class="status-pill" data-exchange-sim-status>dry-run</span>
+                    </div>
+                    <div class="pane-actions">
+                      <button class="secondary-action" type="button" data-preflight-check>Pre-flight</button>
+                      <button class="secondary-action" type="button" data-dry-run-order>Dry-run</button>
+                      <button class="danger-action" type="button" data-kill-switch>Kill</button>
+                    </div>
+                  </div>
+                  <div class="sim-grid">
+                    <div><span>Готовность</span><strong data-preflight-score>не проверено</strong></div>
+                    <div><span>Режим</span><strong>без реальных ключей</strong></div>
+                    <div><span>Действие</span><strong data-preflight-action>ожидает проверки</strong></div>
+                  </div>
+                  <div class="sim-report" data-preflight-report>Pre-flight проверит баланс, спред, TP/SL и риск-лимиты.</div>
+                </div>
+
+                <div class="pane-section">
+                  <div class="pane-header"><h2>Проверка стратегии</h2></div>
+                  <button class="secondary-action full-width" type="button" data-strategy-precheck>Проверить стратегию</button>
+                  <div class="bot-control-report" data-strategy-precheck-report>Проверка ещё не запускалась</div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ═══ TAB: История ══════════════════════════════════ -->
+        <div class="tab-pane" data-tab-pane="journal">
+
+          <div class="pane-section">
+            <div class="pane-header">
+              <div class="pane-title-group">
+                <h2>Все операции</h2>
+                <span class="live-chip" data-battle-status>не готов</span>
+              </div>
+              <div class="pane-actions">
+                <button class="text-button" type="button" data-archive-refresh>Обновить</button>
+                <button class="text-button" type="button" data-archive-toggle>Показать</button>
+              </div>
+            </div>
+            <div class="journal-summary archive-summary">
+              <div><span>Всего</span><strong data-archive-total>0</strong></div>
+              <div><span>Ручные</span><strong data-archive-manual>0</strong></div>
+              <div><span>Авто</span><strong data-archive-auto>0</strong></div>
+              <div><span>Итог PnL</span><strong data-archive-pnl>0.00 USDT</strong></div>
+              <div><span>user1</span><strong data-archive-user="user1">0</strong></div>
+              <div><span>user2</span><strong data-archive-user="user2">0</strong></div>
+              <div><span>тестгость</span><strong data-archive-user="тестгость">0</strong></div>
+              <div><span>Server</span><strong data-archive-user="server">0</strong></div>
+              <div><span>Legacy</span><strong data-archive-user="legacy">0</strong></div>
+            </div>
+            <div class="journal-table-wrap archive-table-wrap" data-archive-panel hidden>
+              <table class="journal-table archive-table">
+                <thead>
+                  <tr>
+                    <th>№</th><th>Дата</th><th>Пользователь</th><th>Источник</th>
+                    <th>Монета</th><th>ТФ</th><th>L/S</th><th>Entry</th>
+                    <th>Выход</th><th>USDT</th><th>%</th><th>Статус</th>
+                  </tr>
+                </thead>
+                <tbody data-archive-rows>
+                  <tr><td colspan="12">Архив пуст</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="pane-section">
+            <div class="pane-header"><h2>Допуск к боевому режиму</h2></div>
+            <div class="gate-grid">
+              <div><span>Прогресс</span><strong data-battle-score>0/100</strong></div>
+              <div><span>Winrate</span><strong data-battle-winrate>0%</strong></div>
+              <div><span>Profit factor</span><strong data-battle-profit-factor>0.00</strong></div>
+              <div><span>Walk-forward</span><strong data-battle-walk-forward>нет данных</strong></div>
+            </div>
+            <div class="gate-report" data-battle-report>Накопи demo/dry-run статистику — тогда откроется testnet и реальный кабинет.</div>
+          </div>
+
+        </div>
+
+        <!-- ═══ TAB: Настройки ════════════════════════════════ -->
+        <div class="tab-pane" data-tab-pane="settings">
+
+          <div class="settings-layout">
+
+            <div class="settings-col">
+
+              <div class="pane-section">
+                <div class="pane-header">
+                  <h2>Радар CMC</h2>
+                  <span class="mini-counter" data-cmc-status>off</span>
+                </div>
+                <label>CMC API key<input id="cmcApiKey" type="password" placeholder="CoinMarketCap API key"></label>
+                <label>CMC proxy URL<input id="cmcProxyUrl" type="url" placeholder="опционально, если браузер блокирует API"></label>
+                <div class="radar-grid">
+                  <label>Топ<select id="cmcLimit"><option value="50">50</option><option value="100" selected>100</option><option value="200">200</option></select></label>
+                  <label>Мин. объем<input id="cmcMinVolume" type="number" min="0" step="1000000" value="50000000"></label>
+                </div>
+                <div class="remote-actions">
+                  <button class="primary-action" type="button" data-cmc-save>Сохранить</button>
+                  <button class="secondary-action" type="button" data-cmc-refresh>Обновить</button>
+                </div>
+                <div class="radar-list" data-cmc-radar-list><span>CMC выбирает монеты для наблюдения.</span></div>
+              </div>
+
+              <div class="pane-section">
+                <div class="pane-header">
+                  <h2>Новостной фон</h2>
+                  <span class="mini-counter" data-news-status>off</span>
+                </div>
+                <label>Биржевая лента URL<input id="exchangeNewsUrl" type="url" placeholder="Bybit/биржа news proxy URL"></label>
+                <label>CMC News key<input id="cmcNewsApiKey" type="password" placeholder="если пусто — берется CMC radar key"></label>
+                <label>CMC News proxy<input id="cmcNewsProxyUrl" type="url" placeholder="опционально для /v1/content/latest"></label>
+                <label>CFTC COT URL<input id="cftcNewsUrl" type="url" placeholder="https://www.cftc.gov/..."></label>
+                <label>Ручные новости<textarea id="manualNewsInput" rows="3" placeholder="BTC bullish ETF inflows grow&#10;CFTC bearish leveraged funds reduce longs"></textarea></label>
+                <div class="remote-actions">
+                  <button class="primary-action" type="button" data-news-save>Сохранить</button>
+                  <button class="secondary-action" type="button" data-news-refresh>Обновить</button>
+                </div>
+                <div class="radar-list news-list" data-news-list><span>Новости добавят бычий/медвежий фильтр к стратегии.</span></div>
+              </div>
+
+            </div>
+
+            <div class="settings-col">
+
+              <div class="pane-section">
+                <div class="pane-header">
+                  <h2>Live рынок</h2>
+                  <span class="mini-counter" data-live-status>offline</span>
+                </div>
+                <button class="primary-action full-width" type="button" data-live-toggle>Включить live</button>
+                <div class="live-readout">
+                  <div><span>Источник</span><strong data-live-source>Bybit V5 public WS</strong></div>
+                  <div><span>Цена</span><strong data-live-price>нет данных</strong></div>
+                  <div><span>Bid / Ask</span><strong data-live-book>нет данных</strong></div>
+                  <div><span>Спред</span><strong data-live-spread>нет данных</strong></div>
+                  <div><span>24h объем</span><strong data-live-volume>нет данных</strong></div>
+                  <div><span>Обновлено</span><strong data-live-updated>нет данных</strong></div>
+                </div>
+              </div>
+
+              <div class="pane-section">
+                <div class="pane-header">
+                  <h2>Общий журнал</h2>
+                  <span class="mini-counter" data-remote-status>local</span>
+                </div>
+                <label>Supabase URL<input id="remoteUrl" type="url" placeholder="https://project.supabase.co"></label>
+                <label>Anon key<input id="remoteKey" type="password" placeholder="public anon key"></label>
+                <label>Таблица<input id="remoteTable" type="text" value="crypto_strategy_trades"></label>
+                <div class="remote-actions">
+                  <button class="primary-action" type="button" data-remote-save>Сохранить</button>
+                  <button class="secondary-action" type="button" data-remote-sync>Синхронизировать</button>
+                </div>
+              </div>
+
+            </div>
+
+            <div class="settings-col">
+
+              <div class="pane-section">
+                <div class="pane-header">
+                  <h2>Обучающая база</h2>
+                  <button class="text-button" type="button" data-reset-training>Сброс</button>
+                </div>
+                <textarea id="trainingInput" rows="4" placeholder="Например: Не торговать пробой без ретеста. После 3 стопов подряд снижать риск вдвое."></textarea>
+                <button class="primary-action" type="button" data-add-training>Добавить правило</button>
+                <div class="rule-list" data-rules></div>
+              </div>
+
+              <div class="pane-section">
+                <div class="pane-header">
+                  <h2>Книжная база</h2>
+                  <span class="mini-counter" data-source-count>0 источников</span>
+                </div>
+                <div class="source-list" data-sources></div>
+              </div>
+
+              <div class="pane-section">
+                <div class="pane-header"><h2>Инструкция</h2></div>
+                <div class="instruction-grid">
+                  <details open>
+                    <summary>Быстрый старт</summary>
+                    <ol>
+                      <li>Войди под своим пользователем: <code>user1</code>, <code>user2</code> или <code>тестгость</code>.</li>
+                      <li>Проверь "Общий журнал" в настройках: статус должен быть <code>shared</code>.</li>
+                      <li>На вкладке Стратегия — выбери актив, таймфрейм, риск и нажми «Сгенерировать».</li>
+                      <li>На вкладке Позиции — введи сумму и нажми «Войти в сделку».</li>
+                      <li>На вкладке Радар — включи «Авто-бот» для автоматических сигналов.</li>
+                      <li>Результаты смотри на вкладках Позиции и История.</li>
+                    </ol>
+                  </details>
+                  <details>
+                    <summary>Серверный авто-бот</summary>
+                    <p>Работает отдельно через GitHub Actions под пользователем <code>server</code>. Запускается раз в 5 минут по расписанию. Сделки видны на вкладке Позиции → Серверный бот.</p>
+                  </details>
+                  <details>
+                    <summary>Перед реальной торговлей</summary>
+                    <ul>
+                      <li>Нужен стабильный winrate &gt; 60%, положительный profit factor.</li>
+                      <li>Смотри «Допуск к боевому режиму» на вкладке История.</li>
+                      <li>Маршрут: demo → testnet → малый реальный бюджет без плеча.</li>
+                    </ul>
+                  </details>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
+      </main>
+
+      <!-- ─── Chat ───────────────────────────────────────────── -->
+      <div class="dash-chat">
+        <div class="chat-toggle-bar">
+          <span>Диалог с ботом</span>
+          <div class="chat-toggle-actions">
             <button class="text-button" type="button" data-clear-chat>Очистить</button>
+            <button class="text-button chat-collapse-btn" type="button" data-chat-toggle>▲</button>
           </div>
+        </div>
+        <div class="chat-body">
           <div class="chat-log" data-chat-log>
             <div class="message bot">
               <strong>Бот</strong>
@@ -996,11 +725,59 @@
             </div>
           </div>
           <form class="chat-form" data-chat-form>
-            <input id="chatInput" type="text" placeholder="Например: нужна стратегия для SOL на откате после сильного импульса" autocomplete="off">
+            <input id="chatInput" type="text" placeholder="Например: стратегия для SOL на откате после сильного импульса" autocomplete="off">
             <button class="primary-action" type="submit">Отправить</button>
           </form>
-        </section>
-      </section>
-    </main>
+        </div>
+      </div>
+
+    </div>
+
+    <script>
+      // Tab switching
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const tab = btn.dataset.tab;
+          document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('is-active'));
+          document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('is-active'));
+          btn.classList.add('is-active');
+          const pane = document.querySelector(`[data-tab-pane="${tab}"]`);
+          if (pane) pane.classList.add('is-active');
+        });
+      });
+
+      // Chat collapse
+      const chatToggleBtn = document.querySelector('[data-chat-toggle]');
+      const dashChat = document.querySelector('.dash-chat');
+      if (chatToggleBtn && dashChat) {
+        chatToggleBtn.addEventListener('click', () => {
+          const collapsed = dashChat.classList.toggle('is-collapsed');
+          chatToggleBtn.textContent = collapsed ? '▲' : '▼';
+        });
+      }
+
+      // Mirror journal stats to History tab (duplicate data-* workaround)
+      function mirrorStat(src, dst) {
+        const srcEl = document.querySelector(`[${src}]`);
+        const dstEl = document.querySelector(`[${dst}]`);
+        if (!srcEl || !dstEl) return;
+        const obs = new MutationObserver(() => { dstEl.textContent = srcEl.textContent; });
+        obs.observe(srcEl, { childList: true, subtree: true, characterData: true });
+        dstEl.textContent = srcEl.textContent;
+      }
+      document.addEventListener('DOMContentLoaded', () => {
+        // Mirror battle gate stats to Positions tab compact summary
+        mirrorStat('data-battle-score', 'data-battle-score-pos');
+        mirrorStat('data-battle-winrate', 'data-battle-winrate-pos');
+        mirrorStat('data-battle-profit-factor', 'data-battle-profit-factor-pos');
+        mirrorStat('data-battle-status', 'data-battle-status-pos');
+        // Mirror intel details to Radar tab
+        mirrorStat('data-intel-details', 'data-intel-details-2');
+        mirrorStat('data-backtest-score', 'data-backtest-score-2');
+        mirrorStat('data-learning-score', 'data-learning-score-2');
+        mirrorStat('data-autopilot-status', 'data-autopilot-status-2');
+      });
+    </script>
+
   </body>
 </html>
