@@ -522,11 +522,18 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
   const ema89 = calculateEma(closes, 89);
   const rsi14 = calculateRsi(closes, 14);
   const atr14 = calculateAtr(candles, 14);
+  const adx14 = calculateAdx(candles, 14);
+  const { macdLine, signalLine } = calculateMacd(closes);
+  const supertrendDir = calculateSupertrend(candles, 10, 3);
   const i = closes.length - 1;
   const emaFast = ema34[i];
   const emaSlow = ema89[i];
   const rsi = rsi14[i];
   const atr = atr14[i];
+  const adx = adx14[i];
+  const macd = macdLine[i];
+  const macdSig = signalLine[i];
+  const stDir = supertrendDir[i];
   if (![emaFast, emaSlow, rsi, atr].every(Number.isFinite)) return null;
 
   const trend = emaFast > emaSlow ? "LONG" : emaFast < emaSlow ? "SHORT" : "NEUTRAL";
@@ -571,6 +578,44 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
     else if (btcTrend === "SHORT" && side === "SHORT") score += 6;
     else if (btcTrend === "LONG" && side === "LONG") score += 5;
     else if (btcTrend === "LONG" && side === "SHORT") score -= 5;
+  }
+  // ADX: market regime filter — weak trend = penalize trend signals, strong = boost
+  if (Number.isFinite(adx)) {
+    if (adx < 15) {
+      if (!scalping) score -= 10;
+    } else if (adx < 20) {
+      if (strategy.kind === "trend") score -= 5;
+    } else if (adx >= 28 && adx <= 45) {
+      if (strategy.kind === "trend") score += 8;
+    } else if (adx > 48) {
+      score -= 6; // extreme volatility, risky entry
+    }
+  }
+  // MACD confluence: independent momentum confirmation
+  if (Number.isFinite(macd) && Number.isFinite(macdSig)) {
+    const macdBullish = macd > macdSig;
+    if (side === "LONG" && macdBullish) score += 8;
+    else if (side === "SHORT" && !macdBullish) score += 8;
+    else score -= 7; // MACD contradicts direction
+  }
+  // Supertrend direction confirmation
+  if (Number.isFinite(stDir)) {
+    const stBullish = stDir === 1;
+    if (side === "LONG" && stBullish) score += 6;
+    else if (side === "SHORT" && !stBullish) score += 6;
+    else score -= 8; // Supertrend contradicts direction
+  }
+  // RSI divergence: price vs RSI disagree over last 8 candles → weakening momentum
+  const divLookback = 8;
+  const rsiPrev = rsi14[Math.max(0, i - divLookback)];
+  const pricePrev = closes[Math.max(0, i - divLookback)];
+  if (Number.isFinite(rsiPrev) && Number.isFinite(pricePrev)) {
+    const priceUp = closes[i] > pricePrev;
+    const rsiUp = rsi > rsiPrev;
+    if (priceUp && !rsiUp && rsi > 52 && side === "LONG") score -= 10; // bearish divergence
+    if (!priceUp && rsiUp && rsi < 48 && side === "SHORT") score -= 10; // bullish divergence
+    if (priceUp && rsiUp && side === "LONG") score += 4; // momentum confirmed
+    if (!priceUp && !rsiUp && side === "SHORT") score += 4; // momentum confirmed
   }
   if (strategy.kind === "pullback") {
     const pullback = evaluatePullback(closes, candles, side, rsi, atrPct, volumeRatio);
@@ -629,7 +674,7 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
     scenario,
     expected,
     patternKey,
-    reason: `${strategy.label}: EMA34/89 ${side}, RSI ${rsi.toFixed(1)}, volume x${volumeRatio.toFixed(2)}, ATR ${atrPct.toFixed(2)}%, чистая цель ${expected.weightedNetPct.toFixed(2)}%, BTC ${btcTrend}`
+    reason: `${strategy.label}: EMA ${side}, RSI ${rsi.toFixed(1)}, MACD ${Number.isFinite(macd) && Number.isFinite(macdSig) ? (macd > macdSig ? "↑" : "↓") : "?"}, ADX ${Number.isFinite(adx) ? adx.toFixed(0) : "?"}, ST ${stDir === 1 ? "↑" : "↓"}, vol x${volumeRatio.toFixed(2)}, ATR ${atrPct.toFixed(2)}%, цель ${expected.weightedNetPct.toFixed(2)}%, BTC ${btcTrend}`
   };
 }
 
@@ -1371,6 +1416,93 @@ function calculateAtr(candles, period) {
     else result[i] = (result[i - 1] * (period - 1) + tr) / period;
   }
   return result;
+}
+
+function calculateMacd(values, fast = 12, slow = 26, signal = 9) {
+  const emaFast = calculateEma(values, fast);
+  const emaSlow = calculateEma(values, slow);
+  const n = values.length;
+  const macdLine = new Array(n).fill(NaN);
+  for (let i = 0; i < n; i++) {
+    if (Number.isFinite(emaFast[i]) && Number.isFinite(emaSlow[i])) macdLine[i] = emaFast[i] - emaSlow[i];
+  }
+  const signalLine = new Array(n).fill(NaN);
+  const macdFinite = macdLine.filter(Number.isFinite);
+  if (macdFinite.length >= signal) {
+    const sigEma = calculateEma(macdFinite, signal);
+    let j = 0;
+    for (let i = 0; i < n; i++) {
+      if (Number.isFinite(macdLine[i])) signalLine[i] = sigEma[j++];
+    }
+  }
+  return { macdLine, signalLine };
+}
+
+function calculateAdx(candles, period = 14) {
+  const n = candles.length;
+  const result = new Array(n).fill(NaN);
+  if (n < period * 2 + 1) return result;
+  const plusDM = new Array(n).fill(0);
+  const minusDM = new Array(n).fill(0);
+  const tr = new Array(n).fill(0);
+  for (let i = 1; i < n; i++) {
+    const up = candles[i].high - candles[i - 1].high;
+    const down = candles[i - 1].low - candles[i].low;
+    plusDM[i] = up > down && up > 0 ? up : 0;
+    minusDM[i] = down > up && down > 0 ? down : 0;
+    tr[i] = Math.max(candles[i].high - candles[i].low, Math.abs(candles[i].high - candles[i - 1].close), Math.abs(candles[i].low - candles[i - 1].close));
+  }
+  let sTR = tr.slice(1, period + 1).reduce((a, b) => a + b, 0);
+  let sPDM = plusDM.slice(1, period + 1).reduce((a, b) => a + b, 0);
+  let sMDM = minusDM.slice(1, period + 1).reduce((a, b) => a + b, 0);
+  const dx = new Array(n).fill(NaN);
+  for (let i = period; i < n; i++) {
+    if (i > period) {
+      sTR = sTR - sTR / period + tr[i];
+      sPDM = sPDM - sPDM / period + plusDM[i];
+      sMDM = sMDM - sMDM / period + minusDM[i];
+    }
+    if (sTR === 0) continue;
+    const pdi = (sPDM / sTR) * 100;
+    const mdi = (sMDM / sTR) * 100;
+    const sum = pdi + mdi;
+    dx[i] = sum > 0 ? (Math.abs(pdi - mdi) / sum) * 100 : 0;
+  }
+  let adxVal = 0;
+  let cnt = 0;
+  for (let i = period; i < 2 * period && i < n; i++) {
+    if (Number.isFinite(dx[i])) { adxVal += dx[i]; cnt++; }
+  }
+  if (cnt === 0) return result;
+  adxVal /= cnt;
+  if (2 * period - 1 < n) result[2 * period - 1] = adxVal;
+  for (let i = 2 * period; i < n; i++) {
+    if (Number.isFinite(dx[i])) {
+      adxVal = (adxVal * (period - 1) + dx[i]) / period;
+      result[i] = adxVal;
+    }
+  }
+  return result;
+}
+
+function calculateSupertrend(candles, period = 10, multiplier = 3) {
+  const n = candles.length;
+  const atr = calculateAtr(candles, period);
+  const dir = new Array(n).fill(1);
+  const upper = new Array(n).fill(NaN);
+  const lower = new Array(n).fill(NaN);
+  for (let i = 1; i < n; i++) {
+    if (!Number.isFinite(atr[i])) { dir[i] = dir[i - 1]; continue; }
+    const hl2 = (candles[i].high + candles[i].low) / 2;
+    const bu = hl2 + multiplier * atr[i];
+    const bl = hl2 - multiplier * atr[i];
+    upper[i] = (!Number.isFinite(upper[i - 1]) || bu < upper[i - 1] || candles[i - 1].close > upper[i - 1]) ? bu : upper[i - 1];
+    lower[i] = (!Number.isFinite(lower[i - 1]) || bl > lower[i - 1] || candles[i - 1].close < lower[i - 1]) ? bl : lower[i - 1];
+    if (dir[i - 1] === -1 && candles[i].close > upper[i]) dir[i] = 1;
+    else if (dir[i - 1] === 1 && candles[i].close < lower[i]) dir[i] = -1;
+    else dir[i] = dir[i - 1];
+  }
+  return dir;
 }
 
 function average(values) {
