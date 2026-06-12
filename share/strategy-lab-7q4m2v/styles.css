@@ -1860,3 +1860,92 @@ canvas {
     grid-template-columns: 1fr;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   Tab navigation (added on top of existing layout)
+══════════════════════════════════════════════════════════════ */
+
+.ws-tab-nav {
+  display: flex;
+  gap: 4px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ws-tab {
+  padding: 0 18px;
+  height: 34px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+  border: 1px solid transparent;
+}
+
+.ws-tab:hover {
+  background: var(--panel-2);
+  color: var(--ink);
+}
+
+.ws-tab.is-active {
+  background: var(--panel-2);
+  color: var(--accent);
+  border-color: rgba(85, 199, 162, 0.3);
+}
+
+/* Tab panes — hidden by default, active pane is visible */
+.ws-pane {
+  display: none;
+}
+
+.ws-pane.is-active {
+  display: block;
+  min-height: 0;
+}
+
+/* Twin bot row (Позиции tab) */
+.twin-bot-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.bot-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(23, 27, 31, 0.88);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+}
+
+.bot-card--server { border-left: 2px solid var(--blue); }
+.bot-card--browser { border-left: 2px solid var(--accent); }
+
+.bot-card-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.bot-card-metrics .sb-item {
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0;
+  border-top: none;
+  border-bottom: none;
+  border-left: none;
+}
+
+.bot-card-metrics .sb-item:nth-child(3n) {
+  border-right: none;
+}
+
+@media (max-width: 900px) {
+  .twin-bot-row { grid-template-columns: 1fr; }
+  .bot-card-metrics { grid-template-columns: repeat(2, 1fr); }
+}
