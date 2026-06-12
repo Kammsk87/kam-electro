@@ -945,13 +945,13 @@ function buildStrategySnapshot(candidate, amount) {
 }
 
 async function fetchLivePrice(symbol) {
-  // Try Binance first (not geo-blocked on GitHub Actions)
+  // Try OKX first (accessible from GitHub Actions)
   try {
-    const params = new URLSearchParams({ symbol: toBinanceSymbol(symbol) });
-    const response = await fetchWithTimeout(`https://api.binance.com/api/v3/ticker/price?${params.toString()}`, {}, 4_000);
-    if (!response.ok) throw new Error(`Binance ticker ${response.status}`);
+    const params = new URLSearchParams({ instId: toOkxSymbol(symbol) });
+    const response = await fetchWithTimeout(`https://www.okx.com/api/v5/market/ticker?${params.toString()}`, {}, 4_000);
+    if (!response.ok) throw new Error(`OKX ticker ${response.status}`);
     const data = await response.json();
-    const price = Number(data.price);
+    const price = Number(data.data?.[0]?.last);
     if (!price || !Number.isFinite(price)) throw new Error("no price");
     return price;
   } catch {
@@ -967,25 +967,32 @@ async function fetchLivePrice(symbol) {
   }
 }
 
+const okxIntervals = { "1m": "1m", "3m": "3m", "5m": "5m", "15m": "15m", "30m": "30m", "1h": "1H", "4h": "4H", "1d": "1D" };
+
+function toOkxSymbol(symbol) {
+  return symbol.replace("/", "-");
+}
+
 function toBinanceSymbol(symbol) {
   return symbol.replace("/", "");
 }
 
-async function fetchCandlesBinance(symbol, interval, limit = 220, start = null) {
-  const params = new URLSearchParams({ symbol: toBinanceSymbol(symbol), interval, limit: String(Math.min(limit, 1000)) });
-  if (start) params.set("startTime", String(start));
-  const response = await fetchWithTimeout(`https://api.binance.com/api/v3/klines?${params.toString()}`, {}, 7_000);
-  if (!response.ok) throw new Error(`Binance ${response.status}`);
+async function fetchCandlesOkx(symbol, interval, limit = 220, start = null) {
+  const bar = okxIntervals[interval] || "15m";
+  const params = new URLSearchParams({ instId: toOkxSymbol(symbol), bar, limit: String(Math.min(limit, 300)) });
+  if (start) params.set("after", String(start));
+  const response = await fetchWithTimeout(`https://www.okx.com/api/v5/market/candles?${params.toString()}`, {}, 7_000);
+  if (!response.ok) throw new Error(`OKX ${response.status}`);
   const data = await response.json();
-  if (!Array.isArray(data)) throw new Error("Binance kline invalid");
-  return data.map((item) => ({
+  if (data.code !== "0" || !Array.isArray(data.data)) throw new Error(data.msg || "OKX kline failed");
+  return data.data.slice().reverse().map((item) => ({
     openTime: Number(item[0]),
     open: Number(item[1]),
     high: Number(item[2]),
     low: Number(item[3]),
     close: Number(item[4]),
     volume: Number(item[5]),
-    closeTime: Number(item[6])
+    closeTime: Number(item[0]) + intervalToMs(interval) - 1
   }));
 }
 
@@ -1014,9 +1021,9 @@ async function fetchCandlesBybit(symbol, interval, limit = 220, start = null) {
 
 async function fetchCandles(symbol, interval, limit = 220, start = null) {
   try {
-    return await fetchCandlesBinance(symbol, interval, limit, start);
+    return await fetchCandlesOkx(symbol, interval, limit, start);
   } catch (err) {
-    log(`Binance candles failed (${err.message}), trying Bybit`);
+    log(`OKX candles failed (${err.message}), trying Bybit`);
     return await fetchCandlesBybit(symbol, interval, limit, start);
   }
 }
