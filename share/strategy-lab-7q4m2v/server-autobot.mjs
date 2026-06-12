@@ -336,7 +336,8 @@ async function remoteFetch(path, options = {}, attempt = 1) {
 
 async function updateActiveTrades(trades) {
   const active = trades.filter(isActiveTrade);
-  const results = await mapLimit(active, 4, async (trade) => {
+  const results = await mapLimit(active, 2, async (trade) => {
+    await wait(200);
     const changed = await replayTradeFromCandles(trade).catch((error) => {
       log(`skip update ${trade.id}: ${error.message}`);
       return false;
@@ -347,10 +348,8 @@ async function updateActiveTrades(trades) {
 }
 
 async function replayTradeFromCandles(trade) {
-  const since = Math.max(Number(trade.lastCheckedAt) || Number(trade.openedAt) || Date.now(), Date.now() - 60 * 24 * 60 * 60 * 1000);
   const interval = trade.timeframe || "15m";
-  const intervalLength = intervalToMs(interval);
-  const candles = await fetchCandles(trade.asset, interval, 500, Math.max(0, since - intervalLength));
+  const candles = await fetchCandles(trade.asset, interval, 300);
   let changed = false;
 
   for (const candle of candles) {
