@@ -821,6 +821,7 @@ const paperEntry = document.querySelector("[data-paper-entry]");
 const paperCurrent = document.querySelector("[data-paper-current]");
 const paperPnl = document.querySelector("[data-paper-pnl]");
 const paperResult = document.querySelector("[data-paper-result]");
+const walletEquity = document.querySelector("[data-wallet-equity]");
 const walletFree = document.querySelector("[data-wallet-free]");
 const walletReserved = document.querySelector("[data-wallet-reserved]");
 const walletServerEquity = document.querySelector("[data-server-wallet-equity]");
@@ -1632,6 +1633,20 @@ function getReservedPaperBudget() {
     .reduce((sum, trade) => sum + Math.max(0, (Number(trade.reservedAmount) || 0) - (Number(trade.releasedAmount) || 0)), 0);
 }
 
+function getClosedBrowserPnl() {
+  return state.paperTrades
+    .filter((trade) => !isPaperTradeActive(trade) && trade.status !== "cancelled" && trade.sessionId !== "server-autobot")
+    .reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0);
+}
+
+function getFreeBrowserBalance() {
+  return Math.max(0, getDepositValue() + getClosedBrowserPnl() - getReservedPaperBudget());
+}
+
+function getBrowserEquity() {
+  return getDepositValue() + getClosedBrowserPnl();
+}
+
 function getTradeAllocationLimits(options = {}) {
   if (options.scalping) {
     return { singlePct: scalpingMaxSingleTradePct, portfolioPct: autopilotMaxPortfolioPct };
@@ -1642,18 +1657,20 @@ function getTradeAllocationLimits(options = {}) {
 }
 
 function getMaxTradeAmountByWallet(options = {}) {
-  const free = getDepositValue();
+  const equity = getBrowserEquity();
   const reserved = getReservedPaperBudget();
-  const budgetBase = Math.max(free + reserved, free);
+  const free = getFreeBrowserBalance();
   const limits = getTradeAllocationLimits(options);
-  const singleLimit = budgetBase * (limits.singlePct / 100);
-  const portfolioLimitLeft = Math.max(0, budgetBase * (limits.portfolioPct / 100) - reserved);
+  const singleLimit = equity * (limits.singlePct / 100);
+  const portfolioLimitLeft = Math.max(0, equity * (limits.portfolioPct / 100) - reserved);
   return Math.max(0, Math.floor(Math.min(free, singleLimit, portfolioLimitLeft) * 100) / 100);
 }
 
 function renderWalletReadout() {
-  const free = getDepositValue();
+  const equity = getBrowserEquity();
+  const free = getFreeBrowserBalance();
   const reserved = getReservedPaperBudget();
+  if (walletEquity) walletEquity.textContent = `${equity.toFixed(2)} USDT`;
   if (walletFree) walletFree.textContent = `${free.toFixed(2)} USDT`;
   if (walletReserved) walletReserved.textContent = `${reserved.toFixed(2)} USDT`;
   if (paperAmount) {
@@ -1685,9 +1702,8 @@ function renderServerWalletReadout() {
 
 function reservePaperBudget(amount) {
   const normalizedAmount = Math.floor((Number(amount) || 0) * 100) / 100;
-  const available = getDepositValue();
+  const available = getFreeBrowserBalance();
   if (normalizedAmount < 10 || normalizedAmount > available + 0.0001) return false;
-  adjustDepositValue(-normalizedAmount, { silent: true });
   renderWalletReadout();
   renderStrategyIntelligence();
   return true;
@@ -1698,7 +1714,6 @@ function settlePaperBudget(trade, releasedAmount, pnlDelta, options = {}) {
   const pnl = Number(pnlDelta) || 0;
   trade.releasedAmount = (Number(trade.releasedAmount) || 0) + amount;
   trade.releasedPnl = (Number(trade.releasedPnl) || 0) + pnl;
-  adjustDepositValue(amount + pnl, { silent: true });
   if (!options.silent) {
     renderWalletReadout();
     renderStrategyIntelligence();
@@ -1710,13 +1725,11 @@ function reconcileLegacyPaperBudget() {
   state.paperTrades.forEach((trade) => {
     if (!isPaperTradeActive(trade) || trade.budgetReserved) return;
     const amount = Math.max(0, Number(trade.amount) || 0);
-    const reserve = Math.min(amount, getDepositValue());
-    trade.reservedAmount = reserve;
+    trade.reservedAmount = amount;
     trade.releasedAmount = 0;
     trade.releasedPnl = 0;
-    trade.budgetReserved = reserve > 0;
+    trade.budgetReserved = amount > 0;
     changed = true;
-    if (reserve > 0) adjustDepositValue(-reserve, { silent: true });
   });
   if (changed) {
     persistPaperTrades();
