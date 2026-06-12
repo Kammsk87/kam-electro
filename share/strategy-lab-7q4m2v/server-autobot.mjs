@@ -945,17 +945,51 @@ function buildStrategySnapshot(candidate, amount) {
 }
 
 async function fetchLivePrice(symbol) {
-  const params = new URLSearchParams({ category: "spot", symbol: toBybitSymbol(symbol) });
-  const response = await fetchWithTimeout(`https://api.bybit.com/v5/market/tickers?${params.toString()}`, {}, 4_000);
-  if (!response.ok) throw new Error(`ticker ${response.status}`);
-  const data = await response.json();
-  if (data.retCode !== 0) throw new Error(data.retMsg || "ticker failed");
-  const price = Number(data.result?.list?.[0]?.lastPrice);
-  if (!price || !Number.isFinite(price)) throw new Error("no price");
-  return price;
+  // Try Binance first (not geo-blocked on GitHub Actions)
+  try {
+    const params = new URLSearchParams({ symbol: toBinanceSymbol(symbol) });
+    const response = await fetchWithTimeout(`https://api.binance.com/api/v3/ticker/price?${params.toString()}`, {}, 4_000);
+    if (!response.ok) throw new Error(`Binance ticker ${response.status}`);
+    const data = await response.json();
+    const price = Number(data.price);
+    if (!price || !Number.isFinite(price)) throw new Error("no price");
+    return price;
+  } catch {
+    // Fallback to Bybit
+    const params = new URLSearchParams({ category: "spot", symbol: toBybitSymbol(symbol) });
+    const response = await fetchWithTimeout(`https://api.bybit.com/v5/market/tickers?${params.toString()}`, {}, 4_000);
+    if (!response.ok) throw new Error(`ticker ${response.status}`);
+    const data = await response.json();
+    if (data.retCode !== 0) throw new Error(data.retMsg || "ticker failed");
+    const price = Number(data.result?.list?.[0]?.lastPrice);
+    if (!price || !Number.isFinite(price)) throw new Error("no price");
+    return price;
+  }
 }
 
-async function fetchCandles(symbol, interval, limit = 220, start = null) {
+function toBinanceSymbol(symbol) {
+  return symbol.replace("/", "");
+}
+
+async function fetchCandlesBinance(symbol, interval, limit = 220, start = null) {
+  const params = new URLSearchParams({ symbol: toBinanceSymbol(symbol), interval, limit: String(Math.min(limit, 1000)) });
+  if (start) params.set("startTime", String(start));
+  const response = await fetchWithTimeout(`https://api.binance.com/api/v3/klines?${params.toString()}`, {}, 7_000);
+  if (!response.ok) throw new Error(`Binance ${response.status}`);
+  const data = await response.json();
+  if (!Array.isArray(data)) throw new Error("Binance kline invalid");
+  return data.map((item) => ({
+    openTime: Number(item[0]),
+    open: Number(item[1]),
+    high: Number(item[2]),
+    low: Number(item[3]),
+    close: Number(item[4]),
+    volume: Number(item[5]),
+    closeTime: Number(item[6])
+  }));
+}
+
+async function fetchCandlesBybit(symbol, interval, limit = 220, start = null) {
   const params = new URLSearchParams({
     category: "spot",
     symbol: toBybitSymbol(symbol),
@@ -976,6 +1010,15 @@ async function fetchCandles(symbol, interval, limit = 220, start = null) {
     volume: Number(item[5]),
     closeTime: Number(item[0]) + intervalToMs(interval) - 1
   }));
+}
+
+async function fetchCandles(symbol, interval, limit = 220, start = null) {
+  try {
+    return await fetchCandlesBinance(symbol, interval, limit, start);
+  } catch (err) {
+    log(`Binance candles failed (${err.message}), trying Bybit`);
+    return await fetchCandlesBybit(symbol, interval, limit, start);
+  }
 }
 
 function closePendingTrade(trade, price, time, reason) {
