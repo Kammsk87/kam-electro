@@ -268,6 +268,48 @@ input[type="range"] {
   padding: 12px;
 }
 
+.workspace-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  margin: -12px -12px 0;
+  padding: 12px 12px 10px;
+  background: rgba(14, 16, 18, 0.97);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.status-bar {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr)) minmax(140px, 1.4fr);
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.sb-item {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 7px 10px;
+  background: rgba(23, 27, 31, 0.88);
+}
+
+.sb-item span {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.sb-item strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
 .top-bar {
   min-height: 44px;
 }
@@ -1392,6 +1434,24 @@ canvas {
     padding: 8px;
   }
 
+  .workspace-header {
+    margin: -8px -8px 0;
+    padding: 8px 8px 8px;
+  }
+
+  .status-bar {
+    margin-top: 7px;
+    gap: 5px;
+  }
+
+  .sb-item {
+    padding: 5px 7px;
+  }
+
+  .sb-item strong {
+    font-size: 11px;
+  }
+
   .side-panel {
     gap: 7px;
   }
@@ -1734,6 +1794,19 @@ canvas {
   .workspace,
   .side-panel {
     padding: 16px;
+  }
+
+  .workspace-header {
+    margin: -16px -16px 0;
+    padding: 16px 16px 10px;
+  }
+
+  .status-bar {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .sb-item--wide {
+    display: none;
   }
 
   .top-bar,

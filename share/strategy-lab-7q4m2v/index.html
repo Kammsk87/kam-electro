@@ -306,16 +306,48 @@
       </aside>
 
       <section class="workspace" aria-label="Рабочая область бота">
-        <header class="top-bar">
-          <div>
-            <p class="eyebrow">Бот для торговой стратегии</p>
-            <h1>Боталин</h1>
+        <div class="workspace-header">
+          <header class="top-bar">
+            <div>
+              <p class="eyebrow">Бот для торговой стратегии</p>
+              <h1>Боталин</h1>
+            </div>
+            <div class="top-actions">
+              <button class="secondary-action" type="button" data-copy>Копировать стратегию</button>
+              <button class="primary-action" type="button" data-generate>Сгенерировать</button>
+            </div>
+          </header>
+          <div class="status-bar">
+            <div class="sb-item">
+              <span>Бот</span>
+              <strong data-sb-bot-status>standby</strong>
+            </div>
+            <div class="sb-item">
+              <span>Свободно</span>
+              <strong data-sb-free>— USDT</strong>
+            </div>
+            <div class="sb-item">
+              <span>В рынке</span>
+              <strong data-sb-reserved>— USDT</strong>
+            </div>
+            <div class="sb-item">
+              <span>День PnL</span>
+              <strong data-sb-pnl>—</strong>
+            </div>
+            <div class="sb-item">
+              <span>Активных</span>
+              <strong data-sb-active>0</strong>
+            </div>
+            <div class="sb-item">
+              <span>Риск лимит</span>
+              <strong data-sb-risk>OK</strong>
+            </div>
+            <div class="sb-item sb-item--wide">
+              <span>Рынок</span>
+              <strong data-sb-market>нет данных</strong>
+            </div>
           </div>
-          <div class="top-actions">
-            <button class="secondary-action" type="button" data-copy>Копировать стратегию</button>
-            <button class="primary-action" type="button" data-generate>Сгенерировать</button>
-          </div>
-        </header>
+        </div>
 
         <section class="strategy-grid">
           <div class="strategy-output" aria-live="polite">

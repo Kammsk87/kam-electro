@@ -789,6 +789,13 @@ const healthDayPnl = document.querySelector("[data-health-day-pnl]");
 const healthRiskLimit = document.querySelector("[data-health-risk-limit]");
 const healthActive = document.querySelector("[data-health-active]");
 const healthMarket = document.querySelector("[data-health-market]");
+const sbBotStatus = document.querySelector("[data-sb-bot-status]");
+const sbFree = document.querySelector("[data-sb-free]");
+const sbReserved = document.querySelector("[data-sb-reserved]");
+const sbPnl = document.querySelector("[data-sb-pnl]");
+const sbRisk = document.querySelector("[data-sb-risk]");
+const sbActive = document.querySelector("[data-sb-active]");
+const sbMarket = document.querySelector("[data-sb-market]");
 const autopilotToggle = document.querySelector("[data-autopilot-toggle]");
 const scalpingMode = document.querySelector("#scalpingMode");
 const autopilotProfile = document.querySelector("#autopilotProfile");
@@ -1438,16 +1445,33 @@ function renderBotHealth() {
   const activeTrades = state.paperTrades.filter(isPaperTradeActive);
   const market = state.marketIntel.marketStructure;
   const riskBlocked = dailyRisk.blocked;
-  botHealthStatus.textContent = riskBlocked ? "risk stop" : state.autopilot.enabled ? "active" : "standby";
-  botHealthStatus.classList.toggle("is-live", state.autopilot.enabled && !riskBlocked);
+  const botStatusText = riskBlocked ? "risk stop" : state.autopilot.enabled ? "active" : "standby";
+  const isLive = state.autopilot.enabled && !riskBlocked;
+  botHealthStatus.textContent = botStatusText;
+  botHealthStatus.classList.toggle("is-live", isLive);
   healthFree.textContent = `${free.toFixed(2)} USDT`;
   healthReserved.textContent = `${reserved.toFixed(2)} USDT`;
-  healthDayPnl.textContent = `${dailyRisk.pnl >= 0 ? "+" : ""}${dailyRisk.pnl.toFixed(2)} USDT`;
-  healthDayPnl.style.color = dailyRisk.pnl >= 0 ? "#55c7a2" : "#ef6b5b";
-  healthRiskLimit.textContent = riskBlocked ? `STOP ${dailyRisk.lossPct.toFixed(2)}%` : `OK до ${dailyMaxLossPct}%`;
-  healthRiskLimit.style.color = riskBlocked ? "#ef6b5b" : "#55c7a2";
+  const pnlText = `${dailyRisk.pnl >= 0 ? "+" : ""}${dailyRisk.pnl.toFixed(2)} USDT`;
+  const pnlColor = dailyRisk.pnl >= 0 ? "#55c7a2" : "#ef6b5b";
+  healthDayPnl.textContent = pnlText;
+  healthDayPnl.style.color = pnlColor;
+  const riskText = riskBlocked ? `STOP ${dailyRisk.lossPct.toFixed(2)}%` : `OK до ${dailyMaxLossPct}%`;
+  const riskColor = riskBlocked ? "#ef6b5b" : "#55c7a2";
+  healthRiskLimit.textContent = riskText;
+  healthRiskLimit.style.color = riskColor;
   healthActive.textContent = String(activeTrades.length);
-  healthMarket.textContent = market ? `ADX ${market.adx.toFixed(0)}, ATR ${market.atrPct.toFixed(2)}%` : "нет данных";
+  const marketText = market ? `ADX ${market.adx.toFixed(0)}, ATR ${market.atrPct.toFixed(2)}%` : "нет данных";
+  healthMarket.textContent = marketText;
+  if (sbBotStatus) {
+    sbBotStatus.textContent = botStatusText;
+    sbBotStatus.style.color = riskBlocked ? "#ef6b5b" : isLive ? "#55c7a2" : "";
+  }
+  if (sbFree) sbFree.textContent = `${free.toFixed(0)} USDT`;
+  if (sbReserved) sbReserved.textContent = `${reserved.toFixed(0)} USDT`;
+  if (sbPnl) { sbPnl.textContent = pnlText; sbPnl.style.color = pnlColor; }
+  if (sbRisk) { sbRisk.textContent = riskText; sbRisk.style.color = riskColor; }
+  if (sbActive) sbActive.textContent = String(activeTrades.length);
+  if (sbMarket) sbMarket.textContent = marketText;
 }
 
 function runStrategyPrecheck() {
