@@ -19,7 +19,8 @@ const serverProfiles = {
     minScalpingVolumeRatio: 1.45,
     minExpectedNetPct: 0.35,
     minScalpingExpectedNetPct: 0.2,
-    blockedAssetMode: "strict"
+    blockedAssetMode: "strict",
+    strategyMaxEntriesPerRun: { trend: 1, pullback: 1, scalping: 1 }
   },
   balanced: {
     label: "Баланс",
@@ -32,7 +33,8 @@ const serverProfiles = {
     minScalpingVolumeRatio: 1.15,
     minExpectedNetPct: 0.25,
     minScalpingExpectedNetPct: 0.14,
-    blockedAssetMode: "hard-only"
+    blockedAssetMode: "hard-only",
+    strategyMaxEntriesPerRun: { trend: 1, pullback: 1, scalping: 1 }
   },
   active: {
     label: "Активный",
@@ -45,7 +47,24 @@ const serverProfiles = {
     minScalpingVolumeRatio: 1.05,
     minExpectedNetPct: 0.18,
     minScalpingExpectedNetPct: 0.1,
-    blockedAssetMode: "hard-only"
+    blockedAssetMode: "hard-only",
+    strategyMaxEntriesPerRun: { trend: 1, pullback: 1, scalping: 2 }
+  },
+  // Paper-mode accelerated learning: many trades, low thresholds, fast cooldown.
+  // All money is virtual — goal is diverse (asset × strategy × side) coverage fast.
+  training: {
+    label: "Обучение",
+    minScore: 60,
+    maxTradePct: 2,
+    maxPortfolioPct: 70,
+    maxEntriesPerRun: 7,
+    duplicateCooldownMs: 8 * 60 * 1000,
+    minVolumeRatio: 0.4,
+    minScalpingVolumeRatio: 0.7,
+    minExpectedNetPct: 0.06,
+    minScalpingExpectedNetPct: 0.04,
+    blockedAssetMode: "hard-only",
+    strategyMaxEntriesPerRun: { trend: 3, pullback: 2, scalping: 3 }
   }
 };
 
@@ -475,12 +494,14 @@ function selectEntryCandidates(candidates, trades) {
   const selected = [];
   const strategyCounts = new Map();
   const activeAssetCounts = countActiveAssets(trades);
+  const profileStrategyLimits = activeProfile.strategyMaxEntriesPerRun || {};
 
   for (const candidate of candidates) {
     const strategy = serverStrategies[candidate.strategyId] || serverStrategies.trend;
     const minScore = getStrategyMinScore(strategy);
     if (candidate.score < minScore) continue;
-    if ((strategyCounts.get(strategy.id) || 0) >= strategy.maxEntriesPerRun) continue;
+    const strategyMax = profileStrategyLimits[strategy.id] ?? strategy.maxEntriesPerRun;
+    if ((strategyCounts.get(strategy.id) || 0) >= strategyMax) continue;
     if ((activeAssetCounts.get(candidate.symbol) || 0) >= config.maxActivePerAsset) continue;
 
     selected.push(candidate);

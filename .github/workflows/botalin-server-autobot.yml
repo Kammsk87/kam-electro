@@ -3,7 +3,7 @@ name: Botalin Server Autobot
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/2 * * * *"
+    - cron: "*/5 * * * *"
 
 permissions:
   contents: read
@@ -18,5 +18,5 @@ jobs:
 
       - name: Run Botalin server paper-autobot
         env:
-          BOTALIN_SERVER_PROFILE: balanced
+          BOTALIN_SERVER_PROFILE: training
         run: node share/strategy-lab-7q4m2v/server-autobot.mjs --once
