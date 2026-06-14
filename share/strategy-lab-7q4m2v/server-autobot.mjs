@@ -1792,12 +1792,115 @@ function formatRemoteError(status, text) {
   return `${status} ${message || "Remote request failed"}`;
 }
 
-main().catch((error) => {
-  if (String(error?.message || "").startsWith("Supabase journal unavailable")) {
-    log(`${error.message}. Cycle skipped without opening trades.`);
-    process.exitCode = 0;
-    return;
+async function runBacktest() {
+  log("=== BACKTEST MODE ===");
+  const results = [];
+  const backtestAssets = config.assets.slice(0, 20);
+  const minScore = config.minScore;
+  const feeRoundTrip = (config.feePct + config.slippagePct) * 2;
+
+  for (const strategy of enabledStrategies) {
+    for (const symbol of backtestAssets) {
+      for (const interval of strategy.timeframes) {
+        let candles;
+        try {
+          candles = await fetchCandles(symbol, interval, 300);
+          await new Promise((r) => setTimeout(r, 80));
+        } catch {
+          continue;
+        }
+        if (!candles || candles.length < 150) continue;
+
+        const signals = [];
+        const warmup = 100;
+
+        for (let i = warmup; i < candles.length - 20; i++) {
+          const window = candles.slice(0, i + 1);
+          let candidate;
+          try {
+            candidate = evaluateCandidate(symbol, interval, window, strategy, [], {});
+          } catch {
+            continue;
+          }
+          if (!candidate || candidate.score < minScore) continue;
+
+          // Simulate trade forward up to 20 candles
+          const { entry, stop, target1, target2, side } = candidate.scenario;
+          let outcome = "timeout";
+          let exitPrice = candles[Math.min(i + 19, candles.length - 1)].close;
+
+          for (let j = i + 1; j < Math.min(i + 21, candles.length); j++) {
+            const c = candles[j];
+            if (side === "LONG") {
+              if (c.low <= stop)    { outcome = "stop";    exitPrice = stop;    break; }
+              if (c.high >= target2) { outcome = "target2"; exitPrice = target2; break; }
+              if (c.high >= target1) { outcome = "target1"; exitPrice = target1; break; }
+            } else {
+              if (c.high >= stop)   { outcome = "stop";    exitPrice = stop;    break; }
+              if (c.low <= target2)  { outcome = "target2"; exitPrice = target2; break; }
+              if (c.low <= target1)  { outcome = "target1"; exitPrice = target1; break; }
+            }
+          }
+
+          const direction = side === "LONG" ? 1 : -1;
+          const pnlPct = entry > 0 ? ((exitPrice - entry) / entry) * direction * 100 - feeRoundTrip : 0;
+          signals.push({ outcome, pnlPct, score: candidate.score });
+        }
+
+        if (signals.length >= 3) {
+          const wins = signals.filter((s) => s.pnlPct > 0);
+          const totalPnl = signals.reduce((a, s) => a + s.pnlPct, 0);
+          results.push({
+            strategy: strategy.id,
+            symbol,
+            interval,
+            signals: signals.length,
+            winRate: Math.round(wins.length / signals.length * 100),
+            avgPnlPct: Number((totalPnl / signals.length).toFixed(3)),
+            totalPnlPct: Number(totalPnl.toFixed(2))
+          });
+        }
+      }
+    }
   }
-  console.error(error);
-  process.exitCode = 1;
-});
+
+  results.sort((a, b) => b.avgPnlPct - a.avgPnlPct);
+
+  // Group by strategy
+  const byStrategy = {};
+  for (const r of results) {
+    if (!byStrategy[r.strategy]) byStrategy[r.strategy] = [];
+    byStrategy[r.strategy].push(r);
+  }
+
+  for (const [stratId, rows] of Object.entries(byStrategy)) {
+    const totalSignals = rows.reduce((a, r) => a + r.signals, 0);
+    const avgWr = rows.reduce((a, r) => a + r.winRate, 0) / rows.length;
+    const avgPnl = rows.reduce((a, r) => a + r.avgPnlPct, 0) / rows.length;
+    log(`[${stratId}] ${rows.length} pairs, ${totalSignals} signals, WR ${avgWr.toFixed(0)}%, avgPnl ${avgPnl.toFixed(3)}%/trade`);
+    rows.slice(0, 5).forEach((r) => log(`  ${r.symbol} ${r.interval}: ${r.signals}× WR${r.winRate}% avg${r.avgPnlPct}%`));
+  }
+
+  log(JSON.stringify({ backtestResults: results, summary: Object.fromEntries(Object.entries(byStrategy).map(([k, rows]) => [k, {
+    pairs: rows.length,
+    signals: rows.reduce((a, r) => a + r.signals, 0),
+    avgWinRate: Math.round(rows.reduce((a, r) => a + r.winRate, 0) / rows.length),
+    avgPnlPct: Number((rows.reduce((a, r) => a + r.avgPnlPct, 0) / rows.length).toFixed(3))
+  }])) }, null, 2));
+}
+
+const runMode = process.argv.includes("--backtest") ? "backtest" : "live";
+
+if (runMode === "backtest") {
+  runBacktest().catch((error) => { console.error(error); process.exitCode = 1; });
+} else {
+  main().catch((error) => {
+    if (String(error?.message || "").startsWith("Supabase journal unavailable")) {
+      log(`${error.message}. Cycle skipped without opening trades.`);
+      process.exitCode = 0;
+      return;
+    }
+    console.error(error);
+    process.exitCode = 1;
+  });
+}
