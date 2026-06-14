@@ -6,6 +6,8 @@ const tableName = "crypto_strategy_trades";
 const settingsTableName = "crypto_strategy_settings";
 const learningPolicyKey = "botalin_learning_policy_v1";
 const requestedProfile = getArgValue("--profile") || process.env.BOTALIN_SERVER_PROFILE || "balanced";
+const requestedStrategy = getArgValue("--strategy") || process.env.BOTALIN_STRATEGY || "all";
+const requestedUserLogin = getArgValue("--user-login") || process.env.BOTALIN_USER_LOGIN || "server";
 
 const serverProfiles = {
   protective: {
@@ -107,13 +109,15 @@ const serverStrategies = {
   }
 };
 
-const enabledStrategies = Object.values(serverStrategies).filter((strategy) => strategy.enabled);
+const enabledStrategies = Object.values(serverStrategies).filter(
+  (strategy) => strategy.enabled && (requestedStrategy === "all" || strategy.id === requestedStrategy)
+);
 
 const config = {
   enabled: true,
   dryRun: process.argv.includes("--dry-run"),
   once: process.argv.includes("--once") || process.argv.includes("--dry-run"),
-  userLogin: "server",
+  userLogin: requestedUserLogin,
   profileId: activeProfileId,
   profileLabel: activeProfile.label,
   depositUsdt: 10000,

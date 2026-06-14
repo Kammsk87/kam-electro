@@ -1,23 +1,24 @@
-name: Bot All Strategies (координатор)
+name: Bot Pullback (Откат к тренду)
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "3-59/5 * * * *"
+    - cron: "1-59/5 * * * *"
 
 permissions:
   contents: read
 
 jobs:
-  paper-autobot:
+  run:
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Run all-strategies bot
+      - name: Run pullback bot
         env:
           BOTALIN_SERVER_PROFILE: training
-          BOTALIN_USER_LOGIN: server
+          BOTALIN_STRATEGY: pullback
+          BOTALIN_USER_LOGIN: server-pullback
         run: node share/strategy-lab-7q4m2v/server-autobot.mjs --once
