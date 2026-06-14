@@ -46,13 +46,13 @@ const pendingOrderMaxAgeMs = 30 * 60 * 1000;
 const pendingScalpingMaxAgeMs = 5 * 60 * 1000;
 const pendingOrderMaxAwayPct = 0.9;
 const pendingCrashLongAwayPct = 1.2;
-const dailyMaxLossPct = 3;
-const dailyMaxStops = 3;
+const dailyMaxLossPct = 4;
+const dailyMaxStops = 5;
 const paperFeePct = 0.12;
 const paperSlippagePct = 0.04;
 const learningReviewMs = 10 * 60 * 1000;
 const learningReviewHour = 23;
-const targetWinRatePct = 60;
+const targetWinRatePct = 50;
 const autopilotProfileMinSamples = 5;
 const autopilotProfiles = {
   protective: {
@@ -3546,9 +3546,6 @@ function evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan =
   if (context.strategyMode === "scalping") {
     return evaluateScalpingQualityGate(context, signalQuality, intel, tradePlan, dailyRisk);
   }
-  if (context.timeframe === "15m" && best.side === "LONG") {
-    return softGate("15m LONG отключен после анализа журнала", 70);
-  }
   if (isAssetQuarantined(context.asset)) {
     return softGate(`${context.asset} в карантине после серии слабых сделок`, 65);
   }
@@ -3563,8 +3560,8 @@ function evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan =
   }
   const minScore = getPresetMinScore();
   if (best.score < minScore) return { ok: false, reason: `профиль ${profile.label}/${preset.label}: score ${best.score}/100 ниже ${minScore}`, score: best.score - 100 };
-  if (!backtest || backtest.trades < 8) return softGate("недостаточно сделок в бэктесте", 55);
-  if (backtest.winRate < 55) return softGate(`бэктест winrate ${backtest.winRate.toFixed(0)}% ниже 55%`, 45);
+  if (!backtest || backtest.trades < 4) return softGate("недостаточно сделок в бэктесте", 55);
+  if (backtest.winRate < 50) return softGate(`бэктест winrate ${backtest.winRate.toFixed(0)}% ниже 50%`, 45);
   if (backtest.expectancyPct <= 0) return softGate(`матожидание ${backtest.expectancyPct.toFixed(2)}% не положительное`, 45);
   if (backtest.maxDrawdownPct > 4.5) return softGate(`просадка ${backtest.maxDrawdownPct.toFixed(2)}% выше лимита`, 35);
   if (state.cmcRadar.assets.length && !getMarketRadarAsset(context.asset)) {
@@ -3574,10 +3571,10 @@ function evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan =
   if (radarAsset && isSuspiciousPumpAsset(radarAsset)) {
     return { ok: false, reason: "анти-памп фильтр: резкий рост без комфортной базы", score: best.score - 36 };
   }
-  if (intel?.marketStructure?.adx < 18 && (context.mode === "trend" || context.mode === "breakout")) {
+  if (intel?.marketStructure?.adx < 14 && (context.mode === "trend" || context.mode === "breakout")) {
     return softGate(`ADX ${intel.marketStructure.adx.toFixed(0)} слабый для ${modeLabel(context.mode)}`, 30);
   }
-  if (intel?.marketStructure?.adx < 15 || intel?.marketStructure?.atrPct < 0.25 || intel?.marketStructure?.volumeRatio < 0.7) {
+  if (intel?.marketStructure?.adx < 12 || intel?.marketStructure?.atrPct < 0.25 || intel?.marketStructure?.volumeRatio < 0.6) {
     return softGate("рыночный шум: слабый ADX/ATR/объем", 34);
   }
   if (intel?.marketStructure?.volumeRatio < 1 && context.mode === "breakout") {
@@ -3649,8 +3646,8 @@ function evaluateScalpingQualityGate(context, signalQuality, intel, tradePlan, d
   if (pattern?.trades >= 3 && (pattern.winRate < targetWinRatePct || pattern.avgPnl <= 0)) {
     return { ok: false, reason: `скальпинг-паттерн слабый: ${pattern.winRate.toFixed(0)}%`, score: best.score - 36 };
   }
-  if (dailyRisk.stops >= 2) {
-    return { ok: false, reason: "скальпинг выключен после 2 дневных стопов", score: best.score - 45 };
+  if (dailyRisk.stops >= 4) {
+    return { ok: false, reason: "скальпинг выключен после 4 дневных стопов", score: best.score - 45 };
   }
   return { ok: true, reason: "скальпинг-фильтры пройдены", score: Math.max(best.score, signal.score) };
 }
@@ -4184,7 +4181,7 @@ function evaluateMarketStructureForScenario(context, scenario) {
   if (structure.adx >= 25 && trendAligned) {
     delta += 8;
     reasons.push("ADX подтверждает силу направления");
-  } else if (structure.adx < 18 && (context.mode === "trend" || context.mode === "breakout")) {
+  } else if (structure.adx < 14 && (context.mode === "trend" || context.mode === "breakout")) {
     delta -= 8;
     reasons.push("ADX слабый для трендового входа");
   } else if (!trendAligned) {
