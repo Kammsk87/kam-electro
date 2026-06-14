@@ -7,6 +7,8 @@ on:
         description: "Strategy to backtest (all / trend / pullback / scalping / rsi-reversal / breakout / vwap-reversion)"
         required: false
         default: "all"
+  schedule:
+    - cron: "0 3 * * 1"  # каждый понедельник в 03:00 UTC
 
 permissions:
   contents: read

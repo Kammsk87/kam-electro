@@ -5,6 +5,7 @@ const supabaseKey = "sb_publishable_BYYOhjwhgjZBP27Yw7YkVg_CEhF6ugc";
 const tableName = "crypto_strategy_trades";
 const settingsTableName = "crypto_strategy_settings";
 const learningPolicyKey = "botalin_learning_policy_v1";
+const backtestPolicyKey = "botalin_backtest_policy_v1";
 const requestedProfile = getArgValue("--profile") || process.env.BOTALIN_SERVER_PROFILE || "balanced";
 const requestedStrategy = getArgValue("--strategy") || process.env.BOTALIN_STRATEGY || "all";
 const requestedUserLogin = getArgValue("--user-login") || process.env.BOTALIN_USER_LOGIN || "server";
@@ -254,13 +255,16 @@ async function main() {
     return;
   }
 
-  const [rows, remotePolicy] = await Promise.all([
+  const [rows, remotePolicy, backtestPolicy] = await Promise.all([
     fetchRemoteRows(),
-    fetchSharedLearningPolicy().catch((error) => { log(`shared learning fallback: ${error.message}`); return null; })
+    fetchSharedLearningPolicy().catch((error) => { log(`shared learning fallback: ${error.message}`); return null; }),
+    fetchBacktestPolicy().catch(() => null)
   ]);
   const trades = rows.map((row) => normalizeTrade(row.trade)).filter(Boolean);
   const journalPolicy = createLearningPolicyFromTrades(trades);
-  const learningPolicy = mergeLearningPolicies(BOOTSTRAP_LEARNING_POLICY, mergeLearningPolicies(remotePolicy, journalPolicy));
+  // Порядок приоритета: живые сделки > remote policy > backtest policy > hardcoded bootstrap
+  const basePolicy = mergeLearningPolicies(backtestPolicy || BOOTSTRAP_LEARNING_POLICY, remotePolicy);
+  const learningPolicy = mergeLearningPolicies(basePolicy, journalPolicy);
   const changedTrades = await updateActiveTrades(trades);
   const candidates = await scanCandidates(trades, learningPolicy);
   const entryCandidates = selectEntryCandidates(candidates, trades);
@@ -386,6 +390,45 @@ async function saveSharedLearningPolicy(policy) {
       value: normalizeLearningPolicy(policy),
       updated_at: new Date().toISOString()
     }])
+  });
+}
+
+async function fetchBacktestPolicy() {
+  const rows = await remoteFetch(`/${encodeURIComponent(settingsTableName)}?select=value&key=eq.${encodeURIComponent(backtestPolicyKey)}&limit=1`);
+  const policy = Array.isArray(rows) ? rows[0]?.value : null;
+  return policy ? normalizeLearningPolicy(policy) : null;
+}
+
+async function saveBacktestPolicy(policy) {
+  await remoteFetch(`/${encodeURIComponent(settingsTableName)}?on_conflict=key`, {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify([{
+      key: backtestPolicyKey,
+      value: normalizeLearningPolicy(policy),
+      updated_at: new Date().toISOString()
+    }])
+  });
+}
+
+function backtestResultsToPolicy(results) {
+  const preferred = [];
+  const blocked = [];
+  for (const r of results) {
+    const sides = ["LONG", "SHORT"];
+    const key = (side) => `${r.symbol}|${r.interval}|${side}|${r.strategy}`;
+    if (r.avgPnlPct > 0.04 && r.winRate >= 55 && r.signals >= 5) {
+      sides.forEach((side) => preferred.push(key(side)));
+    } else if (r.winRate < 30 && r.signals >= 5) {
+      sides.forEach((side) => blocked.push(key(side)));
+    }
+  }
+  return normalizeLearningPolicy({
+    preferredPatterns: [...new Set(preferred)],
+    blockedPatterns: [...new Set(blocked)],
+    lastReviewDate: new Date().toISOString().split("T")[0],
+    reviewedAt: Date.now(),
+    notes: [`backtest:${new Date().toISOString().slice(0, 10)},pairs:${results.length},pref:${preferred.length / 2},block:${blocked.length / 2}`]
   });
 }
 
@@ -1925,6 +1968,16 @@ async function runBacktest() {
     avgWinRate: Math.round(rows.reduce((a, r) => a + r.winRate, 0) / rows.length),
     avgPnlPct: Number((rows.reduce((a, r) => a + r.avgPnlPct, 0) / rows.length).toFixed(3))
   }])) }, null, 2));
+
+  // Сохраняем выводы в Supabase — боты подберут при следующем запуске
+  const policy = backtestResultsToPolicy(results);
+  log(`backtest policy: ${policy.preferredPatterns.length} preferred, ${policy.blockedPatterns.length} blocked`);
+  try {
+    await saveBacktestPolicy(policy);
+    log("backtest policy saved to Supabase ✓");
+  } catch (err) {
+    log(`backtest policy save failed: ${err.message}`);
+  }
 }
 
 const runMode = process.argv.includes("--backtest") ? "backtest" : "live";
