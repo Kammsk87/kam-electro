@@ -486,12 +486,16 @@ async function firestoreQuery(collection, filters = [], orderByField = null, lim
 
 async function firestoreBatch(writes) {
   if (!writes.length) return;
-  const response = await fetchWithTimeout(`${firestoreBase}:batchWrite?key=${firebaseApiKey}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ writes })
-  }, 20_000);
-  if (!response.ok) { const t = await response.text().catch(() => ""); throw new Error(`Firestore batchWrite: ${response.status} ${t}`); }
+  await Promise.all(writes.map(async (w) => {
+    if (!w.update) return;
+    const url = `https://firestore.googleapis.com/v1/${w.update.name}?key=${firebaseApiKey}`;
+    const response = await fetchWithTimeout(url, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fields: w.update.fields })
+    }, 20_000);
+    if (!response.ok) { const t = await response.text().catch(() => ""); throw new Error(`Firestore write: ${response.status} ${t}`); }
+  }));
 }
 
 async function updateActiveTrades(trades) {
