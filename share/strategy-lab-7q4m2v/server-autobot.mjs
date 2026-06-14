@@ -3,6 +3,7 @@
 const firebaseProjectId = process.env.FIREBASE_PROJECT_ID || "";
 const firebaseApiKey = process.env.FIREBASE_API_KEY || "";
 const firestoreBase = `https://firestore.googleapis.com/v1/projects/${firebaseProjectId}/databases/(default)/documents`;
+const firestoreDocPath = `projects/${firebaseProjectId}/databases/(default)/documents`;
 const learningPolicyKey = "botalin_learning_policy_v1";
 const backtestPolicyKey = "botalin_backtest_policy_v1";
 const requestedProfile = getArgValue("--profile") || process.env.BOTALIN_SERVER_PROFILE || "balanced";
@@ -376,7 +377,7 @@ async function upsertTrades(trades) {
   }));
   if (!docs.length) return;
   const writes = docs.map((doc) => ({
-    update: { name: `${firestoreBase}/trades/${doc.id}`, fields: toFirestoreFields(doc) }
+    update: { name: `${firestoreDocPath}/trades/${doc.id}`, fields: toFirestoreFields(doc) }
   }));
   await firestoreBatch(writes);
 }

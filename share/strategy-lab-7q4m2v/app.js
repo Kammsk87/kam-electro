@@ -5794,8 +5794,9 @@ async function pushRemoteJournalTrades() {
     trade
   }));
   if (!docs.length) return;
+  const docPath = base.replace("https://firestore.googleapis.com/v1/", "");
   const writes = docs.map((doc) => ({
-    update: { name: `${base}/trades/${doc.id}`, fields: toFsFields(doc) }
+    update: { name: `${docPath}/trades/${doc.id}`, fields: toFsFields(doc) }
   }));
   const response = await fetch(`${base}:batchWrite?key=${key}`, {
     method: "POST",
