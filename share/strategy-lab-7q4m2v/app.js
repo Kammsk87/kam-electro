@@ -491,14 +491,13 @@ function loadRemoteJournalConfig() {
 
 function normalizeRemoteJournalConfig(config = {}) {
   return {
-    url: String(config?.url || "").trim().replace(/\/$/, ""),
-    anonKey: String(config?.anonKey || "").trim(),
-    table: String(config?.table || "crypto_strategy_trades").trim() || "crypto_strategy_trades"
+    projectId: String(config?.projectId || "").trim(),
+    apiKey: String(config?.apiKey || "").trim()
   };
 }
 
 function isRemoteJournalConfigFilled(config) {
-  return Boolean(config?.url && config?.anonKey && config?.table);
+  return Boolean(config?.projectId && config?.apiKey);
 }
 
 function loadCmcRadarConfig() {
@@ -1838,23 +1837,20 @@ function reconcileLegacyPaperBudget() {
 
 function initRemoteJournalControls() {
   const config = state.remoteJournal.config;
-  remoteUrl.value = config.url;
-  remoteKey.value = config.anonKey;
-  remoteTable.value = config.table || "crypto_strategy_trades";
+  remoteUrl.value = config.projectId;
+  remoteKey.value = config.apiKey;
   renderRemoteJournalStatus();
 }
 
 function saveRemoteJournalConfig() {
   const sharedConfig = normalizeRemoteJournalConfig(window.BOTALIN_REMOTE_JOURNAL_CONFIG);
   const nextConfig = normalizeRemoteJournalConfig({
-    url: remoteUrl.value,
-    anonKey: remoteKey.value,
-    table: remoteTable.value
+    projectId: remoteUrl.value,
+    apiKey: remoteKey.value
   });
   state.remoteJournal.config = isRemoteJournalConfigFilled(nextConfig) ? nextConfig : sharedConfig;
-  remoteUrl.value = state.remoteJournal.config.url;
-  remoteKey.value = state.remoteJournal.config.anonKey;
-  remoteTable.value = state.remoteJournal.config.table;
+  remoteUrl.value = state.remoteJournal.config.projectId;
+  remoteKey.value = state.remoteJournal.config.apiKey;
   localStorage.setItem(remoteJournalConfigKey, JSON.stringify(state.remoteJournal.config));
   setRemoteJournalStatus(isRemoteJournalConfigured() ? "saved" : "local");
   syncRemoteJournal(true);
@@ -1862,7 +1858,7 @@ function saveRemoteJournalConfig() {
 
 function isRemoteJournalConfigured() {
   const config = state.remoteJournal.config;
-  return Boolean(config.url && config.anonKey && config.table);
+  return Boolean(config.projectId && config.apiKey);
 }
 
 function renderRemoteJournalStatus() {
@@ -5738,11 +5734,54 @@ async function syncRemoteJournal(force = false) {
   }
 }
 
+function firestoreJournalBase() {
+  const { projectId, apiKey } = state.remoteJournal.config;
+  return {
+    base: `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`,
+    key: apiKey
+  };
+}
+
+function toFsValue(v) {
+  if (v === null || v === undefined) return { nullValue: null };
+  if (typeof v === "boolean") return { booleanValue: v };
+  if (typeof v === "number") return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+  if (typeof v === "string") return { stringValue: v };
+  if (Array.isArray(v)) return { arrayValue: { values: v.map(toFsValue) } };
+  if (typeof v === "object") return { mapValue: { fields: toFsFields(v) } };
+  return { nullValue: null };
+}
+
+function toFsFields(obj) {
+  const fields = {};
+  for (const [k, v] of Object.entries(obj)) if (v !== undefined) fields[k] = toFsValue(v);
+  return fields;
+}
+
+function fromFsValue(v) {
+  if (!v || "nullValue" in v) return null;
+  if ("booleanValue" in v) return v.booleanValue;
+  if ("integerValue" in v) return Number(v.integerValue);
+  if ("doubleValue" in v) return v.doubleValue;
+  if ("stringValue" in v) return v.stringValue;
+  if ("timestampValue" in v) return v.timestampValue;
+  if ("arrayValue" in v) return (v.arrayValue.values || []).map(fromFsValue);
+  if ("mapValue" in v) { const r = {}; for (const [k, val] of Object.entries(v.mapValue.fields || {})) r[k] = fromFsValue(val); return r; }
+  return null;
+}
+
+function fromFsDoc(doc) {
+  const result = {};
+  for (const [k, v] of Object.entries(doc.fields || {})) result[k] = fromFsValue(v);
+  return result;
+}
+
 async function pushRemoteJournalTrades() {
-  const rows = state.paperTrades.map(compactPaperTradeForStorage).map((trade) => ({
+  const { base, key } = firestoreJournalBase();
+  const docs = state.paperTrades.map(compactPaperTradeForStorage).map((trade) => ({
     id: trade.id,
     client_id: currentClientId,
-    session_id: trade.sessionId,
+    session_id: trade.sessionId || null,
     user_login: getTradeUserLogin(trade),
     asset: trade.asset,
     timeframe: trade.timeframe,
@@ -5754,45 +5793,51 @@ async function pushRemoteJournalTrades() {
     pnl: Number(trade.pnl) || 0,
     trade
   }));
-  if (!rows.length) return;
-  await remoteJournalFetch(`/${encodeURIComponent(state.remoteJournal.config.table)}?on_conflict=id`, {
+  if (!docs.length) return;
+  const writes = docs.map((doc) => ({
+    update: { name: `${base}/trades/${doc.id}`, fields: toFsFields(doc) }
+  }));
+  const response = await fetch(`${base}:batchWrite?key=${key}`, {
     method: "POST",
-    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-    body: JSON.stringify(rows)
-  });
-}
-
-async function fetchRemoteJournalTrades() {
-  const table = encodeURIComponent(state.remoteJournal.config.table);
-  const rows = await remoteJournalFetch(`/${table}?select=*&order=updated_at.desc&limit=1200`);
-  return Array.isArray(rows) ? rows.map((row) => row.trade).filter(Boolean).map(compactPaperTradeForStorage) : [];
-}
-
-async function remoteJournalFetch(path, options = {}) {
-  const config = state.remoteJournal.config;
-  const response = await fetch(`${config.url}/rest/v1${path}`, {
-    ...options,
-    headers: {
-      apikey: config.anonKey,
-      Authorization: `Bearer ${config.anonKey}`,
-      "Content-Type": "application/json",
-      ...(options.headers || {})
-    }
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ writes })
   });
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    throw new Error(`${response.status} ${text || response.statusText || "Remote journal request failed"}`);
+    throw new Error(`${response.status} ${text || "Firebase batchWrite failed"}`);
   }
-  if (response.status === 204) return null;
-  const text = await response.text();
-  return text ? JSON.parse(text) : null;
+}
+
+async function fetchRemoteJournalTrades() {
+  const { base, key } = firestoreJournalBase();
+  const response = await fetch(`${base}:runQuery?key=${key}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: "trades" }],
+        orderBy: [{ field: { fieldPath: "updated_at" }, direction: "DESCENDING" }],
+        limit: 1200
+      }
+    })
+  });
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`${response.status} ${text || "Firebase query failed"}`);
+  }
+  const results = await response.json();
+  return results
+    .filter((r) => r.document)
+    .map((r) => fromFsDoc(r.document))
+    .map((row) => row.trade)
+    .filter(Boolean)
+    .map(compactPaperTradeForStorage);
 }
 
 function getRemoteJournalErrorMessage(error) {
   const message = String(error?.message || error || "sync failed");
-  if (message.includes("PGRST205")) return "таблица не найдена";
   if (message.includes("401") || message.includes("403")) return "ключ/права";
-  if (message.includes("404")) return "таблица/API";
+  if (message.includes("404")) return "проект не найден";
   if (message.length > 44) return `${message.slice(0, 41)}...`;
   return message;
 }

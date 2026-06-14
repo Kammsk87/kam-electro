@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 
-const supabaseUrl = "https://dcpenxsthdhvhhqgvgjq.supabase.co";
-const supabaseKey = "sb_publishable_BYYOhjwhgjZBP27Yw7YkVg_CEhF6ugc";
-const tableName = "crypto_strategy_trades";
-const settingsTableName = "crypto_strategy_settings";
+const firebaseProjectId = process.env.FIREBASE_PROJECT_ID || "";
+const firebaseApiKey = process.env.FIREBASE_API_KEY || "";
+const firestoreBase = `https://firestore.googleapis.com/v1/projects/${firebaseProjectId}/databases/(default)/documents`;
 const learningPolicyKey = "botalin_learning_policy_v1";
 const backtestPolicyKey = "botalin_backtest_policy_v1";
 const requestedProfile = getArgValue("--profile") || process.env.BOTALIN_SERVER_PROFILE || "balanced";
@@ -307,11 +306,24 @@ async function main() {
 }
 
 async function fetchRemoteRows() {
-  const table = encodeURIComponent(tableName);
+  const activeStatusFilter = {
+    fieldFilter: {
+      field: { fieldPath: "status" },
+      op: "IN",
+      value: { arrayValue: { values: ["pending", "open", "partial"].map((s) => ({ stringValue: s })) } }
+    }
+  };
+  const userLoginFilter = {
+    fieldFilter: {
+      field: { fieldPath: "user_login" },
+      op: "EQUAL",
+      value: { stringValue: config.userLogin }
+    }
+  };
   const [lightResult, activeResult, serverFullResult] = await Promise.allSettled([
-    remoteFetch(`/${table}?select=id,user_login,asset,timeframe,side,status,pnl,opened_at,closed_at,updated_at&order=updated_at.desc&limit=1200`),
-    remoteFetch(`/${table}?select=*&status=in.(pending,open,partial)&order=updated_at.desc&limit=300`),
-    remoteFetch(`/${table}?select=*&user_login=eq.${encodeURIComponent(config.userLogin)}&order=updated_at.desc&limit=300`)
+    firestoreQuery("trades", [], "updated_at", 1200),
+    firestoreQuery("trades", [activeStatusFilter], "updated_at", 300),
+    firestoreQuery("trades", [userLoginFilter], "updated_at", 300)
   ]);
   const lightRows = lightResult.status === "fulfilled" ? lightResult.value : [];
   const activeRows = activeResult.status === "fulfilled" ? activeResult.value : [];
@@ -320,18 +332,12 @@ async function fetchRemoteRows() {
   if (activeResult.status === "rejected") log(`active journal fallback: ${activeResult.reason?.message}`);
   if (serverFullResult.status === "rejected") log(`server strategy journal fallback: ${serverFullResult.reason?.message}`);
   if (!lightRows.length && !activeRows.length && !serverFullRows.length) {
-    log(`Supabase journal unavailable — continuing with empty journal (no duplicate guard, no history)`);
+    log("Firebase journal unavailable — continuing with empty journal (no duplicate guard, no history)");
   }
   const byId = new Map();
-  (Array.isArray(lightRows) ? lightRows : []).forEach((row) => {
-    byId.set(row.id, { ...row, trade: normalizeTradeRow(row) });
-  });
-  (Array.isArray(activeRows) ? activeRows : []).forEach((row) => {
-    byId.set(row.id, row);
-  });
-  (Array.isArray(serverFullRows) ? serverFullRows : []).forEach((row) => {
-    byId.set(row.id, row);
-  });
+  lightRows.forEach((row) => byId.set(row.id, { ...row, trade: normalizeTradeRow(row) }));
+  activeRows.forEach((row) => byId.set(row.id, row));
+  serverFullRows.forEach((row) => byId.set(row.id, row));
   return [...byId.values()];
 }
 
@@ -353,10 +359,10 @@ function normalizeTradeRow(row) {
 }
 
 async function upsertTrades(trades) {
-  const rows = trades.map(compactTradeForStorage).map((trade) => ({
+  const docs = trades.map(compactTradeForStorage).map((trade) => ({
     id: trade.id,
     client_id: "server-autobot",
-    session_id: trade.sessionId,
+    session_id: trade.sessionId || null,
     user_login: trade.userLogin || config.userLogin,
     asset: trade.asset,
     timeframe: trade.timeframe,
@@ -368,47 +374,36 @@ async function upsertTrades(trades) {
     pnl: Number(trade.pnl) || 0,
     trade
   }));
-  if (!rows.length) return;
-  await remoteFetch(`/${encodeURIComponent(tableName)}?on_conflict=id`, {
-    method: "POST",
-    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-    body: JSON.stringify(rows)
-  });
+  if (!docs.length) return;
+  const writes = docs.map((doc) => ({
+    update: { name: `${firestoreBase}/trades/${doc.id}`, fields: toFirestoreFields(doc) }
+  }));
+  await firestoreBatch(writes);
 }
 
 async function fetchSharedLearningPolicy() {
-  const rows = await remoteFetch(`/${encodeURIComponent(settingsTableName)}?select=value&key=eq.${encodeURIComponent(learningPolicyKey)}&limit=1`);
-  const policy = Array.isArray(rows) ? rows[0]?.value : null;
-  return normalizeLearningPolicy(policy);
+  const doc = await firestoreGet("settings", learningPolicyKey);
+  return normalizeLearningPolicy(doc?.value ?? null);
 }
 
 async function saveSharedLearningPolicy(policy) {
-  await remoteFetch(`/${encodeURIComponent(settingsTableName)}?on_conflict=key`, {
-    method: "POST",
-    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-    body: JSON.stringify([{
-      key: learningPolicyKey,
-      value: normalizeLearningPolicy(policy),
-      updated_at: new Date().toISOString()
-    }])
+  await firestoreSet("settings", learningPolicyKey, {
+    key: learningPolicyKey,
+    value: normalizeLearningPolicy(policy),
+    updated_at: new Date().toISOString()
   });
 }
 
 async function fetchBacktestPolicy() {
-  const rows = await remoteFetch(`/${encodeURIComponent(settingsTableName)}?select=value&key=eq.${encodeURIComponent(backtestPolicyKey)}&limit=1`);
-  const policy = Array.isArray(rows) ? rows[0]?.value : null;
-  return policy ? normalizeLearningPolicy(policy) : null;
+  const doc = await firestoreGet("settings", backtestPolicyKey);
+  return doc?.value ? normalizeLearningPolicy(doc.value) : null;
 }
 
 async function saveBacktestPolicy(policy) {
-  await remoteFetch(`/${encodeURIComponent(settingsTableName)}?on_conflict=key`, {
-    method: "POST",
-    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-    body: JSON.stringify([{
-      key: backtestPolicyKey,
-      value: normalizeLearningPolicy(policy),
-      updated_at: new Date().toISOString()
-    }])
+  await firestoreSet("settings", backtestPolicyKey, {
+    key: backtestPolicyKey,
+    value: normalizeLearningPolicy(policy),
+    updated_at: new Date().toISOString()
   });
 }
 
@@ -433,29 +428,83 @@ function backtestResultsToPolicy(results) {
   });
 }
 
-async function remoteFetch(path, options = {}, attempt = 1) {
-  try {
-    const response = await fetchWithTimeout(`${supabaseUrl}/rest/v1${path}`, {
-      ...options,
-      headers: {
-        apikey: supabaseKey,
-        Authorization: `Bearer ${supabaseKey}`,
-        "Content-Type": "application/json",
-        ...(options.headers || {})
-      }
-    }, 20_000);
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      throw new Error(formatRemoteError(response.status, text || response.statusText));
-    }
-    if (response.status === 204) return null;
-    const text = await response.text();
-    return text ? JSON.parse(text) : null;
-  } catch (error) {
-    if (attempt >= 3) throw error;
-    await wait(800 * attempt);
-    return remoteFetch(path, options, attempt + 1);
+function toFirestoreValue(v) {
+  if (v === null || v === undefined) return { nullValue: null };
+  if (typeof v === "boolean") return { booleanValue: v };
+  if (typeof v === "number") return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+  if (typeof v === "string") return { stringValue: v };
+  if (Array.isArray(v)) return { arrayValue: { values: v.map(toFirestoreValue) } };
+  if (typeof v === "object") return { mapValue: { fields: toFirestoreFields(v) } };
+  return { nullValue: null };
+}
+
+function toFirestoreFields(obj) {
+  const fields = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== undefined) fields[k] = toFirestoreValue(v);
   }
+  return fields;
+}
+
+function fromFirestoreValue(v) {
+  if (!v || "nullValue" in v) return null;
+  if ("booleanValue" in v) return v.booleanValue;
+  if ("integerValue" in v) return Number(v.integerValue);
+  if ("doubleValue" in v) return v.doubleValue;
+  if ("stringValue" in v) return v.stringValue;
+  if ("timestampValue" in v) return v.timestampValue;
+  if ("arrayValue" in v) return (v.arrayValue.values || []).map(fromFirestoreValue);
+  if ("mapValue" in v) return fromFirestoreDoc(v.mapValue);
+  return null;
+}
+
+function fromFirestoreDoc(doc) {
+  const result = {};
+  for (const [k, v] of Object.entries(doc.fields || {})) result[k] = fromFirestoreValue(v);
+  return result;
+}
+
+async function firestoreGet(collection, docId) {
+  const url = `${firestoreBase}/${collection}/${encodeURIComponent(docId)}?key=${firebaseApiKey}`;
+  const response = await fetchWithTimeout(url, {}, 15_000);
+  if (response.status === 404) return null;
+  if (!response.ok) { const t = await response.text().catch(() => ""); throw new Error(`Firestore get ${collection}/${docId}: ${response.status} ${t}`); }
+  return fromFirestoreDoc(await response.json());
+}
+
+async function firestoreSet(collection, docId, data) {
+  const url = `${firestoreBase}/${collection}/${encodeURIComponent(docId)}?key=${firebaseApiKey}`;
+  const response = await fetchWithTimeout(url, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fields: toFirestoreFields(data) })
+  }, 15_000);
+  if (!response.ok) { const t = await response.text().catch(() => ""); throw new Error(`Firestore set ${collection}/${docId}: ${response.status} ${t}`); }
+}
+
+async function firestoreQuery(collection, filters = [], orderByField = null, limitN = 1000) {
+  const structuredQuery = { from: [{ collectionId: collection }], limit: limitN };
+  if (filters.length === 1) structuredQuery.where = filters[0];
+  else if (filters.length > 1) structuredQuery.where = { compositeFilter: { op: "AND", filters } };
+  if (orderByField) structuredQuery.orderBy = [{ field: { fieldPath: orderByField }, direction: "DESCENDING" }];
+  const response = await fetchWithTimeout(`${firestoreBase}:runQuery?key=${firebaseApiKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ structuredQuery })
+  }, 15_000);
+  if (!response.ok) { const t = await response.text().catch(() => ""); throw new Error(`Firestore query ${collection}: ${response.status} ${t}`); }
+  const results = await response.json();
+  return results.filter((r) => r.document).map((r) => fromFirestoreDoc(r.document));
+}
+
+async function firestoreBatch(writes) {
+  if (!writes.length) return;
+  const response = await fetchWithTimeout(`${firestoreBase}:batchWrite?key=${firebaseApiKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ writes })
+  }, 20_000);
+  if (!response.ok) { const t = await response.text().catch(() => ""); throw new Error(`Firestore batchWrite: ${response.status} ${t}`); }
 }
 
 async function updateActiveTrades(trades) {
@@ -1987,11 +2036,6 @@ if (runMode === "backtest") {
   runBacktest().catch((error) => { console.error(error); process.exitCode = 1; });
 } else {
   main().catch((error) => {
-    if (String(error?.message || "").startsWith("Supabase journal unavailable")) {
-      log(`${error.message}. Cycle skipped without opening trades.`);
-      process.exitCode = 0;
-      return;
-    }
     console.error(error);
     process.exitCode = 1;
   });
