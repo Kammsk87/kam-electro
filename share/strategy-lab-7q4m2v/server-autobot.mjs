@@ -307,38 +307,24 @@ async function main() {
 }
 
 async function fetchRemoteRows() {
-  const activeStatusFilter = {
-    fieldFilter: {
-      field: { fieldPath: "status" },
-      op: "IN",
-      value: { arrayValue: { values: ["pending", "open", "partial"].map((s) => ({ stringValue: s })) } }
-    }
-  };
-  const userLoginFilter = {
-    fieldFilter: {
-      field: { fieldPath: "user_login" },
-      op: "EQUAL",
-      value: { stringValue: config.userLogin }
-    }
-  };
-  const [lightResult, activeResult, serverFullResult] = await Promise.allSettled([
-    firestoreQuery("trades", [], "updated_at", 1200),
-    firestoreQuery("trades", [activeStatusFilter], "updated_at", 300),
-    firestoreQuery("trades", [userLoginFilter], "updated_at", 300)
-  ]);
-  const lightRows = lightResult.status === "fulfilled" ? lightResult.value : [];
-  const activeRows = activeResult.status === "fulfilled" ? activeResult.value : [];
-  const serverFullRows = serverFullResult.status === "fulfilled" ? serverFullResult.value : [];
-  if (lightResult.status === "rejected") log(`light journal fallback: ${lightResult.reason?.message}`);
-  if (activeResult.status === "rejected") log(`active journal fallback: ${activeResult.reason?.message}`);
-  if (serverFullResult.status === "rejected") log(`server strategy journal fallback: ${serverFullResult.reason?.message}`);
-  if (!lightRows.length && !activeRows.length && !serverFullRows.length) {
-    log("Firebase journal unavailable — continuing with empty journal (no duplicate guard, no history)");
+  let allRows = [];
+  try {
+    allRows = await firestoreQuery("trades", [], "updated_at", 1500);
+  } catch (err) {
+    log(`Firebase journal unavailable: ${err.message} — continuing with empty journal`);
+    return [];
   }
+  // Separate active and server-specific rows so downstream dedup and policy work correctly
+  const activeStatuses = new Set(["pending", "open", "partial"]);
   const byId = new Map();
-  lightRows.forEach((row) => byId.set(row.id, { ...row, trade: normalizeTradeRow(row) }));
-  activeRows.forEach((row) => byId.set(row.id, row));
-  serverFullRows.forEach((row) => byId.set(row.id, row));
+  allRows.forEach((row) => {
+    const isActive = activeStatuses.has(row.status);
+    const isOwn = row.user_login === config.userLogin;
+    byId.set(row.id, {
+      ...row,
+      trade: (isActive || isOwn) ? row : normalizeTradeRow(row)
+    });
+  });
   return [...byId.values()];
 }
 
