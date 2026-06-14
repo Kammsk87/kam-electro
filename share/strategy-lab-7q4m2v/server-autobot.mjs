@@ -219,7 +219,8 @@ const config = {
     "LDO/USDT", "CRV/USDT", "RUNE/USDT", "ICP/USDT", "HBAR/USDT",
     "VET/USDT", "ALGO/USDT", "STX/USDT", "ORDI/USDT", "IMX/USDT",
     "SAND/USDT", "MKR/USDT", "GRT/USDT", "SNX/USDT", "PYTH/USDT",
-    "WLD/USDT", "ZEC/USDT", "BLUR/USDT"
+    "WLD/USDT", "ZEC/USDT", "BLUR/USDT",
+    "XAUT/USDT", "XAG/USDT"
   ],
   timeframes: ["5m", "15m", "1h"],
   scalpingTimeframes: ["5m", "15m"]
