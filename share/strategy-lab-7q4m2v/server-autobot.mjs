@@ -146,6 +146,44 @@ const enabledStrategies = Object.values(serverStrategies).filter(
   (strategy) => strategy.enabled && (requestedStrategy === "all" || strategy.id === requestedStrategy)
 );
 
+// Backtest 2026-06-14: 300 candles × 20 assets × 6 strategies
+const BOOTSTRAP_LEARNING_POLICY = {
+  preferredPatterns: [
+    // pullback 1h — лучшие результаты (WR 55–79%, pnl +0.09..+0.50%)
+    "SOL/USDT|1h|LONG|pullback",  "SOL/USDT|1h|SHORT|pullback",
+    "AAVE/USDT|1h|LONG|pullback", "AAVE/USDT|1h|SHORT|pullback",
+    "ARB/USDT|1h|LONG|pullback",  "ARB/USDT|1h|SHORT|pullback",
+    "LTC/USDT|1h|LONG|pullback",  "LTC/USDT|1h|SHORT|pullback",
+    "BCH/USDT|1h|LONG|pullback",  "BCH/USDT|1h|SHORT|pullback",
+    "AVAX/USDT|1h|LONG|pullback", "AVAX/USDT|1h|SHORT|pullback",
+    "TON/USDT|1h|LONG|pullback",  "TON/USDT|1h|SHORT|pullback",
+    "ETH/USDT|1h|LONG|pullback",  "ETH/USDT|1h|SHORT|pullback",
+    // vwap-reversion 15m — хорошая точность (WR 69–86%, pnl +0.04..+0.12%)
+    "BTC/USDT|15m|LONG|vwap-reversion",  "BTC/USDT|15m|SHORT|vwap-reversion",
+    "ADA/USDT|15m|LONG|vwap-reversion",  "ADA/USDT|15m|SHORT|vwap-reversion",
+    "ADA/USDT|5m|LONG|vwap-reversion",   "ADA/USDT|5m|SHORT|vwap-reversion",
+    "ETH/USDT|15m|LONG|vwap-reversion",  "ETH/USDT|15m|SHORT|vwap-reversion",
+    "DOT/USDT|15m|LONG|vwap-reversion",  "DOT/USDT|15m|SHORT|vwap-reversion",
+  ],
+  blockedPatterns: [
+    // breakout 1h — WR=0% на всех тестовых активах
+    "DOT/USDT|1h|LONG|breakout",  "DOT/USDT|1h|SHORT|breakout",
+    "ADA/USDT|1h|LONG|breakout",  "ADA/USDT|1h|SHORT|breakout",
+    "APT/USDT|1h|LONG|breakout",  "APT/USDT|1h|SHORT|breakout",
+    "SUI/USDT|1h|LONG|breakout",  "SUI/USDT|1h|SHORT|breakout",
+    "TON/USDT|1h|LONG|breakout",  "TON/USDT|1h|SHORT|breakout",
+    "TRX/USDT|1h|LONG|breakout",  "TRX/USDT|1h|SHORT|breakout",
+    "DOGE/USDT|1h|LONG|breakout", "DOGE/USDT|1h|SHORT|breakout",
+    "ARB/USDT|1h|LONG|breakout",  "ARB/USDT|1h|SHORT|breakout",
+    "ARB/USDT|15m|LONG|breakout", "ARB/USDT|15m|SHORT|breakout",
+    // trend + pullback 1h на слабых активах (WR 17–19%)
+    "SUI/USDT|1h|LONG|trend",     "SUI/USDT|1h|SHORT|trend",
+    "SUI/USDT|1h|LONG|pullback",  "SUI/USDT|1h|SHORT|pullback",
+    "LINK/USDT|1h|LONG|trend",    "LINK/USDT|1h|SHORT|trend",
+    "LINK/USDT|1h|LONG|pullback", "LINK/USDT|1h|SHORT|pullback",
+  ]
+};
+
 const config = {
   enabled: true,
   dryRun: process.argv.includes("--dry-run"),
@@ -222,7 +260,7 @@ async function main() {
   ]);
   const trades = rows.map((row) => normalizeTrade(row.trade)).filter(Boolean);
   const journalPolicy = createLearningPolicyFromTrades(trades);
-  const learningPolicy = mergeLearningPolicies(remotePolicy, journalPolicy);
+  const learningPolicy = mergeLearningPolicies(BOOTSTRAP_LEARNING_POLICY, mergeLearningPolicies(remotePolicy, journalPolicy));
   const changedTrades = await updateActiveTrades(trades);
   const candidates = await scanCandidates(trades, learningPolicy);
   const entryCandidates = selectEntryCandidates(candidates, trades);
