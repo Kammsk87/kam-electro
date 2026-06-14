@@ -827,6 +827,8 @@ const walletReserved = document.querySelector("[data-wallet-reserved]");
 const walletServerEquity = document.querySelector("[data-server-wallet-equity]");
 const walletServerFree = document.querySelector("[data-server-wallet-free]");
 const walletServerReserved = document.querySelector("[data-server-wallet-reserved]");
+const botsGrid = document.querySelector("[data-bots-grid]");
+const botsLastUpdate = document.querySelector("[data-bots-last-update]");
 const paperEnter = document.querySelector("[data-paper-enter]");
 const paperReset = document.querySelector("[data-paper-reset]");
 const paperClear = document.querySelector("[data-paper-clear]");
@@ -1698,6 +1700,100 @@ function renderServerWalletReadout() {
   if (walletServerEquity) walletServerEquity.textContent = `${s.equity.toFixed(2)} USDT`;
   if (walletServerFree) walletServerFree.textContent = `${s.free.toFixed(2)} USDT`;
   if (walletServerReserved) walletServerReserved.textContent = `${s.reserved.toFixed(2)} USDT`;
+  renderStrategyDashboard();
+}
+
+const SERVER_BOTS = [
+  { login: "server",          label: "Все стратегии", color: "accent" },
+  { login: "server-trend",    label: "Тренд EMA",     color: "blue"   },
+  { login: "server-pullback", label: "Откат",         color: "purple" },
+  { login: "server-scalping", label: "Скальпинг",     color: "yellow" },
+];
+
+function getBotStats(userLogin) {
+  const trades = state.paperTrades.filter(
+    (t) => (t.userLogin || t.authUser) === userLogin || t.sessionId === "server-autobot" && userLogin === "server" && !["server-trend","server-pullback","server-scalping"].includes(t.userLogin || t.authUser)
+  );
+  const active  = trades.filter(isPaperTradeActive);
+  const closed  = trades.filter((t) => !isPaperTradeActive(t) && t.status !== "cancelled");
+  const wins    = closed.filter((t) => (Number(t.pnl) || 0) > 0);
+  const losses  = closed.filter((t) => (Number(t.pnl) || 0) <= 0);
+  const pnl     = closed.reduce((s, t) => s + (Number(t.pnl) || 0), 0);
+  const avgW    = wins.length   ? wins.reduce((s,t) => s+(Number(t.pnl)||0),0)/wins.length   : 0;
+  const avgL    = losses.length ? losses.reduce((s,t)=> s+(Number(t.pnl)||0),0)/losses.length : 0;
+  const wr      = closed.length ? (wins.length / closed.length) * 100 : null;
+  const rr      = avgL !== 0 ? Math.abs(avgW / avgL) : null;
+  const expect  = wr !== null ? (wr/100)*avgW + (1-wr/100)*avgL : null;
+  const lastTrade = trades.reduce((best, t) => {
+    const ts = Number(t.updatedAt) || Number(t.openedAt) || 0;
+    return ts > (Number(best?.updatedAt) || Number(best?.openedAt) || 0) ? t : best;
+  }, null);
+  return { active: active.length, closed: closed.length, wins: wins.length, losses: losses.length, pnl, wr, rr, expect, avgW, avgL, lastTrade };
+}
+
+function formatAgo(trade) {
+  if (!trade) return "нет данных";
+  const ts = Number(trade.updatedAt) || Number(trade.openedAt) || 0;
+  if (!ts) return "нет данных";
+  const m = Math.floor((Date.now() - ts) / 60000);
+  if (m < 1)  return "только что";
+  if (m < 60) return `${m} мин назад`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}ч ${m % 60}м назад`;
+  return `${Math.floor(h/24)}д ${h%24}ч назад`;
+}
+
+function renderStrategyDashboard() {
+  if (!botsGrid) return;
+  const html = SERVER_BOTS.map(({ login, label, color }) => {
+    const s = getBotStats(login);
+    const pnlClass = s.pnl > 0 ? "pos" : s.pnl < 0 ? "neg" : "";
+    const badgeClass = s.pnl > 0 ? "strategy-card__badge--profit" : s.pnl < 0 ? "strategy-card__badge--loss" : "";
+    const pnlStr = `${s.pnl >= 0 ? "+" : ""}${s.pnl.toFixed(2)} USDT`;
+    const wrStr  = s.wr  !== null ? `${s.wr.toFixed(0)}%` : "—";
+    const rrStr  = s.rr  !== null ? s.rr.toFixed(2) : "—";
+    const expStr = s.expect !== null ? `${s.expect >= 0 ? "+" : ""}${s.expect.toFixed(3)}` : "—";
+    return `
+      <div class="strategy-card strategy-card--${color}">
+        <div class="strategy-card__header">
+          <span class="strategy-card__name">${label}</span>
+          <span class="strategy-card__badge ${badgeClass}">${pnlStr}</span>
+        </div>
+        <div class="strategy-card__metrics">
+          <div class="strategy-card__metric">
+            <span>Активных</span>
+            <strong>${s.active}</strong>
+          </div>
+          <div class="strategy-card__metric">
+            <span>Закрытых</span>
+            <strong>${s.closed}</strong>
+          </div>
+          <div class="strategy-card__metric">
+            <span>Winrate</span>
+            <strong class="${s.wr !== null && s.wr >= 50 ? "pos" : s.wr !== null ? "neg" : ""}">${wrStr}</strong>
+          </div>
+          <div class="strategy-card__metric">
+            <span>R:R</span>
+            <strong class="${s.rr !== null && s.rr >= 1 ? "pos" : s.rr !== null && s.rr > 0 ? "neg" : ""}">${rrStr}</strong>
+          </div>
+          <div class="strategy-card__metric">
+            <span>Avg W / L</span>
+            <strong>${s.wins > 0 ? `+${s.avgW.toFixed(2)}` : "—"} / ${s.losses > 0 ? s.avgL.toFixed(2) : "—"}</strong>
+          </div>
+          <div class="strategy-card__metric">
+            <span>Ожидание</span>
+            <strong class="${s.expect !== null && s.expect > 0 ? "pos" : s.expect !== null ? "neg" : ""}">${expStr}</strong>
+          </div>
+        </div>
+        <div class="strategy-card__footer">Сделки: ${s.wins}W / ${s.losses}L · ${formatAgo(s.lastTrade)}</div>
+      </div>
+    `;
+  }).join("");
+  botsGrid.innerHTML = html;
+  if (botsLastUpdate) {
+    const now = new Date();
+    botsLastUpdate.textContent = `обновлено ${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}:${now.getSeconds().toString().padStart(2,"0")}`;
+  }
 }
 
 function reservePaperBudget(amount) {
