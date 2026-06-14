@@ -1704,15 +1704,18 @@ function renderServerWalletReadout() {
 }
 
 const SERVER_BOTS = [
-  { login: "server",          label: "Все стратегии", color: "accent" },
-  { login: "server-trend",    label: "Тренд EMA",     color: "blue"   },
-  { login: "server-pullback", label: "Откат",         color: "purple" },
-  { login: "server-scalping", label: "Скальпинг",     color: "yellow" },
+  { login: "server",          label: "Все стратегии", color: "accent"  },
+  { login: "server-trend",    label: "Тренд EMA",     color: "blue"    },
+  { login: "server-pullback", label: "Откат",         color: "purple"  },
+  { login: "server-scalping", label: "Скальпинг",     color: "yellow"  },
+  { login: "server-rsi",      label: "RSI Разворот",  color: "teal"    },
+  { login: "server-breakout", label: "Пробой",        color: "orange"  },
+  { login: "server-vwap",     label: "VWAP Возврат",  color: "rose"    },
 ];
 
 function getBotStats(userLogin) {
   const trades = state.paperTrades.filter(
-    (t) => (t.userLogin || t.authUser) === userLogin || t.sessionId === "server-autobot" && userLogin === "server" && !["server-trend","server-pullback","server-scalping"].includes(t.userLogin || t.authUser)
+    (t) => (t.userLogin || t.authUser) === userLogin || t.sessionId === "server-autobot" && userLogin === "server" && !["server-trend","server-pullback","server-scalping","server-rsi","server-breakout","server-vwap"].includes(t.userLogin || t.authUser)
   );
   const active  = trades.filter(isPaperTradeActive);
   const closed  = trades.filter((t) => !isPaperTradeActive(t) && t.status !== "cancelled");

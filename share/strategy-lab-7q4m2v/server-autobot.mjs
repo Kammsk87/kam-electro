@@ -59,14 +59,14 @@ const serverProfiles = {
     minScore: 60,
     maxTradePct: 2,
     maxPortfolioPct: 70,
-    maxEntriesPerRun: 7,
+    maxEntriesPerRun: 15,
     duplicateCooldownMs: 8 * 60 * 1000,
     minVolumeRatio: 0.4,
     minScalpingVolumeRatio: 0.7,
     minExpectedNetPct: 0.06,
     minScalpingExpectedNetPct: 0.04,
     blockedAssetMode: "hard-only",
-    strategyMaxEntriesPerRun: { trend: 3, pullback: 2, scalping: 3 }
+    strategyMaxEntriesPerRun: { trend: 3, pullback: 2, scalping: 3, "rsi-reversal": 2, breakout: 3, "vwap-reversion": 2 }
   }
 };
 
@@ -106,6 +106,39 @@ const serverStrategies = {
     timeframes: ["5m", "15m"],
     minScoreOffset: 3,
     maxEntriesPerRun: 1
+  },
+  rsiReversal: {
+    id: "rsi-reversal",
+    label: "RSI Разворот",
+    enabled: true,
+    kind: "rsi-reversal",
+    strategyMode: "reversal",
+    signalTemplate: "reversal",
+    timeframes: ["15m", "1h"],
+    minScoreOffset: 5,
+    maxEntriesPerRun: 1
+  },
+  breakout: {
+    id: "breakout",
+    label: "Пробой уровня",
+    enabled: true,
+    kind: "breakout",
+    strategyMode: "breakout",
+    signalTemplate: "breakout",
+    timeframes: ["15m", "1h"],
+    minScoreOffset: 3,
+    maxEntriesPerRun: 1
+  },
+  vwapReversion: {
+    id: "vwap-reversion",
+    label: "VWAP Возврат",
+    enabled: true,
+    kind: "vwap-reversion",
+    strategyMode: "reversion",
+    signalTemplate: "scalper",
+    timeframes: ["5m", "15m"],
+    minScoreOffset: 4,
+    maxEntriesPerRun: 1
   }
 };
 
@@ -142,7 +175,12 @@ const config = {
     "ADA/USDT", "DOGE/USDT", "TRX/USDT", "AVAX/USDT", "LINK/USDT", "DOT/USDT",
     "MATIC/USDT", "LTC/USDT", "BCH/USDT", "UNI/USDT", "AAVE/USDT", "APT/USDT",
     "SUI/USDT", "ARB/USDT", "OP/USDT", "NEAR/USDT", "ATOM/USDT", "INJ/USDT",
-    "FIL/USDT", "ETC/USDT", "SEI/USDT", "TIA/USDT", "TWT/USDT"
+    "FIL/USDT", "ETC/USDT", "SEI/USDT", "TIA/USDT", "TWT/USDT",
+    "JUP/USDT", "WIF/USDT", "BONK/USDT", "JTO/USDT", "PEPE/USDT",
+    "LDO/USDT", "CRV/USDT", "RUNE/USDT", "ICP/USDT", "HBAR/USDT",
+    "VET/USDT", "ALGO/USDT", "STX/USDT", "ORDI/USDT", "IMX/USDT",
+    "SAND/USDT", "MKR/USDT", "GRT/USDT", "SNX/USDT", "PYTH/USDT",
+    "WLD/USDT", "ZEC/USDT", "BLUR/USDT"
   ],
   timeframes: ["5m", "15m", "1h"],
   scalpingTimeframes: ["5m", "15m"]
@@ -545,14 +583,30 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
   const avgVolume = average(candles.slice(-30, -1).map((candle) => candle.volume));
   const volumeRatio = avgVolume > 0 ? last.volume / avgVolume : 1;
   const impulsePct = prev.close > 0 ? ((last.close - prev.close) / prev.close) * 100 : 0;
-  const history = getPatternStats(trades, symbol, interval, trend, strategy.id);
   const crash = detectCrash(candles);
+  if (crash.severe || atrPct > 4.5 || atrPct < 0.18) return null;
 
-  if (crash.severe || trend === "NEUTRAL" || atrPct > 4.5 || atrPct < 0.18) return null;
-  if (crash.riskOff && trend === "LONG") return null;
+  // Determine trade direction — EMA-based for standard strategies; signal-based for reversal/breakout
+  let side;
+  if (strategy.kind === "rsi-reversal") {
+    if (rsi < 28) side = "LONG";
+    else if (rsi > 72) side = "SHORT";
+    else return null;
+  } else if (strategy.kind === "breakout") {
+    side = getBreakoutSide(candles);
+    if (!side) return null;
+  } else if (strategy.kind === "vwap-reversion") {
+    side = getVwapReversionSide(candles, atr);
+    if (!side) return null;
+  } else {
+    if (trend === "NEUTRAL") return null;
+    side = trend;
+  }
+
+  if (crash.riskOff && side === "LONG") return null;
   if (volumeRatio < (scalping ? config.minScalpingVolumeRatio : config.minVolumeRatio)) return null;
 
-  const side = trend;
+  const history = getPatternStats(trades, symbol, interval, side, strategy.id);
   const patternKey = getLearningPatternKey(symbol, interval, side, strategy.id);
   if (isAssetBlockedByPolicy(symbol, learningPolicy) || learningPolicy?.blockedPatterns?.includes(patternKey)) return null;
   if (learningPolicy?.blockedAssetSides?.includes(`${symbol}|${side}`)) return null;
@@ -630,11 +684,27 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
     if (!scalp.ok) return null;
     score = Math.max(score, scalp.score);
   }
+  if (strategy.kind === "rsi-reversal") {
+    const reversal = evaluateRsiReversal(candles, rsi, side, atrPct, volumeRatio);
+    if (!reversal.ok) return null;
+    score += reversal.scoreBoost;
+  }
+  if (strategy.kind === "breakout") {
+    const bo = evaluateBreakoutSignal(candles, side, volumeRatio, adx, atrPct);
+    if (!bo.ok) return null;
+    score += bo.scoreBoost;
+  }
+  if (strategy.kind === "vwap-reversion") {
+    const vr = evaluateVwapReversion(candles, atr, side, rsi, volumeRatio);
+    if (!vr.ok) return null;
+    score += vr.scoreBoost;
+  }
   if (history.trades >= 3) score += history.winRate >= 60 && history.avgPnlPct > 0 ? 10 : -25;
 
   const riskDistance = last.close * Math.max(scalping ? 0.0015 : 0.0035, Math.min(scalping ? 0.005 : 0.025, atrPct / 100 * (scalping ? 0.58 : 0.75)));
-  const rr1 = scalping ? 0.55 : strategy.kind === "pullback" ? 1.35 : 1.6;
-  const rr2 = scalping ? 0.9 : strategy.kind === "pullback" ? 2 : 2.2;
+  const isReversal = strategy.kind === "rsi-reversal" || strategy.kind === "vwap-reversion";
+  const rr1 = scalping ? 0.55 : strategy.kind === "pullback" ? 1.35 : isReversal ? 1.2 : 1.6;
+  const rr2 = scalping ? 0.9 : strategy.kind === "pullback" ? 2 : isReversal ? 1.8 : 2.2;
   const entry = getStrategyEntryPrice(last.close, side, strategy.kind);
   const scenario = side === "LONG"
     ? {
@@ -699,6 +769,7 @@ function evaluatePullback(closes, candles, side, rsi, atrPct, volumeRatio) {
 
 function getStrategyEntryPrice(price, side, kind) {
   if (kind === "pullback") return side === "LONG" ? price * 0.9985 : price * 1.0015;
+  if (kind === "rsi-reversal" || kind === "vwap-reversion") return side === "LONG" ? price * 0.9992 : price * 1.0008;
   return side === "LONG" ? price * 1.0003 : price * 0.9997;
 }
 
@@ -716,6 +787,81 @@ function evaluateScalp(closes, candles, side, rsi, atrPct, volumeRatio) {
   const lastRangePct = candles[i].close > 0 ? ((candles[i].high - candles[i].low) / candles[i].close) * 100 : 0;
   if (lastRangePct <= 1.8) score += 4;
   return { ok: (longOk || shortOk) && score >= 72, score: Math.round(score) };
+}
+
+function calculateVwap(candles, lookback = 50) {
+  const slice = candles.slice(-lookback);
+  let sumPV = 0, sumV = 0;
+  for (const c of slice) {
+    const typical = (c.high + c.low + c.close) / 3;
+    sumPV += typical * c.volume;
+    sumV += c.volume;
+  }
+  return sumV > 0 ? sumPV / sumV : null;
+}
+
+function getBreakoutSide(candles, lookback = 20) {
+  if (candles.length < lookback + 2) return null;
+  const slice = candles.slice(-lookback - 1, -1);
+  const highN = Math.max(...slice.map((c) => c.high));
+  const lowN = Math.min(...slice.map((c) => c.low));
+  const last = candles[candles.length - 1];
+  if (last.close > highN * 1.002) return "LONG";
+  if (last.close < lowN * 0.998) return "SHORT";
+  return null;
+}
+
+function getVwapReversionSide(candles, atr) {
+  const vwap = calculateVwap(candles, 50);
+  if (!vwap || !Number.isFinite(atr) || atr <= 0) return null;
+  const last = candles[candles.length - 1];
+  const distAtr = (last.close - vwap) / atr;
+  if (distAtr < -1.4) return "LONG";
+  if (distAtr > 1.4) return "SHORT";
+  return null;
+}
+
+function evaluateRsiReversal(candles, rsi, side, atrPct, volumeRatio) {
+  const i = candles.length - 1;
+  const last = candles[i];
+  const prev = candles[i - 1];
+  if (!prev) return { ok: false, scoreBoost: 0 };
+  const range = last.high - last.low;
+  const lowerWick = Math.min(last.open, last.close) - last.low;
+  const upperWick = last.high - Math.max(last.open, last.close);
+  const hasReversalCandle = side === "LONG"
+    ? (range > 0 && lowerWick >= range * 0.3) || last.close > prev.close
+    : (range > 0 && upperWick >= range * 0.3) || last.close < prev.close;
+  if (!hasReversalCandle) return { ok: false, scoreBoost: 0 };
+  let scoreBoost = 15;
+  if (side === "LONG" && rsi < 22) scoreBoost += 10;
+  if (side === "SHORT" && rsi > 78) scoreBoost += 10;
+  if (volumeRatio >= 1.2) scoreBoost += 8;
+  return { ok: true, scoreBoost };
+}
+
+function evaluateBreakoutSignal(candles, side, volumeRatio, adx, atrPct) {
+  if (volumeRatio < 1.3) return { ok: false, scoreBoost: 0 };
+  let scoreBoost = 10;
+  if (volumeRatio >= 1.6) scoreBoost += 8;
+  if (volumeRatio >= 2.0) scoreBoost += 5;
+  if (Number.isFinite(adx) && adx >= 22) scoreBoost += 8;
+  if (atrPct >= 0.3) scoreBoost += 4;
+  return { ok: true, scoreBoost };
+}
+
+function evaluateVwapReversion(candles, atr, side, rsi, volumeRatio) {
+  const vwap = calculateVwap(candles, 50);
+  if (!vwap || !Number.isFinite(atr) || atr <= 0) return { ok: false, scoreBoost: 0 };
+  const last = candles[candles.length - 1];
+  const distAtrAbs = Math.abs((last.close - vwap) / atr);
+  let scoreBoost = 8;
+  if (distAtrAbs >= 2.0) scoreBoost += 8;
+  if (distAtrAbs >= 2.8) scoreBoost += 5;
+  if (side === "LONG" && rsi < 38) scoreBoost += 6;
+  if (side === "SHORT" && rsi > 62) scoreBoost += 6;
+  if (volumeRatio >= 1.1) scoreBoost += 4;
+  return { ok: true, scoreBoost };
 }
 
 function getHigherTfTrend(candles, interval) {

@@ -1960,6 +1960,9 @@ canvas {
   gap: 8px;
   margin-top: 6px;
 }
+@media (min-width: 1400px) {
+  .bots-grid { grid-template-columns: repeat(7, 1fr); }
+}
 .strategy-card {
   border: 1px solid rgba(255,255,255,.08);
   border-radius: 8px;
@@ -2030,6 +2033,9 @@ canvas {
 .strategy-card--blue   { border-left: 2px solid #38bdf8; }
 .strategy-card--purple { border-left: 2px solid #c084fc; }
 .strategy-card--yellow { border-left: 2px solid #fbbf24; }
+.strategy-card--teal   { border-left: 2px solid #2dd4bf; }
+.strategy-card--orange { border-left: 2px solid #fb923c; }
+.strategy-card--rose   { border-left: 2px solid #fb7185; }
 @media (max-width: 1100px) {
   .bots-grid { grid-template-columns: repeat(2, 1fr); }
 }
