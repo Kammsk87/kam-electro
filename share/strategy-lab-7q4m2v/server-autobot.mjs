@@ -316,12 +316,12 @@ async function fetchRemoteRows() {
   const lightRows = lightResult.status === "fulfilled" ? lightResult.value : [];
   const activeRows = activeResult.status === "fulfilled" ? activeResult.value : [];
   const serverFullRows = serverFullResult.status === "fulfilled" ? serverFullResult.value : [];
-  if (!lightRows.length && !activeRows.length && !serverFullRows.length) {
-    throw new Error(`Supabase journal unavailable: ${lightResult.reason?.message || activeResult.reason?.message || serverFullResult.reason?.message || "no rows"}`);
-  }
   if (lightResult.status === "rejected") log(`light journal fallback: ${lightResult.reason?.message}`);
   if (activeResult.status === "rejected") log(`active journal fallback: ${activeResult.reason?.message}`);
   if (serverFullResult.status === "rejected") log(`server strategy journal fallback: ${serverFullResult.reason?.message}`);
+  if (!lightRows.length && !activeRows.length && !serverFullRows.length) {
+    log(`Supabase journal unavailable — continuing with empty journal (no duplicate guard, no history)`);
+  }
   const byId = new Map();
   (Array.isArray(lightRows) ? lightRows : []).forEach((row) => {
     byId.set(row.id, { ...row, trade: normalizeTradeRow(row) });
@@ -443,7 +443,7 @@ async function remoteFetch(path, options = {}, attempt = 1) {
         "Content-Type": "application/json",
         ...(options.headers || {})
       }
-    }, 10_000);
+    }, 20_000);
     if (!response.ok) {
       const text = await response.text().catch(() => "");
       throw new Error(formatRemoteError(response.status, text || response.statusText));
