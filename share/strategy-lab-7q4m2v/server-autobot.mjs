@@ -329,10 +329,21 @@ async function fetchRemoteRows() {
 }
 
 function normalizeTradeRow(row) {
+  const stored = row.trade && typeof row.trade === "object" ? row.trade : {};
+  // Handle double-nesting corruption: old bug stored the whole doc-row as trade,
+  // so entry/amount/stop/target ended up one level deeper in stored.trade
+  const deeper = stored.trade && typeof stored.trade === "object" ? stored.trade : {};
+  const finiteOrFallback = (a, b) => Number.isFinite(Number(a)) && Number(a) !== 0 ? a : b;
   return {
-    ...(row.trade && typeof row.trade === "object" ? row.trade : {}),
+    ...deeper,
+    ...stored,
+    entry: finiteOrFallback(stored.entry, deeper.entry),
+    amount: finiteOrFallback(stored.amount, deeper.amount),
+    stop: finiteOrFallback(stored.stop, deeper.stop),
+    target: finiteOrFallback(stored.target, deeper.target),
+    target1: finiteOrFallback(stored.target1, deeper.target1),
     id: row.id,
-    userLogin: row.user_login || "legacy",
+    userLogin: row.user_login || stored.userLogin || deeper.userLogin || "legacy",
     asset: row.asset,
     timeframe: row.timeframe,
     side: row.side,
