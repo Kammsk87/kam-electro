@@ -334,20 +334,30 @@ async function fetchRemoteRows() {
   return [...byId.values()];
 }
 
+function findNestedNumeric(obj, field, maxDepth = 6) {
+  if (!obj || typeof obj !== "object" || maxDepth <= 0) return undefined;
+  const v = Number(obj[field]);
+  if (Number.isFinite(v) && v !== 0) return obj[field];
+  return findNestedNumeric(obj.trade, field, maxDepth - 1);
+}
+
 function normalizeTradeRow(row) {
   const stored = row.trade && typeof row.trade === "object" ? row.trade : {};
-  // Handle double-nesting corruption: old bug stored the whole doc-row as trade,
-  // so entry/amount/stop/target ended up one level deeper in stored.trade
+  // Recover numeric fields that may have been pushed deep by past corruption cycles
+  const entry = findNestedNumeric(stored, "entry") ?? findNestedNumeric(row, "entry");
+  const amount = findNestedNumeric(stored, "amount") ?? findNestedNumeric(row, "amount");
+  const stop = findNestedNumeric(stored, "stop") ?? findNestedNumeric(row, "stop");
+  const target = findNestedNumeric(stored, "target") ?? findNestedNumeric(row, "target");
+  const target1 = findNestedNumeric(stored, "target1") ?? findNestedNumeric(row, "target1");
   const deeper = stored.trade && typeof stored.trade === "object" ? stored.trade : {};
-  const finiteOrFallback = (a, b) => Number.isFinite(Number(a)) && Number(a) !== 0 ? a : b;
   return {
     ...deeper,
     ...stored,
-    entry: finiteOrFallback(stored.entry, deeper.entry),
-    amount: finiteOrFallback(stored.amount, deeper.amount),
-    stop: finiteOrFallback(stored.stop, deeper.stop),
-    target: finiteOrFallback(stored.target, deeper.target),
-    target1: finiteOrFallback(stored.target1, deeper.target1),
+    ...(entry !== undefined && { entry }),
+    ...(amount !== undefined && { amount }),
+    ...(stop !== undefined && { stop }),
+    ...(target !== undefined && { target }),
+    ...(target1 !== undefined && { target1 }),
     id: row.id,
     userLogin: row.user_login || stored.userLogin || deeper.userLogin || "legacy",
     asset: row.asset,
