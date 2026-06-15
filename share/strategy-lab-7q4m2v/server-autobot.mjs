@@ -322,7 +322,7 @@ async function fetchRemoteRows() {
     const isOwn = row.user_login === config.userLogin;
     byId.set(row.id, {
       ...row,
-      trade: (isActive || isOwn) ? row : normalizeTradeRow(row)
+      trade: normalizeTradeRow(row)
     });
   });
   return [...byId.values()];

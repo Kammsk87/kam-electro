@@ -1715,7 +1715,7 @@ const SERVER_BOTS = [
 
 function getBotStats(userLogin) {
   const trades = state.paperTrades.filter(
-    (t) => (t.userLogin || t.authUser) === userLogin || t.sessionId === "server-autobot" && userLogin === "server" && !["server-trend","server-pullback","server-scalping","server-rsi","server-breakout","server-vwap"].includes(t.userLogin || t.authUser)
+    (t) => getTradeUserLogin(t) === userLogin || t.sessionId === "server-autobot" && userLogin === "server" && !["server-trend","server-pullback","server-scalping","server-rsi","server-breakout","server-vwap"].includes(getTradeUserLogin(t))
   );
   const active  = trades.filter(isPaperTradeActive);
   const closed  = trades.filter((t) => !isPaperTradeActive(t) && t.status !== "cancelled");
@@ -6659,7 +6659,7 @@ function buildArchiveUserStats(trades) {
 }
 
 function getTradeUserLogin(trade) {
-  return String(trade.userLogin || trade.authUser || trade.strategySnapshot?.execution?.userLogin || "legacy");
+  return String(trade.userLogin || trade.authUser || trade.user_login || trade.strategySnapshot?.execution?.userLogin || "legacy");
 }
 
 function getServerStrategyLabel(trade) {
