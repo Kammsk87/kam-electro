@@ -70,6 +70,8 @@ const serverProfiles = {
     blockedAssetMode: "soft",
     softBlockPenalty: 12,
     minTradesBeforeBlock: 20,
+    dailyStopLimit: 20,
+    dailyLossPctLimit: 10,
     strategyMaxEntriesPerRun: { trend: 5, pullback: 5, scalping: 6, "rsi-reversal": 5, breakout: 5, "vwap-reversion": 5 }
   }
 };
@@ -1487,11 +1489,15 @@ function getDailyRisk(trades) {
   const dayStart = new Date();
   dayStart.setHours(0, 0, 0, 0);
   const since = dayStart.getTime();
-  const today = trades.filter((trade) => !isActiveTrade(trade) && (Number(trade.closedAt) || Number(trade.openedAt) || 0) >= since);
+  // Only count losses from the current bot's own user — cross-user stops must not block this instance
+  const ownTrades = trades.filter((t) => t.autopilot === true || t.userLogin === config.userLogin);
+  const today = ownTrades.filter((trade) => !isActiveTrade(trade) && (Number(trade.closedAt) || Number(trade.openedAt) || 0) >= since);
   const pnl = today.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0);
   const lossPct = pnl < 0 ? Math.abs(pnl) / Math.max(1, config.depositUsdt) * 100 : 0;
   const stops = today.filter((trade) => trade.status === "stop" || Number(trade.pnl) < 0).length;
-  return { pnl, lossPct, stops, blocked: lossPct >= 3 || stops >= 3 };
+  const stopLimit = config.dailyStopLimit || 3;
+  const lossPctLimit = config.dailyLossPctLimit || 3;
+  return { pnl, lossPct, stops, blocked: lossPct >= lossPctLimit || stops >= stopLimit };
 }
 
 function getPatternStats(trades, symbol, interval, side, strategyId = "legacy") {
