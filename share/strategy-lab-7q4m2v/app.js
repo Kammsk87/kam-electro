@@ -199,7 +199,7 @@ const emaProfiles = [
 ];
 
 const defaultRules = [
-  "Не считать стратегию готовой без точки отмены сценария и заранее заданного стопа.",
+  "Для обычных стратегий заранее задавать точку отмены сценария; для скальпинга использовать быстрый выход по импульсу, TTL и аварийный риск-контроль.",
   "Риск на сделку держать в пределах 0.25-1.5%, если рынок не имеет явного тренда.",
   "Пробой торговать только после закрепления или ретеста уровня.",
   "После серии убыточных сделок снижать риск и прекращать торговлю до пересмотра плана."
@@ -310,7 +310,7 @@ const knowledgeSources = [
     author: "Ждан Стерлинг",
     theme: "система трейдинга",
     rules: [
-      "Стратегия должна состоять из сетапа, фильтров, входа, стопа, целей, сопровождения и постанализа.",
+      "Стратегия должна состоять из сетапа, фильтров, входа, выхода по риску, целей, сопровождения и постанализа.",
       "Если нет статистики по стратегии, выдавать ее как гипотезу для бэктеста, а не как готовый торговый сигнал."
     ]
   },
@@ -2710,11 +2710,14 @@ function buildInvestorDisciplineBlock(context, tradePlan) {
   const primary = tradePlan?.primary;
   const profile = getAutopilotProfileSettings();
   const profileName = state.autopilot.profile === "auto" ? `Авто-тест, сейчас ${profile.label}` : profile.label;
+  const isScalping = isScalpingContext(context);
   const rrText = primary
     ? `${primary.side}: риск ${formatPrice(Math.abs(primary.entry - primary.stop))}, цель до ${formatPrice(primary.target2)}`
     : "риск/цель еще не рассчитаны";
   const edgeChecks = [
-    "Запас прочности: вход разрешен только если стоп заранее известен, а цель дает асимметрию не хуже выбранного risk/reward.",
+    isScalping
+      ? "Запас прочности: в скальпинге вход разрешен без классического стопа, но только при быстром выходе по импульсу, TTL и аварийном risk-control."
+      : "Запас прочности: вход разрешен только если стоп заранее известен, а цель дает асимметрию не хуже выбранного risk/reward.",
     `Профиль автобота: ${profileName}, вход от ${profile.minScore}/100; часть фильтров может снижать score, а не полностью запрещать вход.`,
     `Дневной стоп: после ${dailyMaxStops} стопов или убытка ${dailyMaxLossPct}% автобот прекращает входы до следующего дня.`,
     `Реализм демо: каждая сделка учитывает комиссию ${paperFeePct}% и проскальзывание ${paperSlippagePct}% на исполнении.`,
@@ -2741,9 +2744,10 @@ function buildTradePlanBlock(tradePlan) {
     return "";
   }
 
+  const stopLabel = isScalpingContext(getContext()) ? "аварийный выход" : "стоп";
   const rows = tradePlan.scenarios.map((scenario) => `
     <li>
-      <strong>${scenario.side}</strong>: вход ${formatPrice(scenario.entry)}, стоп ${formatPrice(scenario.stop)},
+      <strong>${scenario.side}</strong>: вход ${formatPrice(scenario.entry)}, ${stopLabel} ${formatPrice(scenario.stop)},
       цель 1 ${formatPrice(scenario.target1)}, цель 2 ${formatPrice(scenario.target2)}.
       ${escapeHtml(scenario.comment)}
     </li>
@@ -4077,6 +4081,7 @@ async function scanAutopilotCandidates() {
 function buildAutopilotStrategyHtml(candidate) {
   const best = candidate.signalQuality.best;
   const plan = candidate.tradePlan.scenarios.find((scenario) => scenario.side === best.side) || candidate.tradePlan.primary;
+  const stopLabel = isScalpingContext(candidate.context) ? "emergency exit" : "stop";
   return `
     <h2>${candidate.context.asset} · ${candidate.context.timeframe}: авто-бот выбрал ${best.side}</h2>
     <section>
@@ -4085,7 +4090,7 @@ function buildAutopilotStrategyHtml(candidate) {
     </section>
     <section>
       <h3>План</h3>
-      <p>Entry ${formatPrice(plan.entry)}, stop ${formatPrice(plan.stop)}, T1 ${formatPrice(plan.target1)}, T2 ${formatPrice(plan.target2)}.</p>
+      <p>Entry ${formatPrice(plan.entry)}, ${stopLabel} ${formatPrice(plan.stop)}, T1 ${formatPrice(plan.target1)}, T2 ${formatPrice(plan.target2)}.</p>
     </section>
     <section>
       <h3>Фильтры</h3>
@@ -5213,8 +5218,13 @@ function syncPaperSideOptions(tradePlan) {
   }
 }
 
+function isScalpingContext(context, options = {}) {
+  return Boolean(options.scalping || context?.strategyMode === "scalping");
+}
+
 function runExchangePreflight(options = {}) {
   const context = options.context || getContext();
+  const isScalping = isScalpingContext(context, options);
   const tradePlan = options.tradePlan || state.tradePlan || buildTradePlan(context);
   const signalQuality = options.signalQuality || state.signalQuality;
   const side = options.side || signalQuality?.best?.side || getBestScenarioSide(tradePlan) || paperSide.value;
@@ -5234,16 +5244,22 @@ function runExchangePreflight(options = {}) {
     const target2 = Number(scenario.target2);
     const tickSize = estimateBybitTickSize(entry);
     const qty = amount > 0 && entry > 0 ? amount / entry : 0;
-    const rr = Math.abs(target2 - entry) / Math.max(0.00000001, Math.abs(entry - stop));
-    const minRequiredRr = options.scalping || context.strategyMode === "scalping" ? 0.8 : 2;
+    const stopDistance = Math.abs(entry - stop);
+    const rr = stopDistance > 0 ? Math.abs(target2 - entry) / stopDistance : Number.POSITIVE_INFINITY;
+    const minRequiredRr = isScalping ? 0.8 : 2;
     const duplicate = state.paperTrades.some((trade) => isPaperTradeActive(trade) && trade.asset === context.asset && trade.side === scenario.side);
     const orderValue = qty * entry;
 
     add(getDepositValue() >= 10, "Баланс", `свободно ${getDepositValue().toFixed(2)} USDT`);
     add(amount >= 10, "Размер", `после лимитов ${amount.toFixed(2)} USDT`);
     add(orderValue >= 10, "Min notional", `${orderValue.toFixed(2)} USDT >= 10`);
-    add(Number.isFinite(entry) && entry > 0 && Number.isFinite(stop) && stop > 0, "Entry/Stop", `${formatPrice(entry)} / ${formatPrice(stop)}`);
-    add(Number.isFinite(target1) && target1 > 0 && Number.isFinite(target2) && target2 > 0, "TP/SL", `T1 ${formatPrice(target1)}, T2 ${formatPrice(target2)}`);
+    add(Number.isFinite(entry) && entry > 0, isScalping ? "Entry" : "Entry/Stop", isScalping ? formatPrice(entry) : `${formatPrice(entry)} / ${formatPrice(stop)}`);
+    if (isScalping) {
+      add(true, "Scalping exit", "классический стоп не обязателен: выход по импульсу, TTL и аварийный risk-control", "warn");
+    } else {
+      add(Number.isFinite(stop) && stop > 0, "Stop", formatPrice(stop));
+    }
+    add(Number.isFinite(target1) && target1 > 0 && Number.isFinite(target2) && target2 > 0, isScalping ? "TP/Exit" : "TP/SL", `T1 ${formatPrice(target1)}, T2 ${formatPrice(target2)}`);
     add(rr >= minRequiredRr, "Risk/Reward", `RR ${rr.toFixed(2)} / min ${minRequiredRr.toFixed(1)}`);
     add(!duplicate, "Дубли", duplicate ? "уже есть активная сделка по этой монете и стороне" : "дублей нет");
     add(live.active, "Bybit market data", live.active ? `${live.exchange} ${formatPrice(live.lastPrice)}` : "live-данные выключены или еще не пришли", "warn");
@@ -5258,12 +5274,13 @@ function runExchangePreflight(options = {}) {
   const passed = checks.length - blockers.length - warnings.length;
   const score = checks.length ? Math.round((passed / checks.length) * 100) : 0;
   const allowed = blockers.length === 0;
-  const order = allowed && scenario ? buildDryRunOrderPayload(context, scenario, amount) : null;
+  const order = allowed && scenario ? buildDryRunOrderPayload(context, scenario, amount, { scalping: isScalping }) : null;
   return { allowed, score, blockers, warnings, checks, context, scenario, amount, order };
 }
 
-function buildDryRunOrderPayload(context, scenario, amount) {
+function buildDryRunOrderPayload(context, scenario, amount, options = {}) {
   const qty = amount / scenario.entry;
+  const stopLoss = options.scalping ? null : roundPrice(scenario.stop);
   return {
     category: "spot/testnet-dry-run",
     symbol: toBinanceSymbol(context.asset),
@@ -5274,7 +5291,8 @@ function buildDryRunOrderPayload(context, scenario, amount) {
     timeInForce: scenario.executionType === "marketable" ? "IOC" : "GTC",
     takeProfit1: roundPrice(scenario.target1),
     takeProfit2: roundPrice(scenario.target2),
-    stopLoss: roundPrice(scenario.stop),
+    stopLoss,
+    emergencyExit: options.scalping ? roundPrice(scenario.stop) : null,
     reduceOnly: false,
     orderLinkId: `dry-${Date.now()}`
   };
