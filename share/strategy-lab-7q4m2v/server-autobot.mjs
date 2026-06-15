@@ -301,7 +301,7 @@ async function main() {
     return;
   }
 
-  if (toUpsert.length) await upsertTrades(toUpsert);
+  if (toUpsert.length) await upsertTrades(toUpsert).catch((err) => log(`upsert skipped: ${err.message}`));
   await saveSharedLearningPolicy(nextPolicy).catch((error) => log(`shared learning save skipped: ${error.message}`));
   log(`server-autobot done: profile ${config.profileId}, strategies ${enabledStrategies.map((strategy) => strategy.id).join("/")}, updated ${changedTrades.length}, new ${newTrades.length}, best ${best ? `${best.symbol} ${best.interval} ${best.side} ${best.score}` : "none"}`);
 }
@@ -489,8 +489,9 @@ async function firestoreQuery(collection, filters = [], orderByField = null, lim
 
 async function firestoreBatch(writes) {
   if (!writes.length) return;
-  await Promise.all(writes.map(async (w) => {
+  await mapLimit(writes, 3, async (w) => {
     if (!w.update) return;
+    await wait(100);
     const url = `https://firestore.googleapis.com/v1/${w.update.name}?key=${firebaseApiKey}`;
     const response = await fetchWithTimeout(url, {
       method: "PATCH",
@@ -498,7 +499,7 @@ async function firestoreBatch(writes) {
       body: JSON.stringify({ fields: w.update.fields })
     }, 20_000);
     if (!response.ok) { const t = await response.text().catch(() => ""); throw new Error(`Firestore write: ${response.status} ${t}`); }
-  }));
+  });
 }
 
 async function updateActiveTrades(trades) {
