@@ -54,20 +54,23 @@ const serverProfiles = {
     strategyMaxEntriesPerRun: { trend: 1, pullback: 1, scalping: 2 }
   },
   // Paper-mode accelerated learning: many trades, low thresholds, fast cooldown.
-  // All money is virtual — goal is diverse (asset × strategy × side) coverage fast.
+  // Goal: maximum variety (asset × strategy × side × score tier) with tiny position size.
+  // NOT higher risk — smaller positions + higher frequency.
   training: {
     label: "Обучение",
-    minScore: 60,
-    maxTradePct: 2,
+    minScore: 55,
+    maxTradePct: 1,
     maxPortfolioPct: 70,
-    maxEntriesPerRun: 15,
-    duplicateCooldownMs: 8 * 60 * 1000,
-    minVolumeRatio: 0.4,
-    minScalpingVolumeRatio: 0.7,
-    minExpectedNetPct: 0.06,
-    minScalpingExpectedNetPct: 0.04,
-    blockedAssetMode: "hard-only",
-    strategyMaxEntriesPerRun: { trend: 3, pullback: 2, scalping: 3, "rsi-reversal": 2, breakout: 3, "vwap-reversion": 2 }
+    maxEntriesPerRun: 30,
+    duplicateCooldownMs: 4 * 60 * 1000,
+    minVolumeRatio: 0.35,
+    minScalpingVolumeRatio: 0.6,
+    minExpectedNetPct: 0.03,
+    minScalpingExpectedNetPct: 0.02,
+    blockedAssetMode: "soft",
+    softBlockPenalty: 12,
+    minTradesBeforeBlock: 20,
+    strategyMaxEntriesPerRun: { trend: 5, pullback: 5, scalping: 6, "rsi-reversal": 5, breakout: 5, "vwap-reversion": 5 }
   }
 };
 
@@ -303,7 +306,10 @@ async function main() {
 
   if (toUpsert.length) await upsertTrades(toUpsert).catch((err) => log(`upsert skipped: ${err.message}`));
   await saveSharedLearningPolicy(nextPolicy).catch((error) => log(`shared learning save skipped: ${error.message}`));
-  log(`server-autobot done: profile ${config.profileId}, strategies ${enabledStrategies.map((strategy) => strategy.id).join("/")}, updated ${changedTrades.length}, new ${newTrades.length}, best ${best ? `${best.symbol} ${best.interval} ${best.side} ${best.score}` : "none"}`);
+  const enteredSet = new Set(entryCandidates.map((c) => `${c.symbol}|${c.interval}|${c.side}|${c.strategyId}`));
+  const rejected = candidates.filter((c) => !enteredSet.has(`${c.symbol}|${c.interval}|${c.side}|${c.strategyId}`));
+  await saveRejectedSignals(rejected, entryCandidates.length).catch((err) => log(`rejected signals skipped: ${err.message}`));
+  log(`server-autobot done: profile ${config.profileId}, strategies ${enabledStrategies.map((strategy) => strategy.id).join("/")}, updated ${changedTrades.length}, new ${newTrades.length}, rejected ${rejected.length}, best ${best ? `${best.symbol} ${best.interval} ${best.side} ${best.score}` : "none"}`);
 }
 
 async function fetchRemoteRows() {
@@ -376,6 +382,31 @@ async function upsertTrades(trades) {
   const writes = docs.map((doc) => ({
     update: { name: `${firestoreDocPath}/trades/${doc.id}`, fields: toFirestoreFields(doc) }
   }));
+  await firestoreBatch(writes);
+}
+
+async function saveRejectedSignals(rejected, enteredCount) {
+  if (!rejected.length) return;
+  const now = Date.now();
+  const writes = rejected.slice(0, 40).map((c) => {
+    const minScore = getStrategyMinScore(serverStrategies[c.strategyId] || serverStrategies.trend);
+    const rejectReason = c.score < minScore ? `score_low:${c.score}<${minScore}` : `limit_or_cooldown:entered_${enteredCount}`;
+    const id = `rej-${now}-${c.symbol.replace("/", "")}-${c.interval}-${c.side}-${c.strategyId}`;
+    const doc = {
+      id,
+      user_login: config.userLogin,
+      profile: config.profileId,
+      asset: c.symbol,
+      timeframe: c.interval,
+      side: c.side,
+      strategy: c.strategyId,
+      score: c.score,
+      reject_reason: rejectReason,
+      reason_detail: c.reason || "",
+      recorded_at: new Date(now).toISOString()
+    };
+    return { update: { name: `${firestoreDocPath}/rejected_signals/${id}`, fields: toFirestoreFields(doc) } };
+  });
   await firestoreBatch(writes);
 }
 
@@ -745,9 +776,13 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
 
   const history = getPatternStats(trades, symbol, interval, side, strategy.id);
   const patternKey = getLearningPatternKey(symbol, interval, side, strategy.id);
-  if (isAssetBlockedByPolicy(symbol, learningPolicy) || learningPolicy?.blockedPatterns?.includes(patternKey)) return null;
-  if (learningPolicy?.blockedAssetSides?.includes(`${symbol}|${side}`)) return null;
-  let score = 45;
+  const isSoftMode = config.blockedAssetMode === "soft";
+  if (!isSoftMode) {
+    if (isAssetBlockedByPolicy(symbol, learningPolicy) || learningPolicy?.blockedPatterns?.includes(patternKey)) return null;
+    if (learningPolicy?.blockedAssetSides?.includes(`${symbol}|${side}`)) return null;
+  }
+  const blockPenalty = isSoftMode ? getSoftBlockPenalty(symbol, interval, side, strategy, learningPolicy) : 0;
+  let score = 45 - blockPenalty;
   score += side === "LONG" ? Math.max(-10, Math.min(14, slopePct * 8)) : Math.max(-10, Math.min(14, -slopePct * 8));
   if (side === "LONG" && rsi >= 48 && rsi <= 66) score += 15;
   if (side === "SHORT" && rsi >= 34 && rsi <= 52) score += 15;
@@ -1464,8 +1499,19 @@ function getPatternStats(trades, symbol, interval, side, strategyId = "legacy") 
 }
 
 function isAssetBlockedByPolicy(symbol, learningPolicy) {
+  if (config.blockedAssetMode === "soft" || config.blockedAssetMode === "none") return false;
   if (!learningPolicy?.blockedAssets?.includes(symbol)) return false;
   return config.blockedAssetMode === "strict" || learningPolicy.hardBlockedAssets?.includes(symbol);
+}
+
+function getSoftBlockPenalty(symbol, interval, side, strategy, learningPolicy) {
+  if (config.blockedAssetMode !== "soft") return 0;
+  const patternKey = getLearningPatternKey(symbol, interval, side, strategy.id);
+  let penalty = 0;
+  if (learningPolicy?.blockedAssets?.includes(symbol)) penalty += config.softBlockPenalty || 12;
+  if (learningPolicy?.blockedAssetSides?.includes(`${symbol}|${side}`)) penalty += config.softBlockPenalty || 12;
+  if (learningPolicy?.blockedPatterns?.includes(patternKey)) penalty += Math.floor((config.softBlockPenalty || 12) * 0.7);
+  return penalty;
 }
 
 function createLearningPolicyFromTrades(trades) {
@@ -1474,17 +1520,18 @@ function createLearningPolicyFromTrades(trades) {
   const assetSideStats = buildGroupStatsWeighted(closed, (trade) => `${trade.asset}|${trade.side}`);
   const patternStats = buildGroupStatsWeighted(closed, (trade) => getLearningPatternKey(trade.asset, trade.timeframe, trade.side, getTradeStrategyId(trade)));
   const strategyStats = buildGroupStats(closed.filter((trade) => trade.autopilot || trade.userLogin === config.userLogin), getTradeStrategyId);
+  const minBlock = config.minTradesBeforeBlock || 5;
   const blockedAssets = Object.values(assetStats)
-    .filter((item) => item.trades >= 5 && item.winRate < 35 && item.avgPnl <= -2)
+    .filter((item) => item.trades >= minBlock && item.winRate < 35 && item.avgPnl <= -2)
     .map((item) => item.key);
   const hardBlockedAssets = Object.values(assetStats)
-    .filter((item) => item.trades >= 8 && item.winRate < 25 && item.avgPnl <= -3)
+    .filter((item) => item.trades >= Math.max(minBlock, 20) && item.winRate < 25 && item.avgPnl <= -3)
     .map((item) => item.key);
   const blockedAssetSides = Object.values(assetSideStats)
-    .filter((item) => item.trades >= 6 && item.winRate < 30 && item.avgPnl <= -2)
+    .filter((item) => item.trades >= minBlock && item.winRate < 30 && item.avgPnl <= -2)
     .map((item) => item.key);
   const blockedPatterns = Object.values(patternStats)
-    .filter((item) => item.trades >= 5 && item.winRate < 40 && item.avgPnl <= 0)
+    .filter((item) => item.trades >= Math.max(minBlock, 5) && item.winRate < 40 && item.avgPnl <= 0)
     .map((item) => item.key);
   const preferredPatterns = Object.values(patternStats)
     .filter((item) => item.trades >= 4 && item.winRate >= 60 && item.avgPnl > 0)
