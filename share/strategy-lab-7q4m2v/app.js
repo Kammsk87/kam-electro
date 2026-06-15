@@ -5745,7 +5745,10 @@ function firestoreJournalBase() {
 function toFsValue(v) {
   if (v === null || v === undefined) return { nullValue: null };
   if (typeof v === "boolean") return { booleanValue: v };
-  if (typeof v === "number") return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+  if (typeof v === "number") {
+    if (!Number.isFinite(v)) return { nullValue: null };
+    return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+  }
   if (typeof v === "string") return { stringValue: v };
   if (Array.isArray(v)) return { arrayValue: { values: v.map(toFsValue) } };
   if (typeof v === "object") return { mapValue: { fields: toFsFields(v) } };
