@@ -3,7 +3,7 @@ name: Bot Breakout (15m/1h)
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/10 * * * *"
 
 permissions:
   contents: read

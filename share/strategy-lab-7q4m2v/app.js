@@ -538,7 +538,7 @@ function normalizeNewsAnalyticsConfig(config = {}) {
     exchangeUrl: String(config?.exchangeUrl || "").trim(),
     cmcApiKey: String(config?.cmcApiKey || "").trim(),
     cmcProxyUrl: String(config?.cmcProxyUrl || "").trim().replace(/\/$/, ""),
-    cftcUrl: String(config?.cftcUrl || "https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm").trim(),
+    cftcUrl: String(config?.cftcUrl || "").trim(),
     manualText: String(config?.manualText || "").trim()
   };
 }
@@ -828,6 +828,7 @@ const walletServerFree = document.querySelector("[data-server-wallet-free]");
 const walletServerReserved = document.querySelector("[data-server-wallet-reserved]");
 const botsGrid = document.querySelector("[data-bots-grid]");
 const botsLastUpdate = document.querySelector("[data-bots-last-update]");
+const serverOpenPositions = document.querySelector("[data-server-open-positions]");
 const paperEnter = document.querySelector("[data-paper-enter]");
 const paperReset = document.querySelector("[data-paper-reset]");
 const paperClear = document.querySelector("[data-paper-clear]");
@@ -1796,6 +1797,53 @@ function renderStrategyDashboard() {
     const now = new Date();
     botsLastUpdate.textContent = `обновлено ${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}:${now.getSeconds().toString().padStart(2,"0")}`;
   }
+  renderServerOpenPositions();
+}
+
+function renderServerOpenPositions() {
+  if (!serverOpenPositions) return;
+  const serverLogins = new Set(SERVER_BOTS.map((b) => b.login));
+  const open = state.paperTrades.filter((t) => {
+    const login = t.userLogin || t.authUser;
+    return isPaperTradeActive(t) && (serverLogins.has(login) || t.sessionId === "server-autobot");
+  });
+  if (!open.length) {
+    serverOpenPositions.innerHTML = "";
+    return;
+  }
+  const rows = open.map((t) => {
+    const currentPrice = getPaperTradePrice(t);
+    const entry = Number(t.entry) || 0;
+    const pnlPct = entry > 0 ? ((currentPrice - entry) / entry * 100 * (t.side === "SHORT" ? -1 : 1)) : 0;
+    const pnl = Number(t.pnl) || (entry > 0 ? (currentPrice - entry) * (Number(t.size) || 0) * (t.side === "SHORT" ? -1 : 1) : 0);
+    const pnlClass = pnl > 0 ? "pos" : pnl < 0 ? "neg" : "";
+    const age = formatAgo(t);
+    const strategy = getServerStrategyLabel(t);
+    return `<tr>
+      <td><strong>${escapeHtml(t.asset || "—")}</strong></td>
+      <td class="${t.side === "LONG" ? "pos" : "neg"}">${t.side || "—"}</td>
+      <td>${t.timeframe || "—"}</td>
+      <td>${escapeHtml(strategy)}</td>
+      <td>${entry > 0 ? formatPrice(entry) : "—"}</td>
+      <td>${currentPrice > 0 ? formatPrice(currentPrice) : "—"}</td>
+      <td class="${pnlClass}">${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USDT (${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(2)}%)</td>
+      <td style="color:#888">${age}</td>
+    </tr>`;
+  }).join("");
+  serverOpenPositions.innerHTML = `
+    <div class="output-header" style="margin-top:12px">
+      <span>Открытые позиции сервера (${open.length})</span>
+    </div>
+    <div class="journal-table-wrap">
+      <table class="journal-table">
+        <thead><tr>
+          <th>Актив</th><th>Направление</th><th>ТФ</th><th>Стратегия</th>
+          <th>Вход</th><th>Цена</th><th>P&amp;L</th><th>Открыта</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
 }
 
 function reservePaperBudget(amount) {
@@ -2063,7 +2111,7 @@ function saveNewsAnalyticsConfig() {
 
 function isNewsAnalyticsConfigured() {
   const config = state.newsAnalytics.config;
-  return Boolean(config.exchangeUrl || config.cmcProxyUrl || config.cmcApiKey || config.cftcUrl);
+  return Boolean(config.manualText || config.exchangeUrl || config.cmcProxyUrl || config.cmcApiKey || config.cftcUrl);
 }
 
 function setNewsAnalyticsStatus(status, error = "") {
@@ -2532,7 +2580,7 @@ function buildStrategy(userIdea = "", tradePlan = null, signalQuality = null) {
     <section>
       <h3>Риск и сопровождение</h3>
       <ul>
-        <li>Депозит: ${formatPrice(context.deposit)} USDT. Риск на сделку: не более ${Math.min(context.risk, 2).toFixed(2)}% от депозита.</li>
+        <li>Депозит: ${formatPrice(context.deposit)} USDT. Риск на сделку: не более ${Math.min(context.risk, 5).toFixed(2)}% от депозита.</li>
         <li>Размер позиции: ручной вход до ${manualMaxSingleTradePct}% капитала на сделку, автобот до ${autopilotMaxSingleTradePct}%; суммарно автобот держит в рынке не больше ${autopilotMaxPortfolioPct}% капитала.</li>
         <li>Стоп: за локальный экстремум или за уровень отмены сценария.</li>
         <li>Цель: частичная фиксация на ${rrTarget}, остаток вести по структуре.</li>
@@ -5475,7 +5523,7 @@ function enterPaperTrade(options = {}) {
     budgetReserved: true,
     walletSettled: false,
     riskBudget: riskBudgetAtEntry,
-    riskLimitPct: options.scalping ? scalpingRiskPct : Math.min(Number(risk.value) || 1, 2),
+    riskLimitPct: options.scalping ? scalpingRiskPct : Math.min(Number(risk.value) || 1, 5),
     autopilot: Boolean(options.autopilot),
     autopilotProfile: autopilotProfileId,
     exchangePreflight: preflight,
@@ -5546,7 +5594,7 @@ function createStrategySnapshot(context, tradePlan, scenario, quality, options =
       mode: context.mode,
       modeSource: context.modeSource,
       strategyMode: context.strategyMode || "standard",
-      risk: Math.min(Number(context.risk) || 1, 2),
+      risk: Math.min(Number(context.risk) || 1, 5),
       conservative: context.conservative,
       includeLongs: context.includeLongs,
       includeShorts: context.includeShorts,
@@ -5660,7 +5708,7 @@ function getOpeningOrderType(side, placedPrice, entry, executionType = "") {
 }
 
 function getRiskBudget(options = {}) {
-  const riskPct = options.scalping ? scalpingRiskPct : Math.min(Number(risk.value) || 1, 2);
+  const riskPct = options.scalping ? scalpingRiskPct : Math.min(Number(risk.value) || 1, 5);
   return getDepositValue() * (riskPct / 100);
 }
 

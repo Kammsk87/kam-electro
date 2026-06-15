@@ -14,7 +14,7 @@ const serverProfiles = {
   protective: {
     label: "Осторожный",
     minScore: 82,
-    maxTradePct: 3,
+    maxTradePct: 5,
     maxPortfolioPct: 18,
     maxEntriesPerRun: 1,
     duplicateCooldownMs: 120 * 60 * 1000,
@@ -28,7 +28,7 @@ const serverProfiles = {
   balanced: {
     label: "Баланс",
     minScore: 78,
-    maxTradePct: 3,
+    maxTradePct: 5,
     maxPortfolioPct: 24,
     maxEntriesPerRun: 2,
     duplicateCooldownMs: 45 * 60 * 1000,
@@ -42,7 +42,7 @@ const serverProfiles = {
   active: {
     label: "Активный",
     minScore: 74,
-    maxTradePct: 2,
+    maxTradePct: 5,
     maxPortfolioPct: 30,
     maxEntriesPerRun: 3,
     duplicateCooldownMs: 25 * 60 * 1000,

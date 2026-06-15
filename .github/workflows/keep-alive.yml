@@ -1,0 +1,26 @@
+name: Keep Alive (prevent schedule disable)
+
+on:
+  schedule:
+    # Run on the 1st of every month — GitHub disables cron after 60 days of repo inactivity
+    - cron: "0 6 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Touch keep-alive file
+        run: |
+          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > .github/keep-alive.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/keep-alive.txt
+          git diff --cached --quiet || git commit -m "chore: keep-alive [skip ci]"
+          git push
