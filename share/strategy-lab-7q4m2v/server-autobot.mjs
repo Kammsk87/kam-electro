@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createHmac } from "crypto";
 
 const firebaseProjectId = process.env.FIREBASE_PROJECT_ID || "";
 const firebaseApiKey = process.env.FIREBASE_API_KEY || "";
@@ -9,6 +10,12 @@ const backtestPolicyKey = "botalin_backtest_policy_v1";
 const requestedProfile = getArgValue("--profile") || process.env.BOTALIN_SERVER_PROFILE || "balanced";
 const requestedStrategy = getArgValue("--strategy") || process.env.BOTALIN_STRATEGY || "all";
 const requestedUserLogin = getArgValue("--user-login") || process.env.BOTALIN_USER_LOGIN || "server";
+
+// Bybit private API credentials (real trading)
+const bybitApiKey = process.env.BYBIT_API_KEY || "";
+const bybitApiSecret = process.env.BYBIT_API_SECRET || "";
+// Safety flag: real orders are placed ONLY when explicitly set to "true"
+const realTradingEnabled = process.env.BOTALIN_REAL_TRADING === "true";
 
 const serverProfiles = {
   protective: {
@@ -73,6 +80,26 @@ const serverProfiles = {
     dailyStopLimit: 100,
     dailyLossPctLimit: 50,
     strategyMaxEntriesPerRun: { trend: 5, pullback: 5, scalping: 6, "rsi-reversal": 5, breakout: 5, "vwap-reversion": 5 }
+  },
+  real: {
+    label: "Реальная торговля",
+    minScore: 68,
+    maxTradePct: 2,
+    maxPortfolioPct: 20,
+    maxEntriesPerRun: 2,
+    duplicateCooldownMs: 60 * 60 * 1000,
+    minVolumeRatio: 0.6,
+    minScalpingVolumeRatio: 0.9,
+    minExpectedNetPct: 0.15,
+    minScalpingExpectedNetPct: 0.1,
+    blockedAssetMode: "hard",
+    softBlockPenalty: 20,
+    minTradesBeforeBlock: 5,
+    dailyStopLimit: 3,
+    dailyLossPctLimit: 3,
+    feePct: 0.1,
+    slippagePct: 0.05,
+    strategyMaxEntriesPerRun: { trend: 1, pullback: 1, scalping: 0, "rsi-reversal": 1, breakout: 1, "vwap-reversion": 0 }
   }
 };
 
@@ -260,6 +287,17 @@ async function main() {
   if (!config.enabled) {
     log("server-autobot disabled");
     return;
+  }
+
+  // Real trading: log balance and dry-run status at every run
+  if (config.profileId === "real" && bybitApiKey) {
+    try {
+      const balance = await getBybitBalance();
+      log(`[REAL] balance: ${balance.usdt.toFixed(2)} USDT (available: ${balance.available.toFixed(2)}) | realTradingEnabled=${realTradingEnabled}`);
+      if (!realTradingEnabled) log("[REAL] DRY-RUN mode — orders will NOT be placed. Set BOTALIN_REAL_TRADING=true to enable.");
+    } catch (err) {
+      log(`[REAL] balance check failed: ${err.message}`);
+    }
   }
 
   const [rows, remotePolicy, backtestPolicy, rejectedPolicy] = await Promise.all([
@@ -1397,6 +1435,105 @@ function toOkxSymbol(symbol) {
 function toBinanceSymbol(symbol) {
   return symbol.replace("/", "");
 }
+
+// ── Bybit Private API ────────────────────────────────────────────────────────
+
+function bybitSign(str) {
+  return createHmac("sha256", bybitApiSecret).update(str).digest("hex");
+}
+
+async function bybitPrivateGet(endpoint, params = {}) {
+  const ts = Date.now().toString();
+  const recvWindow = "5000";
+  const queryString = new URLSearchParams(params).toString();
+  const sign = bybitSign(ts + bybitApiKey + recvWindow + queryString);
+  const url = `https://api.bybit.com${endpoint}${queryString ? "?" + queryString : ""}`;
+  const response = await fetchWithTimeout(url, {
+    headers: {
+      "X-BAPI-API-KEY": bybitApiKey,
+      "X-BAPI-TIMESTAMP": ts,
+      "X-BAPI-SIGN": sign,
+      "X-BAPI-RECV-WINDOW": recvWindow,
+    },
+  }, 10_000);
+  if (!response.ok) throw new Error(`Bybit private GET ${response.status}`);
+  const data = await response.json();
+  if (data.retCode !== 0) throw new Error(`Bybit API: ${data.retMsg} (${data.retCode})`);
+  return data;
+}
+
+async function bybitPrivatePost(endpoint, body = {}) {
+  const ts = Date.now().toString();
+  const recvWindow = "5000";
+  const bodyStr = JSON.stringify(body);
+  const sign = bybitSign(ts + bybitApiKey + recvWindow + bodyStr);
+  const response = await fetchWithTimeout(`https://api.bybit.com${endpoint}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-BAPI-API-KEY": bybitApiKey,
+      "X-BAPI-TIMESTAMP": ts,
+      "X-BAPI-SIGN": sign,
+      "X-BAPI-RECV-WINDOW": recvWindow,
+    },
+    body: bodyStr,
+  }, 10_000);
+  if (!response.ok) throw new Error(`Bybit private POST ${response.status}`);
+  const data = await response.json();
+  if (data.retCode !== 0) throw new Error(`Bybit API: ${data.retMsg} (${data.retCode})`);
+  return data;
+}
+
+async function getBybitBalance() {
+  const data = await bybitPrivateGet("/v5/account/wallet-balance", { accountType: "UNIFIED" });
+  const coins = data.result.list[0]?.coin || [];
+  const usdt = coins.find((c) => c.coin === "USDT");
+  return {
+    usdt: Number(usdt?.walletBalance || 0),
+    equity: Number(usdt?.equity || 0),
+    available: Number(usdt?.availableToWithdraw || usdt?.walletBalance || 0),
+  };
+}
+
+// Places a real spot order on Bybit. Returns orderId or null if dry-run.
+async function placeRealOrder(symbol, side, usdtAmount, entryPrice, stopPrice, targetPrice) {
+  const bybitSymbol = toBybitSymbol(symbol);
+  const buySide = side === "LONG" ? "Buy" : "Sell";
+  const qty = Number((usdtAmount / entryPrice).toFixed(6));
+
+  if (!realTradingEnabled) {
+    log(`[DRY-RUN] Would place ${buySide} ${bybitSymbol} qty=${qty} @ ${entryPrice} stop=${stopPrice} tp=${targetPrice}`);
+    return null;
+  }
+
+  if (!bybitApiKey || !bybitApiSecret) {
+    log("[REAL] Bybit API credentials not set — skipping order");
+    return null;
+  }
+
+  const data = await bybitPrivatePost("/v5/order/create", {
+    category: "spot",
+    symbol: bybitSymbol,
+    side: buySide,
+    orderType: "Limit",
+    qty: String(qty),
+    price: String(entryPrice),
+    timeInForce: "GTC",
+    stopLoss: String(stopPrice),
+    takeProfit: String(targetPrice),
+  });
+
+  log(`[REAL] Order placed: ${buySide} ${bybitSymbol} qty=${qty} @ ${entryPrice} → orderId=${data.result.orderId}`);
+  return data.result.orderId;
+}
+
+async function cancelRealOrder(symbol, orderId) {
+  if (!realTradingEnabled || !orderId) return;
+  await bybitPrivatePost("/v5/order/cancel", { category: "spot", symbol: toBybitSymbol(symbol), orderId });
+  log(`[REAL] Order cancelled: ${toBybitSymbol(symbol)} orderId=${orderId}`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function fetchCandlesOkx(symbol, interval, limit = 220, start = null) {
   const bar = okxIntervals[interval] || "15m";
