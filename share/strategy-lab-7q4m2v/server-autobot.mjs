@@ -1417,14 +1417,15 @@ async function fetchCandlesOkx(symbol, interval, limit = 220, start = null) {
   }));
 }
 
-async function fetchCandlesBybit(symbol, interval, limit = 220, start = null) {
+async function fetchCandlesBybit(symbol, interval, limit = 220, start = null, end = null) {
   const params = new URLSearchParams({
     category: "spot",
     symbol: toBybitSymbol(symbol),
     interval: bybitIntervals[interval] || "15",
-    limit: String(limit)
+    limit: String(Math.min(limit, 1000))
   });
   if (start) params.set("start", String(start));
+  if (end) params.set("end", String(end));
   const response = await fetchWithTimeout(`https://api.bybit.com/v5/market/kline?${params.toString()}`, {}, 7_000);
   if (!response.ok) throw new Error(`Bybit ${response.status}`);
   const data = await response.json();
@@ -1447,6 +1448,42 @@ async function fetchCandles(symbol, interval, limit = 220, start = null) {
     log(`OKX candles failed (${err.message}), trying Bybit`);
     return await fetchCandlesBybit(symbol, interval, limit, start);
   }
+}
+
+// Fetch deep history via backwards pagination (Bybit end param, OKX after param).
+// targetCandles: desired total candle count (e.g. 4320 for 6 months on 1h)
+async function fetchCandlesDeep(symbol, interval, targetCandles) {
+  const allCandles = [];
+  let endTime = null;
+
+  while (allCandles.length < targetCandles) {
+    const needed = Math.min(1000, targetCandles - allCandles.length);
+    let batch = null;
+
+    // Bybit: end param = exclusive upper bound, up to 1000 per request
+    try {
+      batch = await fetchCandlesBybit(symbol, interval, needed, null, endTime ? endTime - 1 : null).catch(() => null);
+    } catch {}
+
+    // Fallback to OKX: after param = return candles older than this ts, max 300 per request
+    if (!batch || batch.length === 0) {
+      try {
+        batch = await fetchCandlesOkx(symbol, interval, Math.min(needed, 300), endTime || null).catch(() => null);
+      } catch {}
+    }
+
+    if (!batch || batch.length === 0) break;
+    allCandles.unshift(...batch);
+    endTime = batch[0].openTime; // oldest candle in this batch → next page goes before it
+    await wait(200);
+    if (batch.length < Math.min(needed, 50)) break; // no more history available
+  }
+
+  // Deduplicate and sort ascending
+  const seen = new Set();
+  return allCandles
+    .filter((c) => { if (seen.has(c.openTime)) return false; seen.add(c.openTime); return true; })
+    .sort((a, b) => a.openTime - b.openTime);
 }
 
 function closePendingTrade(trade, price, time, reason) {
@@ -2081,25 +2118,48 @@ function formatRemoteError(status, text) {
 }
 
 async function runBacktest() {
-  log("=== BACKTEST MODE ===");
+  log("=== BACKTEST MODE (6 months) ===");
   const results = [];
-  const backtestAssets = config.assets; // все активы
+  const backtestAssets = config.assets;
   const minScore = config.minScore;
   const feeRoundTrip = (config.feePct + config.slippagePct) * 2;
 
+  // Target candle count per interval for ~6 months of history
+  // 5m: scalp patterns don't gain from 6-month history → keep 1000 (~3.5 days)
+  const depthByInterval = { "5m": 1000, "15m": 5760, "1h": 4320, "4h": 1100, "1d": 200 };
+
+  // Collect unique (symbol, interval) pairs across all strategies
+  const uniquePairs = new Set();
   for (const strategy of enabledStrategies) {
     for (const symbol of backtestAssets) {
       for (const interval of strategy.timeframes) {
-        let candles;
-        try {
-          // 1000 свечей: 15m ≈ 10 дней, 1h ≈ 42 дня, 5m ≈ 3.5 дня
-          candles = await fetchCandlesBybit(symbol, interval, 1000).catch(() => null)
-            || await fetchCandlesOkx(symbol, interval, 300).catch(() => null);
-          await wait(120);
-          if (!candles) continue;
-        } catch {
-          continue;
-        }
+        uniquePairs.add(`${symbol}|${interval}`);
+      }
+    }
+  }
+
+  // Pre-fetch all candles once per pair (shared across strategies)
+  log(`backtest: fetching ${uniquePairs.size} symbol/interval pairs`);
+  const candleCache = new Map();
+  for (const key of uniquePairs) {
+    const [symbol, interval] = key.split("|");
+    const target = depthByInterval[interval] || 1000;
+    try {
+      const candles = target <= 1000
+        ? (await fetchCandlesBybit(symbol, interval, target).catch(() => null)
+           || await fetchCandlesOkx(symbol, interval, Math.min(target, 300)).catch(() => null))
+        : await fetchCandlesDeep(symbol, interval, target);
+      if (candles && candles.length >= 150) candleCache.set(key, candles);
+    } catch {}
+    await wait(150);
+  }
+  log(`backtest: loaded ${candleCache.size}/${uniquePairs.size} pairs`);
+
+  // Run all strategies against cached candles (no extra API calls)
+  for (const strategy of enabledStrategies) {
+    for (const symbol of backtestAssets) {
+      for (const interval of strategy.timeframes) {
+        const candles = candleCache.get(`${symbol}|${interval}`);
         if (!candles || candles.length < 150) continue;
 
         const signals = [];
