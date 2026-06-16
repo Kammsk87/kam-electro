@@ -669,29 +669,20 @@ async function scanCandidates(trades, learningPolicy) {
     }
   }
 
-  let candleFails = 0, rawCandidates = 0, activeKeyBlocked = 0, duplicateBlocked = 0;
-  const groups = await mapLimit(scanTasks, 12, async ({ symbol, interval, strategies }) => {
+  const groups = await mapLimit(scanTasks, 5, async ({ symbol, interval, strategies }) => {
+    await wait(80);
     const needsStandardHistory = strategies.some((strategy) => strategy.kind !== "scalping");
     const candles = await fetchCandles(symbol, interval, needsStandardHistory ? 220 : 160).catch(() => []);
-    if (candles.length < (needsStandardHistory ? 90 : 60)) { candleFails++; return []; }
+    if (candles.length < (needsStandardHistory ? 90 : 60)) return [];
     return strategies
       .filter((strategy) => candles.length >= (strategy.kind === "scalping" ? 60 : 90))
-      .map((strategy) => {
-        const c = evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend);
-        if (c) rawCandidates++;
-        if (c && activeKeys.has(getCandidateStrategyExposureKey(c))) activeKeyBlocked++;
-        return c;
-      })
+      .map((strategy) => evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend))
       .filter((candidate) => candidate && !activeKeys.has(getCandidateStrategyExposureKey(candidate)));
   });
 
   const results = groups.flat();
-  const deduped = results.filter((candidate) => {
-    if (hasRecentDuplicate(trades, candidate)) { duplicateBlocked++; return false; }
-    return true;
-  });
-  log(`scan debug: tasks=${scanTasks.length} candleFails=${candleFails} rawCandidates=${rawCandidates} activeKeyBlocked=${activeKeyBlocked} duplicateBlocked=${duplicateBlocked} finalCandidates=${deduped.length} btcTrend=${btcTrend} dailyRisk=${JSON.stringify(getDailyRisk(trades))}`);
-  return deduped
+  return results
+    .filter((candidate) => !hasRecentDuplicate(trades, candidate))
     .sort((a, b) => b.score - a.score)
     .slice(0, 24);
 }
