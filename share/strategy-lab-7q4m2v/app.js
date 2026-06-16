@@ -3854,8 +3854,9 @@ function evaluateAutopilotQualityGate(context, signalQuality, intel, tradePlan =
     return softGate(`детальный паттерн ${qualityPattern.winRate.toFixed(0)}% и ${qualityPattern.avgPnl.toFixed(2)}% avg`, 38);
   }
   if (intel?.derivatives?.sideBias === "CAUTION") return softGate("деривативы показывают перегрев", 25);
-  if (intel?.sentiment?.value >= 82 && best.side === "LONG") return softGate("экстремальная жадность блокирует late long", 20);
-  if (intel?.sentiment?.value <= 18 && best.side === "SHORT") return softGate("экстремальный страх блокирует late short", 20);
+  if (intel?.sentiment?.value > 80 && best.side === "LONG") return { ok: false, reason: "Fear & Greed выше 80: автобот не открывает LONG", score: best.score - 70 };
+  if (intel?.sentiment?.value < 20 && best.side === "LONG") return softGate("Fear & Greed ниже 20: LONG только осторожно", 24);
+  if (intel?.sentiment?.value < 20 && best.side === "SHORT") return softGate("экстремальный страх блокирует late short", 20);
   const news = context.news || summarizeNewsForAsset(context.asset);
   if (news.regulatoryRisk && best.side === "LONG") return { ok: false, reason: "регуляторный негатив из новостей блокирует long", score: best.score - 35 };
   if (news.bias === "BULLISH" && best.side === "SHORT") return softGate("новостной фон против short", 24);
@@ -4445,12 +4446,18 @@ function evaluateIntelForScenario(context, scenario) {
   }
 
   if (intel.sentiment?.value) {
-    if (intel.sentiment.value >= 78 && scenario.side === "LONG") {
-      delta -= 5;
-      reasons.push("жадность повышает риск позднего long");
-    } else if (intel.sentiment.value <= 22 && scenario.side === "SHORT") {
-      delta -= 5;
+    if (intel.sentiment.value > 80 && scenario.side === "LONG") {
+      delta -= 32;
+      reasons.push("Fear & Greed выше 80: long запрещен как поздний вход на жадности");
+    } else if (intel.sentiment.value < 20 && scenario.side === "LONG") {
+      delta -= 10;
+      reasons.push("Fear & Greed ниже 20: покупка только осторожно и меньшим размером");
+    } else if (intel.sentiment.value < 20 && scenario.side === "SHORT") {
+      delta -= 12;
       reasons.push("экстремальный страх повышает риск позднего short");
+    } else if (intel.sentiment.value > 80 && scenario.side === "SHORT") {
+      delta += 4;
+      reasons.push("экстремальная жадность допускает осторожный short по подтверждению");
     } else {
       delta += 2;
       reasons.push("сентимент не экстремальный");
@@ -5096,11 +5103,11 @@ function buildTradePlan(context) {
   }
   ensureAtLeastOneScenario();
   const basePrice = getPlanBasePrice(context);
-  const volatilityPct = getVolatilityPct(context);
+  const stopModel = getAtrStopModelForContext(context, basePrice, false);
   const rr1 = context.conservative ? 1.6 : 1.25;
   const rr2 = context.conservative ? 2.2 : 1.7;
   const entryShiftPct = getEntryShiftPct(context);
-  const riskDistance = basePrice * volatilityPct;
+  const riskDistance = stopModel.distance;
 
   const longEntry = basePrice * (1 + entryShiftPct.long);
   const longRisk = Math.max(riskDistance, longEntry * 0.0035);
@@ -5110,8 +5117,9 @@ function buildTradePlan(context) {
     stop: longEntry - longRisk,
     target1: longEntry + longRisk * rr1,
     target2: longEntry + longRisk * rr2,
+    stopModel,
     confidence: context.live.active && context.live.trendPct >= -0.2 ? "основной" : "условный",
-    comment: "подходит, если цена удерживает входную зону и объем подтверждает движение."
+    comment: `подходит, если цена удерживает входную зону и объем подтверждает движение. Стоп рассчитан по ATR: ${stopModel.stopPct.toFixed(2)}%.`
   };
 
   const shortEntry = basePrice * (1 + entryShiftPct.short);
@@ -5122,8 +5130,9 @@ function buildTradePlan(context) {
     stop: shortEntry + shortRisk,
     target1: shortEntry - shortRisk * rr1,
     target2: shortEntry - shortRisk * rr2,
+    stopModel,
     confidence: context.live.active && context.live.trendPct <= 0.2 ? "основной" : "альтернатива",
-    comment: "активируется при потере уровня, слабой реакции покупателя и подтверждении продавца."
+    comment: `активируется при потере уровня, слабой реакции покупателя и подтверждении продавца. Стоп рассчитан по ATR: ${stopModel.stopPct.toFixed(2)}%.`
   };
 
   const scenarios = [];
@@ -5147,7 +5156,8 @@ function buildScalpingTradePlan(context) {
   const signal = evaluateScalpingSetup(context, candles);
   const executable = getScalpingExecutionPrices(context, basePrice, signal.spreadPct);
   const atrPct = Number(signal.atrPct) || Math.max(0.18, getVolatilityPct(context) * 100);
-  const riskDistance = basePrice * Math.max(0.0012, Math.min(0.0048, atrPct / 100 * 0.55));
+  const stopModel = getAtrStopModelForContext({ ...context, intel: { ...(context.intel || {}), marketStructure: { ...(context.intel?.marketStructure || {}), atrPct } } }, basePrice, true);
+  const riskDistance = stopModel.distance;
   const rr1 = 0.55;
   const rr2 = 0.9;
 
@@ -5161,8 +5171,9 @@ function buildScalpingTradePlan(context) {
     stop: longEntry - riskDistance,
     target1: longEntry + riskDistance * rr1,
     target2: longEntry + riskDistance * rr2,
+    stopModel,
     confidence: signal.side === "LONG" ? "скальпинг-сигнал" : "условный",
-    comment: `скальпинг EMA9/21 + RSI + VWAP: ${signal.reason}`
+    comment: `скальпинг EMA9/21 + RSI + VWAP: ${signal.reason}; аварийный ATR-выход ${stopModel.stopPct.toFixed(2)}%`
   };
 
   const shortEntry = executable.shortEntry;
@@ -5175,8 +5186,9 @@ function buildScalpingTradePlan(context) {
     stop: shortEntry + riskDistance,
     target1: shortEntry - riskDistance * rr1,
     target2: shortEntry - riskDistance * rr2,
+    stopModel,
     confidence: signal.side === "SHORT" ? "скальпинг-сигнал" : "условный",
-    comment: `скальпинг EMA9/21 + RSI + VWAP: ${signal.reason}`
+    comment: `скальпинг EMA9/21 + RSI + VWAP: ${signal.reason}; аварийный ATR-выход ${stopModel.stopPct.toFixed(2)}%`
   };
 
   const scenarios = [];
@@ -5322,6 +5334,25 @@ function getVolatilityPct(context) {
   };
   const modeBoost = context.mode === "high-volatility" ? 0.7 : context.mode === "range" ? 0.82 : 1;
   return byFrame[context.timeframe] * modeBoost;
+}
+
+function getAtrStopModelForContext(context, basePrice, scalping = false) {
+  const structureAtrPct = Number(context.intel?.marketStructure?.atrPct || state.marketIntel?.marketStructure?.atrPct);
+  const fallbackPct = getVolatilityPct(context) * 100;
+  const atrPct = Number.isFinite(structureAtrPct) && structureAtrPct > 0 ? structureAtrPct : fallbackPct;
+  const minPct = scalping ? 0.15 : 0.35;
+  const maxPct = scalping ? 0.5 : 2.5;
+  const multiplier = scalping ? 0.58 : 0.75;
+  const stopPct = Math.max(minPct, Math.min(maxPct, atrPct * multiplier));
+  return {
+    type: "ATR_DYNAMIC",
+    atrPct,
+    multiplier,
+    minPct,
+    maxPct,
+    stopPct,
+    distance: basePrice * (stopPct / 100)
+  };
 }
 
 function getEntryShiftPct(context) {
@@ -5850,7 +5881,8 @@ function snapshotScenario(scenario) {
     immediateFill: Boolean(scenario.immediateFill),
     risk: Math.abs(scenario.entry - scenario.stop),
     reward1: Math.abs(scenario.target1 - scenario.entry),
-    reward2: Math.abs(scenario.target2 - scenario.entry)
+    reward2: Math.abs(scenario.target2 - scenario.entry),
+    stopModel: scenario.stopModel || null
   };
 }
 

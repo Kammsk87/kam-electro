@@ -842,7 +842,11 @@ async function scanCandidates(trades, learningPolicy) {
   const dailyRisk = getDailyRisk(trades);
   if (dailyRisk.blocked) return [];
 
-  const [btcTrend, goldSentiment] = await Promise.all([getBtcTrend(), getGoldSentiment()]);
+  const [btcTrend, goldSentiment, fearGreed] = await Promise.all([
+    getBtcTrend(),
+    getGoldSentiment(),
+    fetchFearGreedIntel().catch(() => null)
+  ]);
   const strategiesByInterval = groupStrategiesByInterval(enabledStrategies);
   const scanTasks = [];
   for (const symbol of config.assets) {
@@ -864,7 +868,7 @@ async function scanCandidates(trades, learningPolicy) {
     if (candles.length < (needsStandardHistory ? 90 : 60)) return [];
     return strategies
       .filter((strategy) => candles.length >= (strategy.kind === "scalping" ? 60 : 90))
-      .map((strategy) => evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend, goldSentiment, { mtf, funding, openInterest }))
+      .map((strategy) => evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend, goldSentiment, { mtf, funding, openInterest, fearGreed }))
       .filter((candidate) => candidate && !activeKeys.has(getCandidateStrategyExposureKey(candidate)));
   });
 
@@ -983,6 +987,10 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
   const fundingDecision = evaluateFundingFilter(funding, side);
   if (fundingDecision.block) return null;
 
+  const fearGreed = externalFilters.fearGreed || null;
+  const fearGreedDecision = evaluateFearGreedFilter(fearGreed, side);
+  if (fearGreedDecision.block) return null;
+
   const history = getPatternStats(trades, symbol, interval, side, strategy.id);
   const patternKey = getLearningPatternKey(symbol, interval, side, strategy.id);
   const isSoftMode = config.blockedAssetMode === "soft";
@@ -1002,6 +1010,7 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
   if (interval === "5m" || interval === "15m") score += 3;
   score += mtfDecision.scoreDelta;
   score += fundingDecision.scoreDelta;
+  score += fearGreedDecision.scoreDelta;
   const crossoverAge = getEmaCrossoverAge(ema34, ema89);
   if (crossoverAge <= 5) score += 10;
   else if (crossoverAge <= 15) score += 3;
@@ -1089,7 +1098,8 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
   }
   if (history.trades >= 3) score += history.winRate >= 60 && history.avgPnlPct > 0 ? 10 : -25;
 
-  const riskDistance = last.close * Math.max(scalping ? 0.0015 : 0.0035, Math.min(scalping ? 0.005 : 0.025, atrPct / 100 * (scalping ? 0.58 : 0.75)));
+  const atrStop = calculateAtrStopModel(last.close, atrPct, scalping);
+  const riskDistance = atrStop.distance;
   const isReversal = strategy.kind === "rsi-reversal" || strategy.kind === "vwap-reversion";
   const rr1 = scalping ? 0.55 : strategy.kind === "pullback" ? 1.35 : isReversal ? 1.2 : 1.6;
   const rr2 = scalping ? 0.9 : strategy.kind === "pullback" ? 2 : isReversal ? 1.8 : 2.2;
@@ -1100,14 +1110,16 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
         entry,
         stop: entry - riskDistance,
         target1: entry + riskDistance * rr1,
-        target2: entry + riskDistance * rr2
+        target2: entry + riskDistance * rr2,
+        stopModel: atrStop
       }
     : {
         side,
         entry,
         stop: entry + riskDistance,
         target1: entry - riskDistance * rr1,
-        target2: entry - riskDistance * rr2
+        target2: entry - riskDistance * rr2,
+        stopModel: atrStop
       };
   const expected = estimateScenarioExpectedNet(scenario, scalping);
   if (expected.weightedNetPct < (scalping ? config.minScalpingExpectedNetPct : config.minExpectedNetPct)) return null;
@@ -1132,13 +1144,14 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
     slopePct,
     mtf,
     funding,
+    fearGreed,
     openInterest: externalFilters.openInterest || null,
     history,
     crash,
     scenario,
     expected,
     patternKey,
-    reason: `${strategy.label}: EMA ${side}, RSI ${rsi.toFixed(1)}, MACD ${Number.isFinite(macd) && Number.isFinite(macdSig) ? (macd > macdSig ? "↑" : "↓") : "?"}, ADX ${Number.isFinite(adx) ? adx.toFixed(0) : "?"}, ST ${stDir === 1 ? "↑" : "↓"}, vol x${volumeRatio.toFixed(2)}, ATR ${atrPct.toFixed(2)}%, MTF ${mtf?.summary || "proxy"}, funding ${funding ? `${funding.fundingRatePct.toFixed(4)}%` : "n/a"}, OI ${externalFilters.openInterest ? `${externalFilters.openInterest.changePct.toFixed(2)}%` : "n/a"}, цель ${expected.weightedNetPct.toFixed(2)}%, BTC ${btcTrend}`
+    reason: `${strategy.label}: EMA ${side}, RSI ${rsi.toFixed(1)}, MACD ${Number.isFinite(macd) && Number.isFinite(macdSig) ? (macd > macdSig ? "↑" : "↓") : "?"}, ADX ${Number.isFinite(adx) ? adx.toFixed(0) : "?"}, ST ${stDir === 1 ? "↑" : "↓"}, vol x${volumeRatio.toFixed(2)}, ATR ${atrPct.toFixed(2)}%, стоп ${atrStop.stopPct.toFixed(2)}%, F&G ${fearGreed ? `${fearGreed.value}` : "n/a"}, MTF ${mtf?.summary || "proxy"}, funding ${funding ? `${funding.fundingRatePct.toFixed(4)}%` : "n/a"}, OI ${externalFilters.openInterest ? `${externalFilters.openInterest.changePct.toFixed(2)}%` : "n/a"}, цель ${expected.weightedNetPct.toFixed(2)}%, BTC ${btcTrend}`
   };
 }
 
@@ -1370,6 +1383,18 @@ async function fetchOpenInterestIntel(symbol) {
   };
 }
 
+async function fetchFearGreedIntel() {
+  const response = await fetchWithTimeout("https://api.alternative.me/fng/?limit=1", {}, 6_000);
+  if (!response.ok) throw new Error(`fear greed ${response.status}`);
+  const data = await response.json();
+  const item = data.data?.[0] || {};
+  return {
+    value: Number(item.value) || 50,
+    label: String(item.value_classification || "Neutral"),
+    updatedAt: Number(item.timestamp) ? Number(item.timestamp) * 1000 : Date.now()
+  };
+}
+
 function evaluateFundingFilter(funding, side) {
   if (!funding || !Number.isFinite(funding.fundingRatePct)) return { block: false, scoreDelta: 0, reason: "funding нет данных" };
   const value = funding.fundingRatePct;
@@ -1384,6 +1409,41 @@ function evaluateFundingFilter(funding, side) {
   if (value <= -0.02 && side === "SHORT") return { block: false, scoreDelta: -12, reason: `funding ${value.toFixed(4)}% против SHORT` };
   if (value <= -0.02 && side === "LONG") return { block: false, scoreDelta: 5, reason: `funding ${value.toFixed(4)}% поддерживает осторожный LONG` };
   return { block: false, scoreDelta: 0, reason: `funding нейтральный ${value.toFixed(4)}%` };
+}
+
+function evaluateFearGreedFilter(fearGreed, side) {
+  if (!fearGreed || !Number.isFinite(fearGreed.value)) return { block: false, scoreDelta: 0, reason: "Fear & Greed нет данных" };
+  const value = fearGreed.value;
+  if (value > 80 && side === "LONG") {
+    return { block: true, scoreDelta: -100, reason: `Fear & Greed ${value}: экстремальная жадность, LONG запрещен` };
+  }
+  if (value < 20 && side === "LONG") {
+    return { block: false, scoreDelta: -12, reason: `Fear & Greed ${value}: extreme fear, покупка только осторожно` };
+  }
+  if (value < 20 && side === "SHORT") {
+    return { block: false, scoreDelta: -10, reason: `Fear & Greed ${value}: поздний SHORT рискован` };
+  }
+  if (value > 80 && side === "SHORT") {
+    return { block: false, scoreDelta: 5, reason: `Fear & Greed ${value}: SHORT получает макро-поддержку` };
+  }
+  return { block: false, scoreDelta: 2, reason: `Fear & Greed ${value}: без экстремума` };
+}
+
+function calculateAtrStopModel(price, atrPct, scalping = false) {
+  const minPct = scalping ? 0.15 : 0.35;
+  const maxPct = scalping ? 0.5 : 2.5;
+  const multiplier = scalping ? 0.58 : 0.75;
+  const atrBasedPct = Number.isFinite(atrPct) ? atrPct * multiplier : minPct;
+  const stopPct = Math.max(minPct, Math.min(maxPct, atrBasedPct));
+  return {
+    type: "ATR_DYNAMIC",
+    atrPct: Number.isFinite(atrPct) ? atrPct : 0,
+    multiplier,
+    minPct,
+    maxPct,
+    stopPct,
+    distance: price * (stopPct / 100)
+  };
 }
 
 async function getBtcTrend() {
@@ -1569,10 +1629,12 @@ function buildStrategySnapshot(candidate, amount) {
         atrPct: candidate.atrPct,
         volumeRatio: candidate.volumeRatio,
         slopePct: candidate.slopePct,
-        expectedNetPct: candidate.expected?.weightedNetPct || 0
+        expectedNetPct: candidate.expected?.weightedNetPct || 0,
+        stopModel: candidate.scenario?.stopModel || null
       },
       marketCrash: candidate.crash,
       multiTimeframe: candidate.mtf || null,
+      sentiment: candidate.fearGreed || null,
       derivatives: {
         ...(candidate.funding ? {
           fundingRatePct: candidate.funding.fundingRatePct,
@@ -1592,7 +1654,8 @@ function buildStrategySnapshot(candidate, amount) {
       entry: candidate.scenario.entry,
       stop: candidate.scenario.stop,
       target1: candidate.scenario.target1,
-      target2: candidate.scenario.target2
+      target2: candidate.scenario.target2,
+      stopModel: candidate.scenario.stopModel || null
     },
     signalQuality: {
       best: {
@@ -1623,7 +1686,9 @@ function buildStrategySnapshot(candidate, amount) {
       "EMA34/89 должна подтверждать направление",
       "RSI должен быть в рабочей зоне выбранной стороны",
       "ATR и объем должны быть в умеренном диапазоне",
+      "ATR-стоп: расстояние до стопа подстраивается под текущую волатильность",
       `Серверная стратегия: ${candidate.strategyLabel}`,
+      "Fear & Greed: при экстремальной жадности LONG запрещен, при экстремальном страхе покупка только осторожно",
       "Multi-timeframe: вход не должен конфликтовать со старшим 1h/4h трендом",
       "Funding Rate: перегретая толпа long/short блокирует вход против риска ликвидаций",
       ...(candidate.strategyId === "breakout" ? ["Open Interest: breakout допускается только при росте OI, иначе пробой считается слабым"] : []),
