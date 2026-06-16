@@ -5,6 +5,7 @@ Description=Run Botalin rsi-reversal bot every 5 minutes
 OnBootSec=4min
 OnUnitActiveSec=5min
 AccuracySec=10s
+RandomizedDelaySec=25s
 Unit=botalin-rsi-reversal.service
 
 [Install]

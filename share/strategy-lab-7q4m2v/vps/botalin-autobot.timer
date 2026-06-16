@@ -5,6 +5,7 @@ Description=Run Botalin server paper-autobot every 3 minutes
 OnBootSec=2min
 OnUnitActiveSec=3min
 AccuracySec=20s
+RandomizedDelaySec=25s
 Unit=botalin-autobot.service
 
 [Install]

@@ -5,6 +5,7 @@ Description=Run Botalin trend bot every 5 minutes
 OnBootSec=1min
 OnUnitActiveSec=5min
 AccuracySec=10s
+RandomizedDelaySec=25s
 Unit=botalin-trend.service
 
 [Install]

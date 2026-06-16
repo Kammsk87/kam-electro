@@ -5,6 +5,7 @@ Description=Run Botalin server health check every 10 minutes
 OnBootSec=3min
 OnUnitActiveSec=10min
 AccuracySec=30s
+RandomizedDelaySec=25s
 Unit=botalin-health.service
 
 [Install]

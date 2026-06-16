@@ -605,9 +605,17 @@ function fromFirestoreDoc(doc) {
   return result;
 }
 
+async function retry429(fn, attempts = 3) {
+  for (let i = 0; i < attempts; i++) {
+    const result = await fn();
+    if (result.status !== 429 || i === attempts - 1) return result;
+    await wait(400 * (i + 1) + Math.random() * 300);
+  }
+}
+
 async function firestoreGet(collection, docId) {
   const url = `${firestoreBase}/${collection}/${encodeURIComponent(docId)}?key=${firebaseApiKey}`;
-  const response = await fetchWithTimeout(url, {}, 15_000);
+  const response = await retry429(() => fetchWithTimeout(url, {}, 15_000));
   if (response.status === 404) return null;
   if (!response.ok) { const t = await response.text().catch(() => ""); throw new Error(`Firestore get ${collection}/${docId}: ${response.status} ${t}`); }
   return fromFirestoreDoc(await response.json());
@@ -615,11 +623,11 @@ async function firestoreGet(collection, docId) {
 
 async function firestoreSet(collection, docId, data) {
   const url = `${firestoreBase}/${collection}/${encodeURIComponent(docId)}?key=${firebaseApiKey}`;
-  const response = await fetchWithTimeout(url, {
+  const response = await retry429(() => fetchWithTimeout(url, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ fields: toFirestoreFields(data) })
-  }, 15_000);
+  }, 15_000));
   if (!response.ok) { const t = await response.text().catch(() => ""); throw new Error(`Firestore set ${collection}/${docId}: ${response.status} ${t}`); }
 }
 
@@ -628,11 +636,11 @@ async function firestoreQuery(collection, filters = [], orderByField = null, lim
   if (filters.length === 1) structuredQuery.where = filters[0];
   else if (filters.length > 1) structuredQuery.where = { compositeFilter: { op: "AND", filters } };
   if (orderByField) structuredQuery.orderBy = [{ field: { fieldPath: orderByField }, direction: "DESCENDING" }];
-  const response = await fetchWithTimeout(`${firestoreBase}:runQuery?key=${firebaseApiKey}`, {
+  const response = await retry429(() => fetchWithTimeout(`${firestoreBase}:runQuery?key=${firebaseApiKey}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ structuredQuery })
-  }, 15_000);
+  }, 15_000));
   if (!response.ok) { const t = await response.text().catch(() => ""); throw new Error(`Firestore query ${collection}: ${response.status} ${t}`); }
   const results = await response.json();
   return results.filter((r) => r.document).map((r) => fromFirestoreDoc(r.document));

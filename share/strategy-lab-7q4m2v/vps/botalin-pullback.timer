@@ -5,6 +5,7 @@ Description=Run Botalin pullback bot every 5 minutes
 OnBootSec=2min
 OnUnitActiveSec=5min
 AccuracySec=10s
+RandomizedDelaySec=25s
 Unit=botalin-pullback.service
 
 [Install]
