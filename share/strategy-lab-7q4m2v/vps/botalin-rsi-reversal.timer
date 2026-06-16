@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Botalin rsi-reversal bot every 5 minutes
+
+[Timer]
+OnBootSec=4min
+OnUnitActiveSec=5min
+AccuracySec=10s
+Unit=botalin-rsi-reversal.service
+
+[Install]
+WantedBy=timers.target

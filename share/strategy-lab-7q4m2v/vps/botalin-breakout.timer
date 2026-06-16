@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Botalin breakout bot every 5 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+AccuracySec=10s
+Unit=botalin-breakout.service
+
+[Install]
+WantedBy=timers.target

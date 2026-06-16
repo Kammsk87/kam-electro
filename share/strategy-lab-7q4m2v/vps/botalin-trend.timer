@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Botalin trend bot every 5 minutes
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=5min
+AccuracySec=10s
+Unit=botalin-trend.service
+
+[Install]
+WantedBy=timers.target

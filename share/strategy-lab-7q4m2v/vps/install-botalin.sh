@@ -56,7 +56,15 @@ if [[ "${PROFILE}" != "training" ]]; then
 fi
 
 systemctl daemon-reload
+
+# Main coordinator (all strategies, every 3 min)
 systemctl enable --now botalin-autobot.timer
+
+# Individual strategy timers (each every 5 min, staggered by 1 min on boot)
+for strategy in trend pullback scalping rsi-reversal breakout vwap-reversion; do
+  systemctl enable --now "botalin-${strategy}.timer"
+done
+
 systemctl enable --now botalin-health.timer
 
 echo
@@ -65,8 +73,9 @@ node "${INSTALL_DIR}/share/strategy-lab-7q4m2v/server-health.mjs" || true
 
 echo
 echo "=== Installed. Useful commands ==="
-echo "  systemctl list-timers 'botalin-*'               # check timer schedule"
-echo "  journalctl -u botalin-autobot.service -f        # follow live log"
-echo "  journalctl -u botalin-autobot.service -n 50     # last 50 lines"
-echo "  systemctl start botalin-autobot.service         # run once manually"
+echo "  systemctl list-timers 'botalin-*'                        # all timers"
+echo "  journalctl -u botalin-autobot.service -f                 # coordinator log"
+echo "  journalctl -u botalin-trend.service -f                   # trend bot log"
+echo "  journalctl -u 'botalin-*.service' -f                     # all bots live"
+echo "  systemctl start botalin-trend.service                    # run manually"
 echo "  node ${INSTALL_DIR}/share/strategy-lab-7q4m2v/server-autobot.mjs --dry-run"

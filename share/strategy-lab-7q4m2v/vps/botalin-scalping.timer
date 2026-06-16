@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Botalin scalping bot every 5 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+AccuracySec=10s
+Unit=botalin-scalping.service
+
+[Install]
+WantedBy=timers.target

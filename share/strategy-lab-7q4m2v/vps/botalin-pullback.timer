@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Botalin pullback bot every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=10s
+Unit=botalin-pullback.service
+
+[Install]
+WantedBy=timers.target

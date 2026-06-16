@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Botalin vwap-reversion bot every 5 minutes
+
+[Timer]
+OnBootSec=6min
+OnUnitActiveSec=5min
+AccuracySec=10s
+Unit=botalin-vwap-reversion.service
+
+[Install]
+WantedBy=timers.target
