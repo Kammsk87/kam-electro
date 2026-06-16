@@ -4400,6 +4400,20 @@ function evaluateIntelForScenario(context, scenario) {
       reasons.push(`funding ${funding.toFixed(4)}% повышает риск позднего SHORT`);
     }
 
+    const oiChangePct = Number(intel.derivatives.oiChangePct) || 0;
+    if (context.mode === "breakout") {
+      if (oiChangePct >= 1) {
+        delta += 10;
+        reasons.push(`Open Interest растет ${oiChangePct.toFixed(2)}%: пробой подтвержден новым интересом`);
+      } else if (oiChangePct >= 0.35) {
+        delta += 4;
+        reasons.push(`Open Interest слегка растет ${oiChangePct.toFixed(2)}%`);
+      } else {
+        delta -= 18;
+        reasons.push(`Open Interest не подтверждает пробой (${oiChangePct.toFixed(2)}%)`);
+      }
+    }
+
     if (intel.derivatives.sideBias === scenario.side) {
       delta += 5;
       reasons.push("деривативные данные не спорят со стороной сделки");

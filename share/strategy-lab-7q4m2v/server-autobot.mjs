@@ -855,15 +855,16 @@ async function scanCandidates(trades, learningPolicy) {
   const groups = await mapLimit(scanTasks, 5, async ({ symbol, interval, strategies }) => {
     await wait(80);
     const needsStandardHistory = strategies.some((strategy) => strategy.kind !== "scalping");
-    const [candles, mtf, funding] = await Promise.all([
+    const [candles, mtf, funding, openInterest] = await Promise.all([
       fetchCandles(symbol, interval, needsStandardHistory ? 220 : 160).catch(() => []),
       fetchMultiTimeframeConfirmation(symbol, interval).catch(() => null),
-      fetchFundingIntel(symbol).catch(() => null)
+      fetchFundingIntel(symbol).catch(() => null),
+      fetchOpenInterestIntel(symbol).catch(() => null)
     ]);
     if (candles.length < (needsStandardHistory ? 90 : 60)) return [];
     return strategies
       .filter((strategy) => candles.length >= (strategy.kind === "scalping" ? 60 : 90))
-      .map((strategy) => evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend, goldSentiment, { mtf, funding }))
+      .map((strategy) => evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend, goldSentiment, { mtf, funding, openInterest }))
       .filter((candidate) => candidate && !activeKeys.has(getCandidateStrategyExposureKey(candidate)));
   });
 
@@ -1077,7 +1078,7 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
     score += reversal.scoreBoost;
   }
   if (strategy.kind === "breakout") {
-    const bo = evaluateBreakoutSignal(candles, side, volumeRatio, adx, atrPct);
+    const bo = evaluateBreakoutSignal(candles, side, volumeRatio, adx, atrPct, externalFilters.openInterest);
     if (!bo.ok) return null;
     score += bo.scoreBoost;
   }
@@ -1131,12 +1132,13 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
     slopePct,
     mtf,
     funding,
+    openInterest: externalFilters.openInterest || null,
     history,
     crash,
     scenario,
     expected,
     patternKey,
-    reason: `${strategy.label}: EMA ${side}, RSI ${rsi.toFixed(1)}, MACD ${Number.isFinite(macd) && Number.isFinite(macdSig) ? (macd > macdSig ? "↑" : "↓") : "?"}, ADX ${Number.isFinite(adx) ? adx.toFixed(0) : "?"}, ST ${stDir === 1 ? "↑" : "↓"}, vol x${volumeRatio.toFixed(2)}, ATR ${atrPct.toFixed(2)}%, MTF ${mtf?.summary || "proxy"}, funding ${funding ? `${funding.fundingRatePct.toFixed(4)}%` : "n/a"}, цель ${expected.weightedNetPct.toFixed(2)}%, BTC ${btcTrend}`
+    reason: `${strategy.label}: EMA ${side}, RSI ${rsi.toFixed(1)}, MACD ${Number.isFinite(macd) && Number.isFinite(macdSig) ? (macd > macdSig ? "↑" : "↓") : "?"}, ADX ${Number.isFinite(adx) ? adx.toFixed(0) : "?"}, ST ${stDir === 1 ? "↑" : "↓"}, vol x${volumeRatio.toFixed(2)}, ATR ${atrPct.toFixed(2)}%, MTF ${mtf?.summary || "proxy"}, funding ${funding ? `${funding.fundingRatePct.toFixed(4)}%` : "n/a"}, OI ${externalFilters.openInterest ? `${externalFilters.openInterest.changePct.toFixed(2)}%` : "n/a"}, цель ${expected.weightedNetPct.toFixed(2)}%, BTC ${btcTrend}`
   };
 }
 
@@ -1229,13 +1231,17 @@ function evaluateRsiReversal(candles, rsi, side, atrPct, volumeRatio) {
   return { ok: true, scoreBoost };
 }
 
-function evaluateBreakoutSignal(candles, side, volumeRatio, adx, atrPct) {
+function evaluateBreakoutSignal(candles, side, volumeRatio, adx, atrPct, openInterest = null) {
   if (volumeRatio < 1.3) return { ok: false, scoreBoost: 0 };
+  if (!openInterest || !Number.isFinite(openInterest.changePct)) return { ok: false, scoreBoost: 0 };
+  if (openInterest.changePct < 0.35) return { ok: false, scoreBoost: 0 };
   let scoreBoost = 10;
   if (volumeRatio >= 1.6) scoreBoost += 8;
   if (volumeRatio >= 2.0) scoreBoost += 5;
   if (Number.isFinite(adx) && adx >= 22) scoreBoost += 8;
   if (atrPct >= 0.3) scoreBoost += 4;
+  if (openInterest.changePct >= 1) scoreBoost += 8;
+  if (openInterest.changePct >= 2.5) scoreBoost += 6;
   return { ok: true, scoreBoost };
 }
 
@@ -1343,6 +1349,24 @@ async function fetchFundingIntel(symbol) {
   return {
     fundingRatePct: Number.isFinite(fundingRatePct) ? fundingRatePct : 0,
     updatedAt: Number(data.result?.list?.[0]?.fundingRateTimestamp) || Date.now()
+  };
+}
+
+async function fetchOpenInterestIntel(symbol) {
+  const bybitSymbol = toBybitSymbol(symbol);
+  const response = await fetchWithTimeout(`https://api.bybit.com/v5/market/open-interest?category=linear&symbol=${bybitSymbol}&intervalTime=15min&limit=2`, {}, 6_000);
+  if (!response.ok) throw new Error(`open interest ${response.status}`);
+  const data = await response.json();
+  if (data.retCode !== 0) throw new Error(data.retMsg || "open interest failed");
+  const list = data.result?.list || [];
+  const current = Number(list[0]?.openInterest) || 0;
+  const previous = Number(list[1]?.openInterest) || current;
+  const changePct = previous > 0 ? ((current - previous) / previous) * 100 : 0;
+  return {
+    openInterest: current,
+    previousOpenInterest: previous,
+    changePct,
+    updatedAt: Number(list[0]?.timestamp) || Date.now()
   };
 }
 
@@ -1549,10 +1573,17 @@ function buildStrategySnapshot(candidate, amount) {
       },
       marketCrash: candidate.crash,
       multiTimeframe: candidate.mtf || null,
-      derivatives: candidate.funding ? {
-        fundingRatePct: candidate.funding.fundingRatePct,
-        updatedAt: candidate.funding.updatedAt
-      } : null,
+      derivatives: {
+        ...(candidate.funding ? {
+          fundingRatePct: candidate.funding.fundingRatePct,
+          fundingUpdatedAt: candidate.funding.updatedAt
+        } : {}),
+        ...(candidate.openInterest ? {
+          openInterest: candidate.openInterest.openInterest,
+          oiChangePct: candidate.openInterest.changePct,
+          oiUpdatedAt: candidate.openInterest.updatedAt
+        } : {})
+      },
       learning: candidate.history,
       notes: [candidate.reason]
     },
@@ -1595,6 +1626,7 @@ function buildStrategySnapshot(candidate, amount) {
       `Серверная стратегия: ${candidate.strategyLabel}`,
       "Multi-timeframe: вход не должен конфликтовать со старшим 1h/4h трендом",
       "Funding Rate: перегретая толпа long/short блокирует вход против риска ликвидаций",
+      ...(candidate.strategyId === "breakout" ? ["Open Interest: breakout допускается только при росте OI, иначе пробой считается слабым"] : []),
       "Чистая ожидаемая прибыль после комиссии и проскальзывания должна быть положительной",
       "LONG блокируется при risk-off/crash режиме",
       "Размер позиции ограничен бюджетом сервера"
