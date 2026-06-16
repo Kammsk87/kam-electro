@@ -855,11 +855,15 @@ async function scanCandidates(trades, learningPolicy) {
   const groups = await mapLimit(scanTasks, 5, async ({ symbol, interval, strategies }) => {
     await wait(80);
     const needsStandardHistory = strategies.some((strategy) => strategy.kind !== "scalping");
-    const candles = await fetchCandles(symbol, interval, needsStandardHistory ? 220 : 160).catch(() => []);
+    const [candles, mtf, funding] = await Promise.all([
+      fetchCandles(symbol, interval, needsStandardHistory ? 220 : 160).catch(() => []),
+      fetchMultiTimeframeConfirmation(symbol, interval).catch(() => null),
+      fetchFundingIntel(symbol).catch(() => null)
+    ]);
     if (candles.length < (needsStandardHistory ? 90 : 60)) return [];
     return strategies
       .filter((strategy) => candles.length >= (strategy.kind === "scalping" ? 60 : 90))
-      .map((strategy) => evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend, goldSentiment))
+      .map((strategy) => evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend, goldSentiment, { mtf, funding }))
       .filter((candidate) => candidate && !activeKeys.has(getCandidateStrategyExposureKey(candidate)));
   });
 
@@ -918,7 +922,7 @@ function selectEntryCandidates(candidates, trades) {
   return selected;
 }
 
-function evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend = "NEUTRAL", goldSentiment = "NEUTRAL") {
+function evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend = "NEUTRAL", goldSentiment = "NEUTRAL", externalFilters = {}) {
   const scalping = strategy.kind === "scalping";
   const closes = candles.map((candle) => candle.close);
   const last = candles[candles.length - 1];
@@ -970,6 +974,14 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
   if (crash.riskOff && side === "LONG") return null;
   if (volumeRatio < (scalping ? config.minScalpingVolumeRatio : config.minVolumeRatio)) return null;
 
+  const mtf = externalFilters.mtf || getProxyMultiTimeframeConfirmation(candles, interval);
+  const mtfDecision = evaluateMultiTimeframeFilter(mtf, side, scalping);
+  if (mtfDecision.block) return null;
+
+  const funding = externalFilters.funding || null;
+  const fundingDecision = evaluateFundingFilter(funding, side);
+  if (fundingDecision.block) return null;
+
   const history = getPatternStats(trades, symbol, interval, side, strategy.id);
   const patternKey = getLearningPatternKey(symbol, interval, side, strategy.id);
   const isSoftMode = config.blockedAssetMode === "soft";
@@ -987,9 +999,8 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
   if (atrPct >= 0.25 && atrPct <= 1.8) score += 10;
   if (Math.abs(impulsePct) > 3.2) score -= 12;
   if (interval === "5m" || interval === "15m") score += 3;
-  const higherTfTrend = getHigherTfTrend(candles, interval);
-  if (higherTfTrend !== "NEUTRAL" && higherTfTrend !== side) score -= 15;
-  else if (higherTfTrend === side) score += 8;
+  score += mtfDecision.scoreDelta;
+  score += fundingDecision.scoreDelta;
   const crossoverAge = getEmaCrossoverAge(ema34, ema89);
   if (crossoverAge <= 5) score += 10;
   else if (crossoverAge <= 15) score += 3;
@@ -1118,12 +1129,14 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
     atrPct,
     volumeRatio,
     slopePct,
+    mtf,
+    funding,
     history,
     crash,
     scenario,
     expected,
     patternKey,
-    reason: `${strategy.label}: EMA ${side}, RSI ${rsi.toFixed(1)}, MACD ${Number.isFinite(macd) && Number.isFinite(macdSig) ? (macd > macdSig ? "↑" : "↓") : "?"}, ADX ${Number.isFinite(adx) ? adx.toFixed(0) : "?"}, ST ${stDir === 1 ? "↑" : "↓"}, vol x${volumeRatio.toFixed(2)}, ATR ${atrPct.toFixed(2)}%, цель ${expected.weightedNetPct.toFixed(2)}%, BTC ${btcTrend}`
+    reason: `${strategy.label}: EMA ${side}, RSI ${rsi.toFixed(1)}, MACD ${Number.isFinite(macd) && Number.isFinite(macdSig) ? (macd > macdSig ? "↑" : "↓") : "?"}, ADX ${Number.isFinite(adx) ? adx.toFixed(0) : "?"}, ST ${stDir === 1 ? "↑" : "↓"}, vol x${volumeRatio.toFixed(2)}, ATR ${atrPct.toFixed(2)}%, MTF ${mtf?.summary || "proxy"}, funding ${funding ? `${funding.fundingRatePct.toFixed(4)}%` : "n/a"}, цель ${expected.weightedNetPct.toFixed(2)}%, BTC ${btcTrend}`
   };
 }
 
@@ -1253,6 +1266,100 @@ function getHigherTfTrend(candles, interval) {
   if (ema21[i] > ema55[i] * 1.002) return "LONG";
   if (ema21[i] < ema55[i] * 0.998) return "SHORT";
   return "NEUTRAL";
+}
+
+function getMtfFramesForInterval(interval) {
+  if (interval === "5m") return ["15m", "1h"];
+  if (interval === "15m") return ["1h", "4h"];
+  if (interval === "1h") return ["4h"];
+  return [];
+}
+
+async function fetchMultiTimeframeConfirmation(symbol, interval) {
+  const frames = getMtfFramesForInterval(interval);
+  if (!frames.length) return { direction: "NEUTRAL", frames: [], summary: "MTF n/a" };
+  const results = await Promise.all(frames.map(async (frame) => {
+    const candles = await fetchCandlesBybit(symbol, frame, 140);
+    return analyzeTrendFromCandles(candles, frame);
+  }));
+  const longCount = results.filter((item) => item.direction === "LONG").length;
+  const shortCount = results.filter((item) => item.direction === "SHORT").length;
+  const direction = longCount === results.length ? "LONG" : shortCount === results.length ? "SHORT" : "MIXED";
+  return {
+    direction,
+    frames: results,
+    summary: results.map((item) => `${item.frame}:${item.direction}`).join("/")
+  };
+}
+
+function getProxyMultiTimeframeConfirmation(candles, interval) {
+  const direction = getHigherTfTrend(candles, interval);
+  return { direction, frames: [{ frame: "proxy", direction }], summary: `proxy:${direction}` };
+}
+
+function analyzeTrendFromCandles(candles, frame = "") {
+  const closes = candles.map((candle) => candle.close);
+  const ema34 = calculateEma(closes, 34);
+  const ema89 = calculateEma(closes, 89);
+  const i = closes.length - 1;
+  if (i < 89 || !Number.isFinite(ema34[i]) || !Number.isFinite(ema89[i])) {
+    return { frame, direction: "NEUTRAL", strength: 0 };
+  }
+  const slope = ema34[i] - ema34[Math.max(0, i - 8)];
+  const strength = closes[i] > 0 ? Math.abs(slope / closes[i]) * 100 : 0;
+  const direction = ema34[i] > ema89[i] && slope >= 0
+    ? "LONG"
+    : ema34[i] < ema89[i] && slope <= 0
+      ? "SHORT"
+      : "NEUTRAL";
+  return { frame, direction, strength };
+}
+
+function evaluateMultiTimeframeFilter(mtf, side, scalping = false) {
+  if (!mtf?.frames?.length) return { block: false, scoreDelta: 0, reason: "MTF нет данных" };
+  const opposite = side === "LONG" ? "SHORT" : "LONG";
+  const hardOpposite = mtf.frames.some((item) => item.direction === opposite && item.frame === "4h");
+  const oppositeCount = mtf.frames.filter((item) => item.direction === opposite).length;
+  const alignedCount = mtf.frames.filter((item) => item.direction === side).length;
+  if (!scalping && (hardOpposite || oppositeCount >= 2)) {
+    return { block: true, scoreDelta: -100, reason: `MTF против сделки: ${mtf.summary}` };
+  }
+  if (scalping && oppositeCount >= 2) {
+    return { block: true, scoreDelta: -100, reason: `MTF против скальпа: ${mtf.summary}` };
+  }
+  if (alignedCount === mtf.frames.length) return { block: false, scoreDelta: 14, reason: `MTF подтверждает: ${mtf.summary}` };
+  if (alignedCount > 0 && oppositeCount === 0) return { block: false, scoreDelta: 6, reason: `MTF частично подтверждает: ${mtf.summary}` };
+  if (oppositeCount > 0) return { block: false, scoreDelta: scalping ? -8 : -14, reason: `MTF частично против: ${mtf.summary}` };
+  return { block: false, scoreDelta: 0, reason: `MTF нейтральный: ${mtf.summary}` };
+}
+
+async function fetchFundingIntel(symbol) {
+  const bybitSymbol = toBybitSymbol(symbol);
+  const response = await fetchWithTimeout(`https://api.bybit.com/v5/market/funding/history?category=linear&symbol=${bybitSymbol}&limit=1`, {}, 6_000);
+  if (!response.ok) throw new Error(`funding ${response.status}`);
+  const data = await response.json();
+  if (data.retCode !== 0) throw new Error(data.retMsg || "funding failed");
+  const fundingRatePct = Number(data.result?.list?.[0]?.fundingRate) * 100;
+  return {
+    fundingRatePct: Number.isFinite(fundingRatePct) ? fundingRatePct : 0,
+    updatedAt: Number(data.result?.list?.[0]?.fundingRateTimestamp) || Date.now()
+  };
+}
+
+function evaluateFundingFilter(funding, side) {
+  if (!funding || !Number.isFinite(funding.fundingRatePct)) return { block: false, scoreDelta: 0, reason: "funding нет данных" };
+  const value = funding.fundingRatePct;
+  if (value >= 0.04 && side === "LONG") {
+    return { block: true, scoreDelta: -100, reason: `funding ${value.toFixed(4)}%: лонги перегреты` };
+  }
+  if (value <= -0.04 && side === "SHORT") {
+    return { block: true, scoreDelta: -100, reason: `funding ${value.toFixed(4)}%: шорты перегреты` };
+  }
+  if (value >= 0.02 && side === "LONG") return { block: false, scoreDelta: -12, reason: `funding ${value.toFixed(4)}% против LONG` };
+  if (value >= 0.02 && side === "SHORT") return { block: false, scoreDelta: 5, reason: `funding ${value.toFixed(4)}% поддерживает осторожный SHORT` };
+  if (value <= -0.02 && side === "SHORT") return { block: false, scoreDelta: -12, reason: `funding ${value.toFixed(4)}% против SHORT` };
+  if (value <= -0.02 && side === "LONG") return { block: false, scoreDelta: 5, reason: `funding ${value.toFixed(4)}% поддерживает осторожный LONG` };
+  return { block: false, scoreDelta: 0, reason: `funding нейтральный ${value.toFixed(4)}%` };
 }
 
 async function getBtcTrend() {
@@ -1441,6 +1548,11 @@ function buildStrategySnapshot(candidate, amount) {
         expectedNetPct: candidate.expected?.weightedNetPct || 0
       },
       marketCrash: candidate.crash,
+      multiTimeframe: candidate.mtf || null,
+      derivatives: candidate.funding ? {
+        fundingRatePct: candidate.funding.fundingRatePct,
+        updatedAt: candidate.funding.updatedAt
+      } : null,
       learning: candidate.history,
       notes: [candidate.reason]
     },
@@ -1481,6 +1593,8 @@ function buildStrategySnapshot(candidate, amount) {
       "RSI должен быть в рабочей зоне выбранной стороны",
       "ATR и объем должны быть в умеренном диапазоне",
       `Серверная стратегия: ${candidate.strategyLabel}`,
+      "Multi-timeframe: вход не должен конфликтовать со старшим 1h/4h трендом",
+      "Funding Rate: перегретая толпа long/short блокирует вход против риска ликвидаций",
       "Чистая ожидаемая прибыль после комиссии и проскальзывания должна быть положительной",
       "LONG блокируется при risk-off/crash режиме",
       "Размер позиции ограничен бюджетом сервера"

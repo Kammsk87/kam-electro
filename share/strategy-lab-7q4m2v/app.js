@@ -3029,16 +3029,18 @@ async function refreshStrategyIntelligence(force = false) {
   state.marketIntel = { ...state.marketIntel, loading: true, asset: context.asset, timeframe: context.timeframe, notes: ["Обновляю бэктест, деривативные фильтры, сентимент и журнал."] };
   renderStrategyIntelligence();
 
-  const [candlesResult, derivativesResult, sentimentResult] = await Promise.allSettled([
+  const [candlesResult, higherResult, derivativesResult, sentimentResult] = await Promise.allSettled([
     fetchHistoricalCandlesFor(context.asset, context.timeframe, 320),
+    fetchHigherTimeframeIntel(context.asset, context.timeframe),
     fetchDerivativeIntel(context.asset),
     fetchSentimentIntel()
   ]);
 
   const candles = candlesResult.status === "fulfilled" ? candlesResult.value : [];
+  const higherTimeframe = higherResult.status === "fulfilled" ? higherResult.value : null;
   const derivatives = derivativesResult.status === "fulfilled" ? derivativesResult.value : null;
   const sentiment = sentimentResult.status === "fulfilled" ? sentimentResult.value : null;
-  state.marketIntel = buildMarketIntelForContext(context, candles, derivatives, sentiment);
+  state.marketIntel = buildMarketIntelForContext(context, candles, derivatives, sentiment, higherTimeframe);
   generateStrategy(state.lastUserIdea);
 }
 
@@ -3049,10 +3051,10 @@ async function refreshSharedLearningMemory(force = false) {
   return true;
 }
 
-function buildMarketIntelForContext(context, candles, derivatives = null, sentiment = null) {
+function buildMarketIntelForContext(context, candles, derivatives = null, sentiment = null, higherTimeframeOverride = null) {
   const backtest = candles.length ? runStrategyBacktest(candles, context) : null;
   const marketStructure = candles.length ? analyzeMarketStructure(candles) : null;
-  const higherTimeframe = candles.length ? analyzeHigherTimeframeProxy(candles) : null;
+  const higherTimeframe = higherTimeframeOverride || (candles.length ? analyzeHigherTimeframeProxy(candles) : null);
   const marketCrash = candles.length ? analyzeMarketCrashRisk(candles) : null;
   const marketRadar = getMarketRadarAsset(context.asset);
   const learning = analyzeLearningJournal(context.asset);
@@ -3125,6 +3127,52 @@ function analyzeHigherTimeframeProxy(candles) {
     direction,
     strength: Math.abs(slope / closes[last]) * 100,
     note: `старший фильтр по EMA34/89: ${direction}`
+  };
+}
+
+function getHigherTimeframesForInterval(interval) {
+  if (interval === "5m") return ["15m", "1h"];
+  if (interval === "15m") return ["1h", "4h"];
+  if (interval === "1h") return ["4h"];
+  return [];
+}
+
+async function fetchHigherTimeframeIntel(symbol, interval) {
+  const frames = getHigherTimeframesForInterval(interval);
+  if (!frames.length) return null;
+  const results = await Promise.all(frames.map(async (frame) => {
+    const candles = await fetchHistoricalCandlesFor(symbol, frame, 160);
+    return analyzeHigherFrameCandles(candles, frame);
+  }));
+  const longCount = results.filter((item) => item.direction === "LONG").length;
+  const shortCount = results.filter((item) => item.direction === "SHORT").length;
+  const direction = longCount === results.length ? "LONG" : shortCount === results.length ? "SHORT" : "MIXED";
+  return {
+    direction,
+    frames: results,
+    strength: average(results.map((item) => item.strength)),
+    note: `реальный MTF ${results.map((item) => `${item.frame}:${item.direction}`).join(" / ")}`
+  };
+}
+
+function analyzeHigherFrameCandles(candles, frame) {
+  const closes = candles.map((candle) => candle.close);
+  const ema34 = calculateEmaSeries(closes, 34);
+  const ema89 = calculateEmaSeries(closes, 89);
+  const last = closes.length - 1;
+  if (last < 89 || !Number.isFinite(ema34[last]) || !Number.isFinite(ema89[last])) {
+    return { frame, direction: "UNKNOWN", strength: 0 };
+  }
+  const slope = ema34[last] - ema34[Math.max(0, last - 8)];
+  const direction = ema34[last] > ema89[last] && slope >= 0
+    ? "LONG"
+    : ema34[last] < ema89[last] && slope <= 0
+      ? "SHORT"
+      : "NEUTRAL";
+  return {
+    frame,
+    direction,
+    strength: closes[last] > 0 ? Math.abs(slope / closes[last]) * 100 : 0
   };
 }
 
@@ -4125,9 +4173,12 @@ async function scanAutopilotCandidates() {
   const enriched = [];
   for (const candidate of top) {
     if (!state.autopilot.enabled) break;
-    const derivatives = await fetchDerivativeIntel(candidate.context.asset).catch(() => null);
+    const [derivatives, higherTimeframe] = await Promise.all([
+      fetchDerivativeIntel(candidate.context.asset).catch(() => null),
+      fetchHigherTimeframeIntel(candidate.context.asset, candidate.context.timeframe).catch(() => null)
+    ]);
     const context = { ...candidate.context };
-    const intel = buildMarketIntelForContext(context, candidate.candles, derivatives, sentiment);
+    const intel = buildMarketIntelForContext(context, candidate.candles, derivatives, sentiment, higherTimeframe);
     context.intel = intel;
     const tradePlan = buildTradePlan(context);
     const signalQuality = evaluateSignalQuality(context, tradePlan);
@@ -4334,6 +4385,21 @@ function evaluateIntelForScenario(context, scenario) {
   }
 
   if (intel.derivatives?.sideBias) {
+    const funding = Number(intel.derivatives.fundingRatePct) || 0;
+    if (scenario.side === "LONG" && funding >= 0.04) {
+      delta -= 28;
+      reasons.push(`funding ${funding.toFixed(4)}%: long-толпа перегрета, вход блокируется по риску`);
+    } else if (scenario.side === "SHORT" && funding <= -0.04) {
+      delta -= 28;
+      reasons.push(`funding ${funding.toFixed(4)}%: short-толпа перегрета, вход блокируется по риску`);
+    } else if (scenario.side === "LONG" && funding >= 0.02) {
+      delta -= 12;
+      reasons.push(`funding ${funding.toFixed(4)}% повышает риск позднего LONG`);
+    } else if (scenario.side === "SHORT" && funding <= -0.02) {
+      delta -= 12;
+      reasons.push(`funding ${funding.toFixed(4)}% повышает риск позднего SHORT`);
+    }
+
     if (intel.derivatives.sideBias === scenario.side) {
       delta += 5;
       reasons.push("деривативные данные не спорят со стороной сделки");
@@ -4343,6 +4409,24 @@ function evaluateIntelForScenario(context, scenario) {
     } else {
       delta -= 4;
       reasons.push("деривативный перекос против выбранной стороны");
+    }
+  }
+
+  if (intel.higherTimeframe?.direction) {
+    const frames = intel.higherTimeframe.frames || [];
+    const opposite = scenario.side === "LONG" ? "SHORT" : "LONG";
+    const oppositeCount = frames.filter((frame) => frame.direction === opposite).length;
+    const alignedCount = frames.filter((frame) => frame.direction === scenario.side).length;
+    const hard4hOpposite = frames.some((frame) => frame.frame === "4h" && frame.direction === opposite);
+    if (hard4hOpposite || oppositeCount >= 2) {
+      delta -= 24;
+      reasons.push(`старший таймфрейм против сделки: ${intel.higherTimeframe.note || intel.higherTimeframe.direction}`);
+    } else if (alignedCount === frames.length && frames.length) {
+      delta += 10;
+      reasons.push(`1h/4h подтверждают направление: ${intel.higherTimeframe.note}`);
+    } else if (alignedCount > 0 && oppositeCount === 0) {
+      delta += 5;
+      reasons.push(`старший таймфрейм частично подтверждает: ${intel.higherTimeframe.note}`);
     }
   }
 
