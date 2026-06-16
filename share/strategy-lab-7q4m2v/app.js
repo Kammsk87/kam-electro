@@ -1752,13 +1752,7 @@ function getServerStrategyId(trade) {
   return "unknown";
 }
 
-function getBotStats(bot) {
-  const trades = state.paperTrades.filter((trade) => {
-    if (bot.strategy === "vps") return getTradeUserLogin(trade) === "server-vps";
-    if (!isServerTrade(trade)) return false;
-    if (bot.strategy === "all") return getTradeUserLogin(trade) !== "server-vps";
-    return getServerStrategyId(trade) === bot.strategy;
-  });
+function buildBotStatsFromTrades(trades) {
   const active  = trades.filter(isPaperTradeActive);
   const closed  = trades.filter((t) => !isPaperTradeActive(t) && t.status !== "cancelled");
   const wins    = closed.filter((t) => (Number(t.pnl) || 0) > 0);
@@ -1774,6 +1768,16 @@ function getBotStats(bot) {
     return ts > (Number(best?.updatedAt) || Number(best?.openedAt) || 0) ? t : best;
   }, null);
   return { active: active.length, closed: closed.length, wins: wins.length, losses: losses.length, pnl, wr, rr, expect, avgW, avgL, lastTrade };
+}
+
+function getBotStats(bot) {
+  const trades = state.paperTrades.filter((trade) => {
+    if (bot.strategy === "vps") return getTradeUserLogin(trade) === "server-vps";
+    if (!isServerTrade(trade)) return false;
+    if (bot.strategy === "all") return getTradeUserLogin(trade) !== "server-vps";
+    return getServerStrategyId(trade) === bot.strategy;
+  });
+  return buildBotStatsFromTrades(trades);
 }
 
 function formatAgo(trade) {
