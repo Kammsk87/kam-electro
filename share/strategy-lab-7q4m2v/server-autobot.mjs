@@ -261,15 +261,16 @@ async function main() {
     return;
   }
 
-  const [rows, remotePolicy, backtestPolicy] = await Promise.all([
+  const [rows, remotePolicy, backtestPolicy, rejectedPolicy] = await Promise.all([
     fetchRemoteRows(),
     fetchSharedLearningPolicy().catch((error) => { log(`shared learning fallback: ${error.message}`); return null; }),
-    fetchBacktestPolicy().catch(() => null)
+    fetchBacktestPolicy().catch(() => null),
+    fetchRejectedSignalsPolicy().catch(() => null)
   ]);
   const trades = rows.map((row) => normalizeTrade(row.trade)).filter(Boolean);
   const journalPolicy = createLearningPolicyFromTrades(trades);
-  // Порядок приоритета: живые сделки > remote policy > backtest policy > hardcoded bootstrap
-  const basePolicy = mergeLearningPolicies(backtestPolicy || BOOTSTRAP_LEARNING_POLICY, remotePolicy);
+  // Порядок приоритета: живые сделки > remote policy > backtest policy > rejected_signals > hardcoded bootstrap
+  const basePolicy = mergeLearningPolicies(backtestPolicy || BOOTSTRAP_LEARNING_POLICY, rejectedPolicy, remotePolicy);
   const learningPolicy = mergeLearningPolicies(basePolicy, journalPolicy);
   const changedTrades = await updateActiveTrades(trades);
   const candidates = await scanCandidates(trades, learningPolicy);
@@ -438,6 +439,48 @@ async function saveSharedLearningPolicy(policy) {
 async function fetchBacktestPolicy() {
   const doc = await firestoreGet("settings", backtestPolicyKey);
   return doc?.value ? normalizeLearningPolicy(doc.value) : null;
+}
+
+async function fetchRejectedSignalsPolicy() {
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  let rows;
+  try {
+    rows = await firestoreQuery("rejected_signals", [
+      { fieldFilter: { field: { fieldPath: "recorded_at" }, op: "GREATER_THAN_OR_EQUAL", value: { stringValue: sevenDaysAgo } } }
+    ], "recorded_at", 2000);
+  } catch {
+    return null;
+  }
+  if (!rows?.length) return null;
+
+  // Count how many times each pattern was rejected due to limit (scored well, just no slot)
+  // vs low score (signal was actually weak)
+  const limitCounts = {};
+  const scoreLowCounts = {};
+  for (const row of rows) {
+    const key = `${row.asset}|${row.timeframe}|${row.side}|${row.strategy}`;
+    if (!key.includes("undefined")) {
+      if (String(row.reject_reason || "").startsWith("limit_or_cooldown")) {
+        limitCounts[key] = (limitCounts[key] || 0) + 1;
+      } else if (String(row.reject_reason || "").startsWith("score_low")) {
+        scoreLowCounts[key] = (scoreLowCounts[key] || 0) + 1;
+      }
+    }
+  }
+  // Prefer patterns that passed scoring ≥2 times but weren't entered (queue was full)
+  // Soft-block patterns that consistently score low (≥3 times) but were never preferred
+  const preferredPatterns = Object.entries(limitCounts)
+    .filter(([, c]) => c >= 2)
+    .map(([k]) => k);
+  const blockedPatterns = Object.entries(scoreLowCounts)
+    .filter(([k, c]) => c >= 3 && !limitCounts[k])
+    .map(([k]) => k);
+  if (!preferredPatterns.length && !blockedPatterns.length) return null;
+  return normalizeLearningPolicy({
+    preferredPatterns,
+    blockedPatterns,
+    notes: [`rejected_signals:${rows.length},pref:${preferredPatterns.length},block:${blockedPatterns.length}`]
+  });
 }
 
 async function saveBacktestPolicy(policy) {

@@ -1711,11 +1711,12 @@ const SERVER_BOTS = [
   { login: "server-rsi",      label: "RSI Разворот",  color: "teal"    },
   { login: "server-breakout", label: "Пробой",        color: "orange"  },
   { login: "server-vwap",     label: "VWAP Возврат",  color: "rose"    },
+  { login: "server-vps",      label: "VPS (все)",     color: "accent"  },
 ];
 
 function getBotStats(userLogin) {
   const trades = state.paperTrades.filter(
-    (t) => getTradeUserLogin(t) === userLogin || t.sessionId === "server-autobot" && userLogin === "server" && !["server-trend","server-pullback","server-scalping","server-rsi","server-breakout","server-vwap"].includes(getTradeUserLogin(t))
+    (t) => getTradeUserLogin(t) === userLogin || t.sessionId === "server-autobot" && userLogin === "server" && !["server-trend","server-pullback","server-scalping","server-rsi","server-breakout","server-vwap","server-vps"].includes(getTradeUserLogin(t))
   );
   const active  = trades.filter(isPaperTradeActive);
   const closed  = trades.filter((t) => !isPaperTradeActive(t) && t.status !== "cancelled");
