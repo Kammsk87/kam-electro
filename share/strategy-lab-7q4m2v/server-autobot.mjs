@@ -214,6 +214,8 @@ const config = {
   minScalpingExpectedNetPct: activeProfile.minScalpingExpectedNetPct,
   blockedAssetMode: activeProfile.blockedAssetMode,
   maxActivePerAsset: 2,
+  // XAUT/XAG не торгуются, но используются как риск-сентимент индикаторы (см. getGoldSentiment)
+  sentimentAssets: ["XAUT/USDT", "XAG/USDT"],
   assets: [
     "BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT", "TON/USDT",
     "ADA/USDT", "DOGE/USDT", "TRX/USDT", "AVAX/USDT", "LINK/USDT", "DOT/USDT",
@@ -224,8 +226,7 @@ const config = {
     "LDO/USDT", "CRV/USDT", "RUNE/USDT", "ICP/USDT", "HBAR/USDT",
     "VET/USDT", "ALGO/USDT", "STX/USDT", "ORDI/USDT", "IMX/USDT",
     "SAND/USDT", "MKR/USDT", "GRT/USDT", "SNX/USDT", "PYTH/USDT",
-    "WLD/USDT", "ZEC/USDT", "BLUR/USDT",
-    "XAUT/USDT", "XAG/USDT"
+    "WLD/USDT", "ZEC/USDT", "BLUR/USDT"
   ],
   timeframes: ["5m", "15m", "1h"],
   scalpingTimeframes: ["5m", "15m"]
@@ -268,6 +269,21 @@ async function main() {
     fetchRejectedSignalsPolicy().catch(() => null)
   ]);
   const trades = rows.map((row) => normalizeTrade(row.trade)).filter(Boolean);
+  // Авто-снижение порога: когда каждая стратегия накопила 100+ закрытых сделок — достаточно данных
+  const closedByStrategy = {};
+  for (const t of trades) {
+    if (!isActiveTrade(t) && t.status !== "cancelled") {
+      const sid = getTradeStrategyId(t);
+      closedByStrategy[sid] = (closedByStrategy[sid] || 0) + 1;
+    }
+  }
+  const minClosedAcrossStrategies = enabledStrategies.length
+    ? Math.min(...enabledStrategies.map((s) => closedByStrategy[s.id] || 0))
+    : 0;
+  if (minClosedAcrossStrategies >= 100 && config.minScore > 50) {
+    log(`auto minScore: ${config.minScore} → 50 (all strategies ≥100 closed trades)`);
+    config.minScore = 50;
+  }
   const journalPolicy = createLearningPolicyFromTrades(trades);
   // Порядок приоритета: живые сделки > remote policy > backtest policy > rejected_signals > hardcoded bootstrap
   const basePolicy = mergeLearningPolicies(backtestPolicy || BOOTSTRAP_LEARNING_POLICY, rejectedPolicy, remotePolicy);
@@ -702,7 +718,7 @@ async function scanCandidates(trades, learningPolicy) {
   const dailyRisk = getDailyRisk(trades);
   if (dailyRisk.blocked) return [];
 
-  const btcTrend = await getBtcTrend();
+  const [btcTrend, goldSentiment] = await Promise.all([getBtcTrend(), getGoldSentiment()]);
   const strategiesByInterval = groupStrategiesByInterval(enabledStrategies);
   const scanTasks = [];
   for (const symbol of config.assets) {
@@ -719,7 +735,7 @@ async function scanCandidates(trades, learningPolicy) {
     if (candles.length < (needsStandardHistory ? 90 : 60)) return [];
     return strategies
       .filter((strategy) => candles.length >= (strategy.kind === "scalping" ? 60 : 90))
-      .map((strategy) => evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend))
+      .map((strategy) => evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend, goldSentiment))
       .filter((candidate) => candidate && !activeKeys.has(getCandidateStrategyExposureKey(candidate)));
   });
 
@@ -778,7 +794,7 @@ function selectEntryCandidates(candidates, trades) {
   return selected;
 }
 
-function evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend = "NEUTRAL") {
+function evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend = "NEUTRAL", goldSentiment = "NEUTRAL") {
   const scalping = strategy.kind === "scalping";
   const closes = candles.map((candle) => candle.close);
   const last = candles[candles.length - 1];
@@ -863,6 +879,14 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
     else if (btcTrend === "SHORT" && side === "SHORT") score += 6;
     else if (btcTrend === "LONG" && side === "LONG") score += 5;
     else if (btcTrend === "LONG" && side === "SHORT") score -= 5;
+  }
+  // Золото/серебро: RISK_OFF = деньги уходят в защитные активы = осторожность с LONG
+  if (goldSentiment === "RISK_OFF") {
+    if (side === "LONG") score -= 8;
+    else score += 4;
+  } else if (goldSentiment === "RISK_ON") {
+    if (side === "LONG") score += 4;
+    else score -= 5;
   }
   // ADX: market regime filter — weak trend = penalize trend signals, strong = boost
   if (Number.isFinite(adx)) {
@@ -1118,6 +1142,26 @@ async function getBtcTrend() {
     if (!Number.isFinite(ema34[i]) || !Number.isFinite(ema89[i])) return "NEUTRAL";
     if (ema34[i] > ema89[i] * 1.003) return "LONG";
     if (ema34[i] < ema89[i] * 0.997) return "SHORT";
+    return "NEUTRAL";
+  } catch {
+    return "NEUTRAL";
+  }
+}
+
+// Золото/серебро растёт → рынок уходит в защитные активы → RISK_OFF (пенализировать LONG)
+async function getGoldSentiment() {
+  try {
+    const candles = await fetchCandlesBybit("XAUT/USDT", "1h", 60).catch(() => null)
+      || await fetchCandlesBybit("XAG/USDT", "1h", 60).catch(() => null);
+    if (!candles || candles.length < 30) return "NEUTRAL";
+    const closes = candles.map((c) => c.close);
+    const i = closes.length - 1;
+    const ema14 = calculateEma(closes, 14);
+    const ema34 = calculateEma(closes, 34);
+    if (!Number.isFinite(ema14[i]) || !Number.isFinite(ema34[i])) return "NEUTRAL";
+    // Короткий EMA выше длинного = золото растёт = защитный режим
+    if (ema14[i] > ema34[i] * 1.002) return "RISK_OFF";
+    if (ema14[i] < ema34[i] * 0.998) return "RISK_ON";
     return "NEUTRAL";
   } catch {
     return "NEUTRAL";
@@ -2039,7 +2083,7 @@ function formatRemoteError(status, text) {
 async function runBacktest() {
   log("=== BACKTEST MODE ===");
   const results = [];
-  const backtestAssets = config.assets.slice(0, 20);
+  const backtestAssets = config.assets; // все активы
   const minScore = config.minScore;
   const feeRoundTrip = (config.feePct + config.slippagePct) * 2;
 
@@ -2048,8 +2092,11 @@ async function runBacktest() {
       for (const interval of strategy.timeframes) {
         let candles;
         try {
-          candles = await fetchCandles(symbol, interval, 300);
-          await new Promise((r) => setTimeout(r, 80));
+          // 1000 свечей: 15m ≈ 10 дней, 1h ≈ 42 дня, 5m ≈ 3.5 дня
+          candles = await fetchCandlesBybit(symbol, interval, 1000).catch(() => null)
+            || await fetchCandlesOkx(symbol, interval, 300).catch(() => null);
+          await wait(120);
+          if (!candles) continue;
         } catch {
           continue;
         }
