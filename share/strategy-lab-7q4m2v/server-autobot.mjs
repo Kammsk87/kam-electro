@@ -70,8 +70,8 @@ const serverProfiles = {
     blockedAssetMode: "soft",
     softBlockPenalty: 12,
     minTradesBeforeBlock: 20,
-    dailyStopLimit: 20,
-    dailyLossPctLimit: 10,
+    dailyStopLimit: 100,
+    dailyLossPctLimit: 50,
     strategyMaxEntriesPerRun: { trend: 5, pullback: 5, scalping: 6, "rsi-reversal": 5, breakout: 5, "vwap-reversion": 5 }
   }
 };
