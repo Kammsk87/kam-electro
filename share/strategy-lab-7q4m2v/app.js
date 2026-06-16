@@ -6,6 +6,7 @@ const autopilotKey = "crypto-strategy-bot-autopilot-v1";
 const learningPolicyKey = "crypto-strategy-bot-learning-policy-v1";
 const remoteJournalConfigKey = "crypto-strategy-bot-remote-journal-v1";
 const remoteClientIdKey = "crypto-strategy-bot-client-id";
+const remoteTableName = "crypto_strategy_trades";
 const remoteSettingsTableName = "crypto_strategy_settings";
 const remoteLearningPolicyKey = "botalin_learning_policy_v1";
 const cmcRadarConfigKey = "crypto-strategy-bot-cmc-radar-v1";
@@ -490,13 +491,20 @@ function loadRemoteJournalConfig() {
 }
 
 function normalizeRemoteJournalConfig(config = {}) {
+  const provider = String(config?.provider || (config?.supabaseUrl ? "supabase" : "firestore")).trim() || "firestore";
   return {
+    provider,
     projectId: String(config?.projectId || "").trim(),
-    apiKey: String(config?.apiKey || "").trim()
+    apiKey: String(config?.apiKey || "").trim(),
+    supabaseUrl: String(config?.supabaseUrl || "").trim().replace(/\/$/, ""),
+    supabaseKey: String(config?.supabaseKey || "").trim(),
+    tableName: String(config?.tableName || remoteTableName).trim() || remoteTableName,
+    settingsTableName: String(config?.settingsTableName || remoteSettingsTableName).trim() || remoteSettingsTableName
   };
 }
 
 function isRemoteJournalConfigFilled(config) {
+  if (config?.provider === "supabase") return Boolean(config?.supabaseUrl && config?.supabaseKey);
   return Boolean(config?.projectId && config?.apiKey);
 }
 
@@ -1932,20 +1940,23 @@ function reconcileLegacyPaperBudget() {
 
 function initRemoteJournalControls() {
   const config = state.remoteJournal.config;
-  remoteUrl.value = config.projectId;
-  remoteKey.value = config.apiKey;
+  remoteUrl.value = config.provider === "supabase" ? config.supabaseUrl : config.projectId;
+  remoteKey.value = config.provider === "supabase" ? config.supabaseKey : config.apiKey;
   renderRemoteJournalStatus();
 }
 
 function saveRemoteJournalConfig() {
   const sharedConfig = normalizeRemoteJournalConfig(window.BOTALIN_REMOTE_JOURNAL_CONFIG);
   const nextConfig = normalizeRemoteJournalConfig({
+    provider: sharedConfig.provider || "supabase",
     projectId: remoteUrl.value,
-    apiKey: remoteKey.value
+    apiKey: remoteKey.value,
+    supabaseUrl: remoteUrl.value,
+    supabaseKey: remoteKey.value
   });
   state.remoteJournal.config = isRemoteJournalConfigFilled(nextConfig) ? nextConfig : sharedConfig;
-  remoteUrl.value = state.remoteJournal.config.projectId;
-  remoteKey.value = state.remoteJournal.config.apiKey;
+  remoteUrl.value = state.remoteJournal.config.provider === "supabase" ? state.remoteJournal.config.supabaseUrl : state.remoteJournal.config.projectId;
+  remoteKey.value = state.remoteJournal.config.provider === "supabase" ? state.remoteJournal.config.supabaseKey : state.remoteJournal.config.apiKey;
   localStorage.setItem(remoteJournalConfigKey, JSON.stringify(state.remoteJournal.config));
   setRemoteJournalStatus(isRemoteJournalConfigured() ? "saved" : "local");
   syncRemoteJournal(true);
@@ -3411,7 +3422,8 @@ function normalizeLearningPolicy(policy) {
 
 async function fetchSharedLearningPolicy() {
   if (!isRemoteJournalConfigured()) return false;
-  const rows = await remoteJournalFetch(`/${encodeURIComponent(remoteSettingsTableName)}?select=value&key=eq.${encodeURIComponent(remoteLearningPolicyKey)}&limit=1`);
+  const table = state.remoteJournal.config.settingsTableName || remoteSettingsTableName;
+  const rows = await remoteJournalFetch(`/${encodeURIComponent(table)}?select=value&key=eq.${encodeURIComponent(remoteLearningPolicyKey)}&limit=1`);
   const remotePolicy = Array.isArray(rows) ? rows[0]?.value : null;
   if (!remotePolicy) return false;
   const normalized = normalizeLearningPolicy(remotePolicy);
@@ -3426,7 +3438,8 @@ async function fetchSharedLearningPolicy() {
 async function saveSharedLearningPolicy() {
   if (!isRemoteJournalConfigured()) return false;
   const value = normalizeLearningPolicy(state.learningPolicy);
-  await remoteJournalFetch(`/${encodeURIComponent(remoteSettingsTableName)}?on_conflict=key`, {
+  const table = state.remoteJournal.config.settingsTableName || remoteSettingsTableName;
+  await remoteJournalFetch(`/${encodeURIComponent(table)}?on_conflict=key`, {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
     body: JSON.stringify([{
@@ -5855,6 +5868,38 @@ function firestoreJournalBase() {
   };
 }
 
+function supabaseJournalBase() {
+  const { supabaseUrl, supabaseKey, tableName, settingsTableName } = state.remoteJournal.config;
+  return {
+    base: `${supabaseUrl}/rest/v1`,
+    key: supabaseKey,
+    table: tableName || remoteTableName,
+    settingsTable: settingsTableName || remoteSettingsTableName
+  };
+}
+
+async function remoteJournalFetch(path, options = {}) {
+  const config = state.remoteJournal.config;
+  if (config.provider !== "supabase") {
+    throw new Error("remoteJournalFetch доступен только для Supabase backend");
+  }
+  const { base, key } = supabaseJournalBase();
+  const headers = {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+    "Content-Type": "application/json",
+    ...(options.headers || {})
+  };
+  const response = await fetch(`${base}${path}`, { ...options, headers });
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`${response.status} ${text || "Supabase request failed"}`);
+  }
+  if (response.status === 204) return null;
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
+}
+
 function toFsValue(v) {
   if (v === null || v === undefined) return { nullValue: null };
   if (typeof v === "boolean") return { booleanValue: v };
@@ -5893,6 +5938,9 @@ function fromFsDoc(doc) {
 }
 
 async function pushRemoteJournalTrades() {
+  if (state.remoteJournal.config.provider === "supabase") {
+    return pushSupabaseJournalTrades();
+  }
   const { base, key } = firestoreJournalBase();
   const docs = state.paperTrades.map(compactPaperTradeForStorage).map((trade) => ({
     id: trade.id,
@@ -5925,7 +5973,35 @@ async function pushRemoteJournalTrades() {
   }
 }
 
+async function pushSupabaseJournalTrades() {
+  const { table } = supabaseJournalBase();
+  const docs = state.paperTrades.map(compactPaperTradeForStorage).map((trade) => ({
+    id: trade.id,
+    client_id: currentClientId,
+    session_id: trade.sessionId || null,
+    user_login: getTradeUserLogin(trade),
+    asset: trade.asset,
+    timeframe: trade.timeframe,
+    side: trade.side,
+    status: trade.status,
+    opened_at: toIsoOrNull(trade.openedAt),
+    closed_at: toIsoOrNull(trade.closedAt),
+    updated_at: toIsoOrNull(getTradeUpdatedAt(trade)),
+    pnl: Number(trade.pnl) || 0,
+    trade
+  }));
+  if (!docs.length) return;
+  await remoteJournalFetch(`/${encodeURIComponent(table)}?on_conflict=id`, {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify(docs)
+  });
+}
+
 async function fetchRemoteJournalTrades() {
+  if (state.remoteJournal.config.provider === "supabase") {
+    return fetchSupabaseJournalTrades();
+  }
   const { base, key } = firestoreJournalBase();
   const response = await fetch(`${base}:runQuery?key=${key}`, {
     method: "POST",
@@ -5951,10 +6027,20 @@ async function fetchRemoteJournalTrades() {
     .map(compactPaperTradeForStorage);
 }
 
+async function fetchSupabaseJournalTrades() {
+  const { table } = supabaseJournalBase();
+  const rows = await remoteJournalFetch(`/${encodeURIComponent(table)}?select=trade&order=updated_at.desc&limit=1200`);
+  return (Array.isArray(rows) ? rows : [])
+    .map((row) => row.trade)
+    .filter(Boolean)
+    .map(compactPaperTradeForStorage);
+}
+
 function getRemoteJournalErrorMessage(error) {
   const message = String(error?.message || error || "sync failed");
   if (message.includes("401") || message.includes("403")) return "ключ/права";
   if (message.includes("404")) return "проект не найден";
+  if (message.includes("429")) return "лимит backend";
   if (message.length > 44) return `${message.slice(0, 41)}...`;
   return message;
 }

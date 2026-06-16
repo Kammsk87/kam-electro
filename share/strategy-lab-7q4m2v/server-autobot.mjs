@@ -5,6 +5,11 @@ const firebaseProjectId = process.env.FIREBASE_PROJECT_ID || "";
 const firebaseApiKey = process.env.FIREBASE_API_KEY || "";
 const firestoreBase = `https://firestore.googleapis.com/v1/projects/${firebaseProjectId}/databases/(default)/documents`;
 const firestoreDocPath = `projects/${firebaseProjectId}/databases/(default)/documents`;
+const supabaseUrl = (process.env.SUPABASE_URL || "https://dcpenxsthdhvhhqgvgjq.supabase.co").replace(/\/$/, "");
+const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY || "sb_publishable_BYYOhjwhgjZBP27Yw7YkVg_CEhF6ugc";
+const supabaseTradesTable = process.env.BOTALIN_TRADES_TABLE || "crypto_strategy_trades";
+const supabaseSettingsTable = process.env.BOTALIN_SETTINGS_TABLE || "crypto_strategy_settings";
+const remoteBackend = process.env.BOTALIN_REMOTE_BACKEND || "supabase";
 const learningPolicyKey = "botalin_learning_policy_v1";
 const backtestPolicyKey = "botalin_backtest_policy_v1";
 const requestedProfile = getArgValue("--profile") || process.env.BOTALIN_SERVER_PROFILE || "balanced";
@@ -370,6 +375,17 @@ async function main() {
 }
 
 async function fetchRemoteRows() {
+  if (remoteBackend === "supabase") {
+    try {
+      const rows = await supabaseFetch(`/${encodeURIComponent(supabaseTradesTable)}?select=id,user_login,asset,timeframe,side,status,pnl,opened_at,closed_at,updated_at,trade&order=updated_at.desc&limit=1500`);
+      return (Array.isArray(rows) ? rows : []).map((row) => ({
+        ...row,
+        trade: normalizeTradeRow(row)
+      }));
+    } catch (err) {
+      log(`Supabase journal unavailable: ${err.message} — trying Firebase fallback`);
+    }
+  }
   let allRows = [];
   try {
     allRows = await firestoreQuery("trades", [], "updated_at", 1500);
@@ -446,6 +462,14 @@ async function upsertTrades(trades) {
     trade
   }));
   if (!docs.length) return;
+  if (remoteBackend === "supabase") {
+    await supabaseFetch(`/${encodeURIComponent(supabaseTradesTable)}?on_conflict=id`, {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify(docs)
+    });
+    return;
+  }
   const writes = docs.map((doc) => ({
     update: { name: `${firestoreDocPath}/trades/${doc.id}`, fields: toFirestoreFields(doc) }
   }));
@@ -454,6 +478,9 @@ async function upsertTrades(trades) {
 
 async function saveRejectedSignals(rejected, enteredCount) {
   if (!rejected.length) return;
+  if (remoteBackend === "supabase") {
+    return;
+  }
   const now = Date.now();
   const writes = rejected.slice(0, 40).map((c) => {
     const minScore = getStrategyMinScore(serverStrategies[c.strategyId] || serverStrategies.trend);
@@ -478,11 +505,27 @@ async function saveRejectedSignals(rejected, enteredCount) {
 }
 
 async function fetchSharedLearningPolicy() {
+  if (remoteBackend === "supabase") {
+    const rows = await supabaseFetch(`/${encodeURIComponent(supabaseSettingsTable)}?select=value&key=eq.${encodeURIComponent(learningPolicyKey)}&limit=1`);
+    return normalizeLearningPolicy(Array.isArray(rows) ? rows[0]?.value : null);
+  }
   const doc = await firestoreGet("settings", learningPolicyKey);
   return normalizeLearningPolicy(doc?.value ?? null);
 }
 
 async function saveSharedLearningPolicy(policy) {
+  if (remoteBackend === "supabase") {
+    await supabaseFetch(`/${encodeURIComponent(supabaseSettingsTable)}?on_conflict=key`, {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify([{
+        key: learningPolicyKey,
+        value: normalizeLearningPolicy(policy),
+        updated_at: new Date().toISOString()
+      }])
+    });
+    return;
+  }
   await firestoreSet("settings", learningPolicyKey, {
     key: learningPolicyKey,
     value: normalizeLearningPolicy(policy),
@@ -491,11 +534,17 @@ async function saveSharedLearningPolicy(policy) {
 }
 
 async function fetchBacktestPolicy() {
+  if (remoteBackend === "supabase") {
+    const rows = await supabaseFetch(`/${encodeURIComponent(supabaseSettingsTable)}?select=value&key=eq.${encodeURIComponent(backtestPolicyKey)}&limit=1`);
+    const value = Array.isArray(rows) ? rows[0]?.value : null;
+    return value ? normalizeLearningPolicy(value) : null;
+  }
   const doc = await firestoreGet("settings", backtestPolicyKey);
   return doc?.value ? normalizeLearningPolicy(doc.value) : null;
 }
 
 async function fetchRejectedSignalsPolicy() {
+  if (remoteBackend === "supabase") return null;
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   let rows;
   try {
@@ -538,6 +587,18 @@ async function fetchRejectedSignalsPolicy() {
 }
 
 async function saveBacktestPolicy(policy) {
+  if (remoteBackend === "supabase") {
+    await supabaseFetch(`/${encodeURIComponent(supabaseSettingsTable)}?on_conflict=key`, {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify([{
+        key: backtestPolicyKey,
+        value: normalizeLearningPolicy(policy),
+        updated_at: new Date().toISOString()
+      }])
+    });
+    return;
+  }
   await firestoreSet("settings", backtestPolicyKey, {
     key: backtestPolicyKey,
     value: normalizeLearningPolicy(policy),
@@ -611,6 +672,23 @@ async function retry429(fn, attempts = 3) {
     if (result.status !== 429 || i === attempts - 1) return result;
     await wait(400 * (i + 1) + Math.random() * 300);
   }
+}
+
+async function supabaseFetch(path, options = {}) {
+  const headers = {
+    apikey: supabaseKey,
+    Authorization: `Bearer ${supabaseKey}`,
+    "Content-Type": "application/json",
+    ...(options.headers || {})
+  };
+  const response = await fetchWithTimeout(`${supabaseUrl}/rest/v1${path}`, { ...options, headers }, 20_000);
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`Supabase ${response.status} ${text || response.statusText}`);
+  }
+  if (response.status === 204) return null;
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
 }
 
 async function firestoreGet(collection, docId) {
