@@ -1704,20 +1704,61 @@ function renderServerWalletReadout() {
 }
 
 const SERVER_BOTS = [
-  { login: "server",          label: "Все стратегии", color: "accent"  },
-  { login: "server-trend",    label: "Тренд EMA",     color: "blue"    },
-  { login: "server-pullback", label: "Откат",         color: "purple"  },
-  { login: "server-scalping", label: "Скальпинг",     color: "yellow"  },
-  { login: "server-rsi",      label: "RSI Разворот",  color: "teal"    },
-  { login: "server-breakout", label: "Пробой",        color: "orange"  },
-  { login: "server-vwap",     label: "VWAP Возврат",  color: "rose"    },
-  { login: "server-vps",      label: "VPS (все)",     color: "accent"  },
+  { login: "server",          strategy: "all",            label: "Все стратегии", color: "accent"  },
+  { login: "server-trend",    strategy: "trend",          label: "Тренд EMA",     color: "blue"    },
+  { login: "server-pullback", strategy: "pullback",       label: "Откат",         color: "purple"  },
+  { login: "server-scalping", strategy: "scalping",       label: "Скальпинг",     color: "yellow"  },
+  { login: "server-rsi",      strategy: "rsi-reversal",   label: "RSI Разворот",  color: "teal"    },
+  { login: "server-breakout", strategy: "breakout",       label: "Пробой",        color: "orange"  },
+  { login: "server-vwap",     strategy: "vwap-reversion", label: "VWAP Возврат",  color: "rose"    },
+  { login: "server-vps",      strategy: "vps",            label: "VPS (все)",     color: "accent"  },
 ];
 
-function getBotStats(userLogin) {
-  const trades = state.paperTrades.filter(
-    (t) => getTradeUserLogin(t) === userLogin || t.sessionId === "server-autobot" && userLogin === "server" && !["server-trend","server-pullback","server-scalping","server-rsi","server-breakout","server-vwap","server-vps"].includes(getTradeUserLogin(t))
+function isServerTrade(trade) {
+  const login = getTradeUserLogin(trade);
+  return login === "server" || login.startsWith("server-") || trade.sessionId === "server-autobot" || trade.modeSource === "server-auto" || trade.strategySnapshot?.execution?.modeSource === "server-auto";
+}
+
+function getServerStrategyId(trade) {
+  const explicit = String(
+    trade.serverStrategyId ||
+    trade.strategySnapshot?.execution?.serverStrategyId ||
+    trade.strategySnapshot?.context?.serverStrategyId ||
+    ""
   );
+  if (explicit) return explicit;
+  const login = getTradeUserLogin(trade);
+  if (login === "server-trend") return "trend";
+  if (login === "server-pullback") return "pullback";
+  if (login === "server-scalping") return "scalping";
+  if (login === "server-rsi") return "rsi-reversal";
+  if (login === "server-breakout") return "breakout";
+  if (login === "server-vwap") return "vwap-reversion";
+  if (login === "server-vps") return "vps";
+  const preset = String(trade.botPreset || trade.strategySnapshot?.execution?.botPreset || "");
+  if (preset.includes("pullback")) return "pullback";
+  if (preset.includes("scalping")) return "scalping";
+  if (preset.includes("rsi")) return "rsi-reversal";
+  if (preset.includes("breakout")) return "breakout";
+  if (preset.includes("vwap")) return "vwap-reversion";
+  if (preset.includes("trend")) return "trend";
+  const label = getServerStrategyLabel(trade).toLowerCase();
+  if (label.includes("откат") || label.includes("pullback")) return "pullback";
+  if (label.includes("скальп") || label.includes("scalping")) return "scalping";
+  if (label.includes("rsi")) return "rsi-reversal";
+  if (label.includes("пробой") || label.includes("breakout")) return "breakout";
+  if (label.includes("vwap")) return "vwap-reversion";
+  if (label.includes("ema") || label.includes("тренд")) return "trend";
+  return "unknown";
+}
+
+function getBotStats(bot) {
+  const trades = state.paperTrades.filter((trade) => {
+    if (bot.strategy === "vps") return getTradeUserLogin(trade) === "server-vps";
+    if (!isServerTrade(trade)) return false;
+    if (bot.strategy === "all") return getTradeUserLogin(trade) !== "server-vps";
+    return getServerStrategyId(trade) === bot.strategy;
+  });
   const active  = trades.filter(isPaperTradeActive);
   const closed  = trades.filter((t) => !isPaperTradeActive(t) && t.status !== "cancelled");
   const wins    = closed.filter((t) => (Number(t.pnl) || 0) > 0);
@@ -1749,8 +1790,9 @@ function formatAgo(trade) {
 
 function renderStrategyDashboard() {
   if (!botsGrid) return;
-  const html = SERVER_BOTS.map(({ login, label, color }) => {
-    const s = getBotStats(login);
+  const html = SERVER_BOTS.map((bot) => {
+    const { label, color } = bot;
+    const s = getBotStats(bot);
     const pnlClass = s.pnl > 0 ? "pos" : s.pnl < 0 ? "neg" : "";
     const badgeClass = s.pnl > 0 ? "strategy-card__badge--profit" : s.pnl < 0 ? "strategy-card__badge--loss" : "";
     const pnlStr = `${s.pnl >= 0 ? "+" : ""}${s.pnl.toFixed(2)} USDT`;
