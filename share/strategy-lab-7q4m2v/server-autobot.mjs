@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { createHmac } from "crypto";
+import { appendFile, mkdir, readFile, writeFile } from "fs/promises";
+import { dirname, resolve } from "path";
 
 const firebaseProjectId = process.env.FIREBASE_PROJECT_ID || "";
 const firebaseApiKey = process.env.FIREBASE_API_KEY || "";
@@ -10,6 +12,7 @@ const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY ||
 const supabaseTradesTable = process.env.BOTALIN_TRADES_TABLE || "crypto_strategy_trades";
 const supabaseSettingsTable = process.env.BOTALIN_SETTINGS_TABLE || "crypto_strategy_settings";
 const remoteBackend = process.env.BOTALIN_REMOTE_BACKEND || "supabase";
+const localJournalPath = process.env.BOTALIN_LOCAL_JOURNAL_PATH || resolve(process.cwd(), ".botalin", "server-journal.jsonl");
 const learningPolicyKey = "botalin_learning_policy_v1";
 const backtestPolicyKey = "botalin_backtest_policy_v1";
 const requestedProfile = getArgValue("--profile") || process.env.BOTALIN_SERVER_PROFILE || "balanced";
@@ -366,7 +369,11 @@ async function main() {
     return;
   }
 
-  if (toUpsert.length) await upsertTrades(toUpsert).catch((err) => log(`upsert skipped: ${err.message}`));
+  if (toUpsert.length) {
+    await upsertTrades(toUpsert).catch((err) => log(`upsert skipped: ${err.message}`));
+  } else {
+    await flushLocalJournalDocs().catch((err) => log(`local journal flush skipped: ${err.message}`));
+  }
   await saveSharedLearningPolicy(nextPolicy).catch((error) => log(`shared learning save skipped: ${error.message}`));
   const enteredSet = new Set(entryCandidates.map((c) => `${c.symbol}|${c.interval}|${c.side}|${c.strategyId}`));
   const rejected = candidates.filter((c) => !enteredSet.has(`${c.symbol}|${c.interval}|${c.side}|${c.strategyId}`));
@@ -388,10 +395,12 @@ async function fetchRemoteRows() {
       if (!hasAnySuccess) throw results.find((item) => item.status === "rejected")?.reason || new Error("Supabase journal unavailable");
       const activeRows = results[0].status === "fulfilled" ? results[0].value : [];
       const recentRows = results[1].status === "fulfilled" ? results[1].value : [];
+      const localRows = await readLocalJournalDocs();
       const byId = new Map();
-      [...(Array.isArray(activeRows) ? activeRows : []), ...(Array.isArray(recentRows) ? recentRows : [])].forEach((row) => {
+      [...(Array.isArray(activeRows) ? activeRows : []), ...(Array.isArray(recentRows) ? recentRows : []), ...localRows].forEach((row) => {
         if (row?.id) byId.set(row.id, row);
       });
+      if (localRows.length) log(`local journal merged: ${localRows.length} queued rows`);
       return [...byId.values()].map((row) => ({
         ...row,
         trade: normalizeTradeRow(row)
@@ -404,6 +413,14 @@ async function fetchRemoteRows() {
   try {
     allRows = await firestoreQuery("trades", [], "updated_at", 1500);
   } catch (err) {
+    const localRows = await readLocalJournalDocs();
+    if (localRows.length) {
+      log(`Firebase journal unavailable: ${err.message} — using local journal fallback ${localRows.length} rows`);
+      return localRows.map((row) => ({
+        ...row,
+        trade: normalizeTradeRow(row)
+      }));
+    }
     log(`Firebase journal unavailable: ${err.message} — continuing with empty journal`);
     return [];
   }
@@ -477,17 +494,95 @@ async function upsertTrades(trades) {
   }));
   if (!docs.length) return;
   if (remoteBackend === "supabase") {
-    await supabaseFetch(`/${encodeURIComponent(supabaseTradesTable)}?on_conflict=id`, {
-      method: "POST",
-      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-      body: JSON.stringify(docs)
-    });
+    const queuedDocs = await readLocalJournalDocs();
+    const docsToPost = dedupeJournalDocs([...queuedDocs, ...docs]);
+    try {
+      await postSupabaseTradeDocs(docsToPost);
+      if (queuedDocs.length) {
+        await writeLocalJournalDocs([]);
+        log(`local journal flushed: ${queuedDocs.length} queued rows`);
+      }
+    } catch (error) {
+      await appendLocalJournalDocs(docs);
+      throw error;
+    }
     return;
   }
   const writes = docs.map((doc) => ({
     update: { name: `${firestoreDocPath}/trades/${doc.id}`, fields: toFirestoreFields(doc) }
   }));
   await firestoreBatch(writes);
+}
+
+async function postSupabaseTradeDocs(docs) {
+  if (!docs.length) return;
+  await supabaseFetch(`/${encodeURIComponent(supabaseTradesTable)}?on_conflict=id`, {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify(docs)
+  });
+}
+
+async function flushLocalJournalDocs() {
+  if (remoteBackend !== "supabase") return;
+  const docs = await readLocalJournalDocs();
+  if (!docs.length) return;
+  await postSupabaseTradeDocs(docs);
+  await writeLocalJournalDocs([]);
+  log(`local journal flushed: ${docs.length} queued rows`);
+}
+
+async function readLocalJournalDocs() {
+  try {
+    const text = await readFile(localJournalPath, "utf8");
+    const docs = text
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        try {
+          return JSON.parse(line);
+        } catch {
+          return null;
+        }
+      })
+      .filter((row) => row?.id && row.trade && typeof row.trade === "object");
+    return dedupeJournalDocs(docs);
+  } catch (error) {
+    if (error?.code === "ENOENT") return [];
+    throw error;
+  }
+}
+
+async function appendLocalJournalDocs(docs) {
+  const rows = dedupeJournalDocs(docs).filter((row) => row?.id);
+  if (!rows.length) return;
+  await mkdir(dirname(localJournalPath), { recursive: true });
+  await appendFile(localJournalPath, `${rows.map((row) => JSON.stringify(row)).join("\n")}\n`, "utf8");
+  log(`local journal queued: ${rows.length} rows at ${localJournalPath}`);
+}
+
+async function writeLocalJournalDocs(docs) {
+  await mkdir(dirname(localJournalPath), { recursive: true });
+  const rows = dedupeJournalDocs(docs).filter((row) => row?.id);
+  const body = rows.length ? `${rows.map((row) => JSON.stringify(row)).join("\n")}\n` : "";
+  await writeFile(localJournalPath, body, "utf8");
+}
+
+function dedupeJournalDocs(docs) {
+  const byId = new Map();
+  docs.forEach((doc) => {
+    if (!doc?.id) return;
+    const existing = byId.get(doc.id);
+    if (!existing || getJournalDocTime(doc) >= getJournalDocTime(existing)) {
+      byId.set(doc.id, doc);
+    }
+  });
+  return [...byId.values()];
+}
+
+function getJournalDocTime(doc) {
+  return Date.parse(doc.updated_at || doc.closed_at || doc.opened_at || "") || Number(doc.trade?.updatedAt || doc.trade?.closedAt || doc.trade?.openedAt) || 0;
 }
 
 async function saveRejectedSignals(rejected, enteredCount) {

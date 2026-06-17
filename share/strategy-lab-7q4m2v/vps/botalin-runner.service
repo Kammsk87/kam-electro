@@ -12,6 +12,7 @@ Environment=BOTALIN_RUNNER_INTERVAL_SEC=180
 Environment=BOTALIN_RUNNER_STAGGER_SEC=20
 Environment=BOTALIN_RUNNER_HEALTH_EVERY=5
 Environment=BOTALIN_RUNNER_STRATEGIES=trend,pullback,scalping,rsi-reversal,breakout,vwap-reversion
+Environment=BOTALIN_LOCAL_JOURNAL_PATH=/opt/botalin/.botalin/server-journal.jsonl
 ExecStartPre=/bin/sh -c '/usr/bin/flock -w 30 /opt/botalin/.git/update.lock /usr/bin/git -C /opt/botalin pull --ff-only --quiet || true'
 ExecStart=/usr/bin/node /opt/botalin/share/strategy-lab-7q4m2v/server-runner.mjs
 Restart=always
