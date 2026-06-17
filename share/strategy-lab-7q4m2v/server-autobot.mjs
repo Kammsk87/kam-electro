@@ -13,6 +13,11 @@ const supabaseTradesTable = process.env.BOTALIN_TRADES_TABLE || "crypto_strategy
 const supabaseSettingsTable = process.env.BOTALIN_SETTINGS_TABLE || "crypto_strategy_settings";
 const remoteBackend = process.env.BOTALIN_REMOTE_BACKEND || "supabase";
 const localJournalPath = process.env.BOTALIN_LOCAL_JOURNAL_PATH || resolve(process.cwd(), ".botalin", "server-journal.jsonl");
+const firestoreFallbackCachePath = process.env.BOTALIN_FIRESTORE_CACHE_PATH || resolve(process.cwd(), ".botalin", "firestore-fallback-cache.json");
+// Each strategy is a separate short-lived process spawned ~20s apart within one runner
+// cycle. During a Supabase outage every one of them would otherwise hit the Firestore
+// quota independently — sharing one read across the cycle cuts that ~7x.
+const firestoreFallbackCacheTtlMs = 150_000;
 const learningPolicyKey = "botalin_learning_policy_v1";
 const backtestPolicyKey = "botalin_backtest_policy_v1";
 const requestedProfile = getArgValue("--profile") || process.env.BOTALIN_SERVER_PROFILE || "balanced";
@@ -409,9 +414,15 @@ async function fetchRemoteRows() {
       log(`Supabase journal unavailable: ${err.message} — trying Firebase fallback`);
     }
   }
+  const cachedRows = await readFirestoreFallbackCache();
+  if (cachedRows) {
+    log(`Firestore fallback cache hit: ${cachedRows.length} rows (saved a Firestore read)`);
+    return cachedRows.map((row) => ({ ...row, trade: normalizeTradeRow(row) }));
+  }
   let allRows = [];
   try {
-    allRows = await firestoreQuery("trades", [], "updated_at", 1500);
+    allRows = await firestoreQuery("trades", [], "updated_at", 600);
+    await writeFirestoreFallbackCache(allRows);
   } catch (err) {
     const localRows = await readLocalJournalDocs();
     if (localRows.length) {
@@ -567,6 +578,24 @@ async function writeLocalJournalDocs(docs) {
   const rows = dedupeJournalDocs(docs).filter((row) => row?.id);
   const body = rows.length ? `${rows.map((row) => JSON.stringify(row)).join("\n")}\n` : "";
   await writeFile(localJournalPath, body, "utf8");
+}
+
+async function readFirestoreFallbackCache() {
+  try {
+    const text = await readFile(firestoreFallbackCachePath, "utf8");
+    const { fetchedAt, rows } = JSON.parse(text);
+    if (!Array.isArray(rows) || Date.now() - Number(fetchedAt) > firestoreFallbackCacheTtlMs) return null;
+    return rows;
+  } catch {
+    return null;
+  }
+}
+
+async function writeFirestoreFallbackCache(rows) {
+  try {
+    await mkdir(dirname(firestoreFallbackCachePath), { recursive: true });
+    await writeFile(firestoreFallbackCachePath, JSON.stringify({ fetchedAt: Date.now(), rows }), "utf8");
+  } catch {}
 }
 
 function dedupeJournalDocs(docs) {
