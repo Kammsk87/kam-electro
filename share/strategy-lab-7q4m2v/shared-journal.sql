@@ -26,6 +26,16 @@ alter table public.crypto_strategy_trades
 create index if not exists crypto_strategy_trades_user_login_idx
   on public.crypto_strategy_trades (user_login);
 
+create index if not exists crypto_strategy_trades_user_updated_idx
+  on public.crypto_strategy_trades (user_login, updated_at desc);
+
+create index if not exists crypto_strategy_trades_status_updated_idx
+  on public.crypto_strategy_trades (status, updated_at desc);
+
+create index if not exists crypto_strategy_trades_active_updated_idx
+  on public.crypto_strategy_trades (updated_at desc)
+  where status in ('pending', 'open', 'partial');
+
 create table if not exists public.crypto_strategy_settings (
   key text primary key,
   value jsonb not null,

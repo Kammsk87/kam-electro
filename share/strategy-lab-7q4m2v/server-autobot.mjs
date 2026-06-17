@@ -377,8 +377,22 @@ async function main() {
 async function fetchRemoteRows() {
   if (remoteBackend === "supabase") {
     try {
-      const rows = await supabaseFetch(`/${encodeURIComponent(supabaseTradesTable)}?select=id,user_login,asset,timeframe,side,status,pnl,opened_at,closed_at,updated_at,trade&order=updated_at.desc&limit=1500`);
-      return (Array.isArray(rows) ? rows : []).map((row) => ({
+      const select = "id,user_login,asset,timeframe,side,status,pnl,opened_at,closed_at,updated_at,trade";
+      const activePath = `/${encodeURIComponent(supabaseTradesTable)}?select=${select}&status=in.(pending,open,partial)&order=updated_at.desc&limit=300`;
+      const recentPath = `/${encodeURIComponent(supabaseTradesTable)}?select=${select}&order=updated_at.desc&limit=600`;
+      const results = await Promise.allSettled([
+        supabaseFetch(activePath, { timeoutMs: 10_000 }),
+        supabaseFetch(recentPath, { timeoutMs: 12_000 })
+      ]);
+      const hasAnySuccess = results.some((item) => item.status === "fulfilled");
+      if (!hasAnySuccess) throw results.find((item) => item.status === "rejected")?.reason || new Error("Supabase journal unavailable");
+      const activeRows = results[0].status === "fulfilled" ? results[0].value : [];
+      const recentRows = results[1].status === "fulfilled" ? results[1].value : [];
+      const byId = new Map();
+      [...(Array.isArray(activeRows) ? activeRows : []), ...(Array.isArray(recentRows) ? recentRows : [])].forEach((row) => {
+        if (row?.id) byId.set(row.id, row);
+      });
+      return [...byId.values()].map((row) => ({
         ...row,
         trade: normalizeTradeRow(row)
       }));
@@ -675,13 +689,14 @@ async function retry429(fn, attempts = 3) {
 }
 
 async function supabaseFetch(path, options = {}) {
+  const { timeoutMs = 12_000, ...fetchOptions } = options;
   const headers = {
     apikey: supabaseKey,
     Authorization: `Bearer ${supabaseKey}`,
     "Content-Type": "application/json",
-    ...(options.headers || {})
+    ...(fetchOptions.headers || {})
   };
-  const response = await fetchWithTimeout(`${supabaseUrl}/rest/v1${path}`, { ...options, headers }, 20_000);
+  const response = await fetchWithTimeout(`${supabaseUrl}/rest/v1${path}`, { ...fetchOptions, headers }, timeoutMs);
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     throw new Error(`Supabase ${response.status} ${text || response.statusText}`);

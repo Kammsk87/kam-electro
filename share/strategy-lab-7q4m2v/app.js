@@ -5,6 +5,7 @@ const depositKey = "crypto-strategy-bot-deposit-v1";
 const autopilotKey = "crypto-strategy-bot-autopilot-v1";
 const learningPolicyKey = "crypto-strategy-bot-learning-policy-v1";
 const remoteJournalConfigKey = "crypto-strategy-bot-remote-journal-v1";
+const remoteJournalSyncStateKey = "crypto-strategy-bot-remote-sync-state-v1";
 const remoteClientIdKey = "crypto-strategy-bot-client-id";
 const remoteTableName = "crypto_strategy_trades";
 const remoteSettingsTableName = "crypto_strategy_settings";
@@ -508,6 +509,27 @@ function isRemoteJournalConfigFilled(config) {
   return Boolean(config?.projectId && config?.apiKey);
 }
 
+function loadRemoteJournalSyncState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(remoteJournalSyncStateKey));
+    return {
+      lastPushWatermark: Number(saved?.lastPushWatermark) || 0,
+      backoffUntil: Number(saved?.backoffUntil) || 0,
+      consecutiveFailures: Number(saved?.consecutiveFailures) || 0
+    };
+  } catch (error) {
+    return { lastPushWatermark: 0, backoffUntil: 0, consecutiveFailures: 0 };
+  }
+}
+
+function saveRemoteJournalSyncState() {
+  localStorage.setItem(remoteJournalSyncStateKey, JSON.stringify({
+    lastPushWatermark: Number(state.remoteJournal.lastPushWatermark) || 0,
+    backoffUntil: Number(state.remoteJournal.backoffUntil) || 0,
+    consecutiveFailures: Number(state.remoteJournal.consecutiveFailures) || 0
+  }));
+}
+
 function loadCmcRadarConfig() {
   const sharedConfig = normalizeCmcRadarConfig(window.BOTALIN_MARKET_RADAR_CONFIG);
   try {
@@ -683,7 +705,8 @@ const state = {
     config: loadRemoteJournalConfig(),
     syncing: false,
     lastSyncAt: 0,
-    status: "local"
+    status: "local",
+    ...loadRemoteJournalSyncState()
   },
   cmcRadar: {
     config: loadCmcRadarConfig(),
@@ -5968,26 +5991,50 @@ async function syncRemoteJournal(force = false) {
     return;
   }
   if (state.remoteJournal.syncing) return;
+  if (!force && state.remoteJournal.backoffUntil && Date.now() < state.remoteJournal.backoffUntil) {
+    const sec = Math.ceil((state.remoteJournal.backoffUntil - Date.now()) / 1000);
+    setRemoteJournalStatus(`pause ${sec}s`);
+    renderRemoteJournalStatus();
+    return;
+  }
   if (!force && Date.now() - state.remoteJournal.lastSyncAt < 12000) return;
 
   state.remoteJournal.syncing = true;
   setRemoteJournalStatus("sync");
   try {
-    await pushRemoteJournalTrades();
+    await pushRemoteJournalTrades(force);
     const remoteTrades = await fetchRemoteJournalTrades();
     mergeRemoteJournalTrades(remoteTrades);
     state.remoteJournal.lastSyncAt = Date.now();
+    markRemoteJournalSuccess();
     setRemoteJournalStatus(`shared ${state.paperTrades.length}`);
     state.paperTrades = state.paperTrades.map(compactPaperTradeForStorage);
     localStorage.setItem(paperJournalKey, JSON.stringify({ trades: state.paperTrades }));
     renderTradeJournal();
     updatePaperTrades();
   } catch (error) {
+    markRemoteJournalFailure(error);
     setRemoteJournalStatus(`error: ${getRemoteJournalErrorMessage(error)}`);
     console.warn("Remote journal sync failed", error);
   } finally {
     state.remoteJournal.syncing = false;
   }
+}
+
+function markRemoteJournalSuccess() {
+  state.remoteJournal.consecutiveFailures = 0;
+  state.remoteJournal.backoffUntil = 0;
+  saveRemoteJournalSyncState();
+}
+
+function markRemoteJournalFailure(error) {
+  const message = String(error?.message || error || "");
+  const failures = Math.min(8, (Number(state.remoteJournal.consecutiveFailures) || 0) + 1);
+  const baseMs = message.includes("522") || message.includes("timeout") ? 120_000 : 20_000;
+  const delayMs = Math.min(10 * 60_000, baseMs * Math.max(1, failures));
+  state.remoteJournal.consecutiveFailures = failures;
+  state.remoteJournal.backoffUntil = Date.now() + delayMs;
+  saveRemoteJournalSyncState();
 }
 
 function firestoreJournalBase() {
@@ -6014,13 +6061,24 @@ async function remoteJournalFetch(path, options = {}) {
     throw new Error("remoteJournalFetch доступен только для Supabase backend");
   }
   const { base, key } = supabaseJournalBase();
+  const { timeoutMs = 12_000, ...fetchOptions } = options;
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
   const headers = {
     apikey: key,
     Authorization: `Bearer ${key}`,
     "Content-Type": "application/json",
-    ...(options.headers || {})
+    ...(fetchOptions.headers || {})
   };
-  const response = await fetch(`${base}${path}`, { ...options, headers });
+  let response;
+  try {
+    response = await fetch(`${base}${path}`, { ...fetchOptions, headers, signal: controller.signal });
+  } catch (error) {
+    if (error?.name === "AbortError") throw new Error("Supabase timeout");
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
+  }
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     throw new Error(`${response.status} ${text || "Supabase request failed"}`);
@@ -6067,12 +6125,35 @@ function fromFsDoc(doc) {
   return result;
 }
 
-async function pushRemoteJournalTrades() {
+function getRemoteTradesDelta(force = false) {
+  const watermark = Number(state.remoteJournal.lastPushWatermark) || 0;
+  const recentWindow = force ? 24 * 60 * 60 * 1000 : 6 * 60 * 60 * 1000;
+  const recentSince = Date.now() - recentWindow;
+  const sorted = state.paperTrades
+    .map(compactPaperTradeForStorage)
+    .sort((a, b) => getTradeUpdatedAt(b) - getTradeUpdatedAt(a));
+  const delta = sorted.filter((trade) => {
+    const updatedAt = getTradeUpdatedAt(trade);
+    return isPaperTradeActive(trade) || updatedAt > watermark || updatedAt >= recentSince;
+  });
+  return (delta.length ? delta : sorted.slice(0, 5)).slice(0, force ? 300 : 180);
+}
+
+function updateRemotePushWatermark(trades) {
+  const maxUpdatedAt = trades.reduce((max, trade) => Math.max(max, getTradeUpdatedAt(trade)), Number(state.remoteJournal.lastPushWatermark) || 0);
+  if (maxUpdatedAt > (Number(state.remoteJournal.lastPushWatermark) || 0)) {
+    state.remoteJournal.lastPushWatermark = maxUpdatedAt;
+    saveRemoteJournalSyncState();
+  }
+}
+
+async function pushRemoteJournalTrades(force = false) {
   if (state.remoteJournal.config.provider === "supabase") {
-    return pushSupabaseJournalTrades();
+    return pushSupabaseJournalTrades(force);
   }
   const { base, key } = firestoreJournalBase();
-  const docs = state.paperTrades.map(compactPaperTradeForStorage).map((trade) => ({
+  const tradesToPush = getRemoteTradesDelta(force);
+  const docs = tradesToPush.map(compactPaperTradeForStorage).map((trade) => ({
     id: trade.id,
     client_id: currentClientId,
     session_id: trade.sessionId || null,
@@ -6101,11 +6182,13 @@ async function pushRemoteJournalTrades() {
     const text = await response.text().catch(() => "");
     throw new Error(`${response.status} ${text || "Firebase batchWrite failed"}`);
   }
+  updateRemotePushWatermark(tradesToPush);
 }
 
-async function pushSupabaseJournalTrades() {
+async function pushSupabaseJournalTrades(force = false) {
   const { table } = supabaseJournalBase();
-  const docs = state.paperTrades.map(compactPaperTradeForStorage).map((trade) => ({
+  const tradesToPush = getRemoteTradesDelta(force);
+  const docs = tradesToPush.map(compactPaperTradeForStorage).map((trade) => ({
     id: trade.id,
     client_id: currentClientId,
     session_id: trade.sessionId || null,
@@ -6124,8 +6207,10 @@ async function pushSupabaseJournalTrades() {
   await remoteJournalFetch(`/${encodeURIComponent(table)}?on_conflict=id`, {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    timeoutMs: 10_000,
     body: JSON.stringify(docs)
   });
+  updateRemotePushWatermark(tradesToPush);
 }
 
 async function fetchRemoteJournalTrades() {
@@ -6159,9 +6244,24 @@ async function fetchRemoteJournalTrades() {
 
 async function fetchSupabaseJournalTrades() {
   const { table } = supabaseJournalBase();
-  const rows = await remoteJournalFetch(`/${encodeURIComponent(table)}?select=trade&order=updated_at.desc&limit=1200`);
-  return (Array.isArray(rows) ? rows : [])
-    .map((row) => row.trade)
+  const activePath = `/${encodeURIComponent(table)}?select=trade&status=in.(pending,open,partial)&order=updated_at.desc&limit=250`;
+  const recentPath = `/${encodeURIComponent(table)}?select=trade&order=updated_at.desc&limit=350`;
+  const results = await Promise.allSettled([
+    remoteJournalFetch(activePath, { timeoutMs: 9_000 }),
+    remoteJournalFetch(recentPath, { timeoutMs: 10_000 })
+  ]);
+  const hasAnySuccess = results.some((item) => item.status === "fulfilled");
+  const activeRows = results[0].status === "fulfilled" ? results[0].value : [];
+  const recentRows = results[1].status === "fulfilled" ? results[1].value : [];
+  if (!hasAnySuccess) {
+    throw results.find((item) => item.status === "rejected")?.reason || new Error("Supabase journal unavailable");
+  }
+  const byId = new Map();
+  [...(Array.isArray(activeRows) ? activeRows : []), ...(Array.isArray(recentRows) ? recentRows : [])].forEach((row) => {
+    const trade = row?.trade;
+    if (trade?.id) byId.set(trade.id, trade);
+  });
+  return [...byId.values()]
     .filter(Boolean)
     .map(compactPaperTradeForStorage);
 }
@@ -6171,6 +6271,8 @@ function getRemoteJournalErrorMessage(error) {
   if (message.includes("401") || message.includes("403")) return "ключ/права";
   if (message.includes("404")) return "проект не найден";
   if (message.includes("429")) return "лимит backend";
+  if (message.includes("522")) return "Supabase 522: проект не отвечает";
+  if (message.toLowerCase().includes("timeout")) return "Supabase timeout";
   if (message.length > 44) return `${message.slice(0, 41)}...`;
   return message;
 }
