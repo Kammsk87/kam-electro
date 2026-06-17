@@ -1517,7 +1517,9 @@ async function fetchFundingIntel(symbol) {
 
 async function fetchOpenInterestIntel(symbol) {
   const bybitSymbol = toBybitSymbol(symbol);
-  const response = await fetchWithTimeout(`https://api.bybit.com/v5/market/open-interest?category=linear&symbol=${bybitSymbol}&intervalTime=15min&limit=2`, {}, 6_000);
+  // 1h window: real OI moves are typically 0.01-0.2% over 15min (the breakout score
+  // thresholds of 0.35/1/2.5% never fire at that window) but spread -0.7%..+1.4% over 1h.
+  const response = await fetchWithTimeout(`https://api.bybit.com/v5/market/open-interest?category=linear&symbol=${bybitSymbol}&intervalTime=1h&limit=2`, {}, 6_000);
   if (!response.ok) throw new Error(`open interest ${response.status}`);
   const data = await response.json();
   if (data.retCode !== 0) throw new Error(data.retMsg || "open interest failed");
