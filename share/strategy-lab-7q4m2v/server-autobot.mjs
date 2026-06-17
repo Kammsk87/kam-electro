@@ -1997,11 +1997,23 @@ async function fetchCandlesBybit(symbol, interval, limit = 220, start = null, en
   }));
 }
 
+// Symbols not listed on OKX spot (e.g. delisted/renamed) — skip OKX and go straight
+// to Bybit instead of re-trying a request that always fails with code 51001.
+const okxUnavailableSymbols = new Set();
+
 async function fetchCandles(symbol, interval, limit = 220, start = null) {
+  if (okxUnavailableSymbols.has(symbol)) {
+    return await fetchCandlesBybit(symbol, interval, limit, start);
+  }
   try {
     return await fetchCandlesOkx(symbol, interval, limit, start);
   } catch (err) {
-    log(`OKX candles failed (${err.message}), trying Bybit`);
+    if (/51001/.test(err.message)) {
+      okxUnavailableSymbols.add(symbol);
+      log(`OKX: ${symbol} not listed, using Bybit for this run onward`);
+    } else {
+      log(`OKX candles failed (${err.message}), trying Bybit`);
+    }
     return await fetchCandlesBybit(symbol, interval, limit, start);
   }
 }
