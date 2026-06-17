@@ -942,6 +942,16 @@ function selectEntryCandidates(candidates, trades) {
   return selected;
 }
 
+// Режим рынка: 8 корзин (тренд/флэт × вверх/вниз × выс./низк. волатильность)
+// Используется для Этапа 1 режимного роутера — пока только тегирование сделок,
+// без влияния на отбор сигналов.
+function classifyMarketRegime(adx, slopePct, atrPct) {
+  const trending = Number.isFinite(adx) && adx >= 22;
+  const up = slopePct >= 0;
+  const highVol = atrPct >= 1.0;
+  return `${trending ? "trending" : "ranging"}-${up ? "up" : "down"}-${highVol ? "highvol" : "lowvol"}`;
+}
+
 function evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend = "NEUTRAL", goldSentiment = "NEUTRAL", externalFilters = {}) {
   const scalping = strategy.kind === "scalping";
   const closes = candles.map((candle) => candle.close);
@@ -1157,6 +1167,7 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
     atrPct,
     volumeRatio,
     slopePct,
+    regime: classifyMarketRegime(adx, slopePct, atrPct),
     mtf,
     funding,
     fearGreed,
@@ -1602,6 +1613,7 @@ async function buildServerTrade(candidate, trades) {
     result: candidate.scalping ? "server: позиция открыта моментально" : "server: ордер ожидает вход",
     decision: candidate.reason,
     score: candidate.score,
+    regimeAtEntry: candidate.regime || null,
     strategySnapshot: buildStrategySnapshot(candidate, amount),
     lastCheckedAt: now,
     exitPrice: null,
