@@ -1823,26 +1823,28 @@ function buildStrategySnapshot(candidate, amount) {
 }
 
 async function fetchLivePrice(symbol) {
-  // Try OKX first (accessible from GitHub Actions)
-  try {
-    const params = new URLSearchParams({ instId: toOkxSymbol(symbol) });
-    const response = await fetchWithTimeout(`https://www.okx.com/api/v5/market/ticker?${params.toString()}`, {}, 4_000);
-    if (!response.ok) throw new Error(`OKX ticker ${response.status}`);
-    const data = await response.json();
-    const price = Number(data.data?.[0]?.last);
-    if (!price || !Number.isFinite(price)) throw new Error("no price");
-    return price;
-  } catch {
-    // Fallback to Bybit
-    const params = new URLSearchParams({ category: "spot", symbol: toBybitSymbol(symbol) });
-    const response = await fetchWithTimeout(`https://api.bybit.com/v5/market/tickers?${params.toString()}`, {}, 4_000);
-    if (!response.ok) throw new Error(`ticker ${response.status}`);
-    const data = await response.json();
-    if (data.retCode !== 0) throw new Error(data.retMsg || "ticker failed");
-    const price = Number(data.result?.list?.[0]?.lastPrice);
-    if (!price || !Number.isFinite(price)) throw new Error("no price");
-    return price;
+  // Try OKX first (accessible from GitHub Actions), unless known unlisted there.
+  if (!okxUnavailableSymbols.has(symbol)) {
+    try {
+      const params = new URLSearchParams({ instId: toOkxSymbol(symbol) });
+      const response = await fetchWithTimeout(`https://www.okx.com/api/v5/market/ticker?${params.toString()}`, {}, 4_000);
+      if (!response.ok) throw new Error(`OKX ticker ${response.status}`);
+      const data = await response.json();
+      const price = Number(data.data?.[0]?.last);
+      if (!price || !Number.isFinite(price)) throw new Error("no price");
+      return price;
+    } catch {
+      // Fall through to Bybit
+    }
   }
+  const params = new URLSearchParams({ category: "spot", symbol: toBybitSymbol(symbol) });
+  const response = await fetchWithTimeout(`https://api.bybit.com/v5/market/tickers?${params.toString()}`, {}, 4_000);
+  if (!response.ok) throw new Error(`ticker ${response.status}`);
+  const data = await response.json();
+  if (data.retCode !== 0) throw new Error(data.retMsg || "ticker failed");
+  const price = Number(data.result?.list?.[0]?.lastPrice);
+  if (!price || !Number.isFinite(price)) throw new Error("no price");
+  return price;
 }
 
 const okxIntervals = { "1m": "1m", "3m": "3m", "5m": "5m", "15m": "15m", "30m": "30m", "1h": "1H", "4h": "4H", "1d": "1D" };
@@ -1997,9 +1999,10 @@ async function fetchCandlesBybit(symbol, interval, limit = 220, start = null, en
   }));
 }
 
-// Symbols not listed on OKX spot (e.g. delisted/renamed) — skip OKX and go straight
-// to Bybit instead of re-trying a request that always fails with code 51001.
-const okxUnavailableSymbols = new Set();
+// Watchlist symbols not listed on OKX spot (error 51001 "instrument doesn't exist").
+// Each strategy run is a short-lived `--once` process, so an in-memory cache built
+// at runtime would reset every cycle — this list must be static instead.
+const okxUnavailableSymbols = new Set(["TON/USDT", "MATIC/USDT", "TWT/USDT", "RUNE/USDT", "VET/USDT", "MKR/USDT", "XAG/USDT"]);
 
 async function fetchCandles(symbol, interval, limit = 220, start = null) {
   if (okxUnavailableSymbols.has(symbol)) {
@@ -2008,12 +2011,7 @@ async function fetchCandles(symbol, interval, limit = 220, start = null) {
   try {
     return await fetchCandlesOkx(symbol, interval, limit, start);
   } catch (err) {
-    if (/51001/.test(err.message)) {
-      okxUnavailableSymbols.add(symbol);
-      log(`OKX: ${symbol} not listed, using Bybit for this run onward`);
-    } else {
-      log(`OKX candles failed (${err.message}), trying Bybit`);
-    }
+    log(`OKX candles failed (${err.message}), trying Bybit`);
     return await fetchCandlesBybit(symbol, interval, limit, start);
   }
 }
