@@ -92,6 +92,10 @@ const serverProfiles = {
     minTradesBeforeBlock: 20,
     dailyStopLimit: 100,
     dailyLossPctLimit: 50,
+    // RSI extremes loosened from the default 28/72 — at 28/72 this strategy produced
+    // ~1 trade/day (24h log), ~100 days to reach the 100-closed-trades checkpoint.
+    rsiReversalLow: 35,
+    rsiReversalHigh: 65,
     strategyMaxEntriesPerRun: { trend: 5, pullback: 5, scalping: 6, "rsi-reversal": 5, breakout: 5, "vwap-reversion": 5 }
   },
   real: {
@@ -253,6 +257,8 @@ const config = {
   minExpectedNetPct: activeProfile.minExpectedNetPct,
   minScalpingExpectedNetPct: activeProfile.minScalpingExpectedNetPct,
   blockedAssetMode: activeProfile.blockedAssetMode,
+  rsiReversalLow: activeProfile.rsiReversalLow ?? 28,
+  rsiReversalHigh: activeProfile.rsiReversalHigh ?? 72,
   maxActivePerAsset: 2,
   // XAUT/XAG не торгуются, но используются как риск-сентимент индикаторы (см. getGoldSentiment)
   sentimentAssets: ["XAUT/USDT", "XAG/USDT"],
@@ -1111,8 +1117,8 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
   // Determine trade direction — EMA-based for standard strategies; signal-based for reversal/breakout
   let side;
   if (strategy.kind === "rsi-reversal") {
-    if (rsi < 28) side = "LONG";
-    else if (rsi > 72) side = "SHORT";
+    if (rsi < config.rsiReversalLow) side = "LONG";
+    else if (rsi > config.rsiReversalHigh) side = "SHORT";
     else return null;
   } else if (strategy.kind === "breakout") {
     side = getBreakoutSide(candles);
