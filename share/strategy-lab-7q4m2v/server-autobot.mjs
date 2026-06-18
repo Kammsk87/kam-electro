@@ -2730,6 +2730,11 @@ function formatRemoteError(status, text) {
 async function runBacktest() {
   log("=== BACKTEST MODE (6 months) ===");
   const results = [];
+  // Live trading only ever enters the single highest-scoring candidate per cycle
+  // (selectEntryCandidates), while this backtest counts every bar that merely clears
+  // minScore. Bucketing by score lets us check whether picking the best-of-best (as
+  // live does) is what produces edge, rather than minScore alone.
+  const signalsByStrategy = {};
   const backtestAssets = config.assets;
   const minScore = config.minScore;
   const feeRoundTrip = (config.feePct + config.slippagePct) * 2;
@@ -2806,6 +2811,7 @@ async function runBacktest() {
           const direction = side === "LONG" ? 1 : -1;
           const pnlPct = entry > 0 ? ((exitPrice - entry) / entry) * direction * 100 - feeRoundTrip : 0;
           signals.push({ outcome, pnlPct, score: candidate.score });
+          (signalsByStrategy[strategy.id] ||= []).push({ score: candidate.score, pnlPct });
         }
 
         if (signals.length >= 3) {
@@ -2840,6 +2846,26 @@ async function runBacktest() {
     const avgPnl = rows.reduce((a, r) => a + r.avgPnlPct, 0) / rows.length;
     log(`[${stratId}] ${rows.length} pairs, ${totalSignals} signals, WR ${avgWr.toFixed(0)}%, avgPnl ${avgPnl.toFixed(3)}%/trade`);
     rows.slice(0, 5).forEach((r) => log(`  ${r.symbol} ${r.interval}: ${r.signals}× WR${r.winRate}% avg${r.avgPnlPct}%`));
+  }
+
+  // Does picking only the highest-scoring signals (as live's selectEntryCandidates
+  // does) actually produce better edge than the minScore floor alone?
+  const scoreBands = [
+    { label: "<60", test: (s) => s < 60 },
+    { label: "60-69", test: (s) => s >= 60 && s < 70 },
+    { label: "70-79", test: (s) => s >= 70 && s < 80 },
+    { label: "80-89", test: (s) => s >= 80 && s < 90 },
+    { label: "90+", test: (s) => s >= 90 }
+  ];
+  for (const [stratId, signals] of Object.entries(signalsByStrategy)) {
+    log(`[${stratId}] score bands:`);
+    for (const band of scoreBands) {
+      const inBand = signals.filter((s) => band.test(s.score));
+      if (!inBand.length) continue;
+      const wins = inBand.filter((s) => s.pnlPct > 0);
+      const avgPnl = inBand.reduce((a, s) => a + s.pnlPct, 0) / inBand.length;
+      log(`  score ${band.label}: ${inBand.length}× WR${Math.round(wins.length / inBand.length * 100)}% avg${avgPnl.toFixed(3)}%`);
+    }
   }
 
   log(JSON.stringify({ backtestResults: results, summary: Object.fromEntries(Object.entries(byStrategy).map(([k, rows]) => [k, {
