@@ -26,6 +26,8 @@ jobs:
           BOTALIN_SERVER_PROFILE: training
           FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
           FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           BOTALIN_STRATEGY: ${{ inputs.strategy || 'all' }}
           BOTALIN_USER_LOGIN: backtest
         run: node share/strategy-lab-7q4m2v/server-autobot.mjs --backtest
