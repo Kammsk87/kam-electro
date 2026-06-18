@@ -195,6 +195,10 @@ const serverStrategies = {
 const enabledStrategies = Object.values(serverStrategies).filter(
   (strategy) => strategy.enabled && (requestedStrategy === "all" || strategy.id === requestedStrategy)
 );
+// All strategies that exist in the system, regardless of which one this process instance
+// is scanning — needed for cross-strategy checks (e.g. "every strategy has ≥100 closed
+// trades"), since each strategy normally runs as its own single-strategy process.
+const allServerStrategies = Object.values(serverStrategies).filter((strategy) => strategy.enabled);
 
 // Backtest 2026-06-14: 300 candles × 20 assets × 6 strategies
 const BOOTSTRAP_LEARNING_POLICY = {
@@ -334,8 +338,8 @@ async function main() {
       closedByStrategy[sid] = (closedByStrategy[sid] || 0) + 1;
     }
   }
-  const minClosedAcrossStrategies = enabledStrategies.length
-    ? Math.min(...enabledStrategies.map((s) => closedByStrategy[s.id] || 0))
+  const minClosedAcrossStrategies = allServerStrategies.length
+    ? Math.min(...allServerStrategies.map((s) => closedByStrategy[s.id] || 0))
     : 0;
   if (minClosedAcrossStrategies >= 100 && config.minScore > 50) {
     log(`auto minScore: ${config.minScore} → 50 (all strategies ≥100 closed trades)`);
