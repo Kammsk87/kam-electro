@@ -1135,13 +1135,16 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
 
   // Determine trade direction — EMA-based for standard strategies; signal-based for reversal/breakout
   let side;
+  let breakoutLevel = null;
   if (strategy.kind === "rsi-reversal") {
     if (rsi < config.rsiReversalLow) side = "LONG";
     else if (rsi > config.rsiReversalHigh) side = "SHORT";
     else return null;
   } else if (strategy.kind === "breakout") {
-    side = getBreakoutSide(candles);
-    if (!side) return null;
+    const breakoutSignal = getBreakoutSide(candles);
+    if (!breakoutSignal) return null;
+    side = breakoutSignal.side;
+    breakoutLevel = breakoutSignal.level;
   } else if (strategy.kind === "vwap-reversion") {
     side = getVwapReversionSide(candles, atr);
     if (!side) return null;
@@ -1281,9 +1284,15 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
   const atrStop = calculateAtrStopModel(last.close, atrPct, scalping, wideStop);
   const riskDistance = atrStop.distance;
   const isReversal = strategy.kind === "rsi-reversal" || strategy.kind === "vwap-reversion";
-  const rr1 = scalping ? 0.55 : strategy.kind === "pullback" ? 1.35 : strategy.kind === "momentum" ? 2.2 : isReversal ? 1.2 : 1.6;
-  const rr2 = scalping ? 0.9 : strategy.kind === "pullback" ? 2 : strategy.kind === "momentum" ? 3.8 : isReversal ? 1.8 : 2.2;
-  const entry = getStrategyEntryPrice(last.close, side, strategy.kind);
+  // rr1/rr2 у scalping были 0.55/0.9 (цель меньше риска даже без учёта costs) — при реальном
+  // live winrate ~47% это математически гарантированный минус (нужен WR>=58% на таком RR).
+  // Подняты до 1.3/1.9: безубыточный WR для blended RR=1.6 — около 38%, что даёт запас
+  // прибыльности при текущем winrate без необходимости угадывать чаще.
+  const rr1 = scalping ? 1.3 : strategy.kind === "pullback" ? 1.35 : strategy.kind === "momentum" ? 2.2 : isReversal ? 1.2 : 1.6;
+  const rr2 = scalping ? 1.9 : strategy.kind === "pullback" ? 2 : strategy.kind === "momentum" ? 3.8 : isReversal ? 1.8 : 2.2;
+  const entry = strategy.kind === "breakout"
+    ? getBreakoutEntryPrice(breakoutLevel, side)
+    : getStrategyEntryPrice(last.close, side, strategy.kind);
   const scenario = side === "LONG"
     ? {
         side,
@@ -1359,6 +1368,13 @@ function getStrategyEntryPrice(price, side, kind) {
   return side === "LONG" ? price * 1.0003 : price * 0.9997;
 }
 
+// Вход не по цене пробоя (это погоня за уже состоявшимся движением — основная причина
+// WR=7% на breakout в live), а по retest пробитого уровня: ждём возврата цены к highN/lowN
+// и входим чуть дальше уровня в сторону сигнала, подтверждая, что уровень удержался.
+function getBreakoutEntryPrice(level, side) {
+  return side === "LONG" ? level * 1.0008 : level * 0.9992;
+}
+
 function evaluateScalp(closes, candles, side, rsi, atrPct, volumeRatio) {
   const ema9 = calculateEma(closes, 9);
   const ema21 = calculateEma(closes, 21);
@@ -1392,8 +1408,8 @@ function getBreakoutSide(candles, lookback = 20) {
   const highN = Math.max(...slice.map((c) => c.high));
   const lowN = Math.min(...slice.map((c) => c.low));
   const last = candles[candles.length - 1];
-  if (last.close > highN * 1.002) return "LONG";
-  if (last.close < lowN * 0.998) return "SHORT";
+  if (last.close > highN * 1.002) return { side: "LONG", level: highN };
+  if (last.close < lowN * 0.998) return { side: "SHORT", level: lowN };
   return null;
 }
 
@@ -2240,7 +2256,9 @@ function getStrategyMinScore(strategy) {
 }
 
 function getTriggerDirection(candidate) {
-  if (candidate.strategyKind === "pullback") return candidate.side === "LONG" ? "below" : "above";
+  if (candidate.strategyKind === "pullback" || candidate.strategyKind === "breakout") {
+    return candidate.side === "LONG" ? "below" : "above";
+  }
   return candidate.side === "LONG" ? "above" : "below";
 }
 
