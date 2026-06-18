@@ -6,5 +6,6 @@ After=network-online.target
 [Service]
 Type=oneshot
 WorkingDirectory=/opt/botalin
+EnvironmentFile=-/etc/botalin.env
 ExecStart=/usr/bin/node /opt/botalin/share/strategy-lab-7q4m2v/server-health.mjs
 Nice=5
