@@ -1742,6 +1742,7 @@ const SERVER_BOTS = [
   { login: "server-rsi",      strategy: "rsi-reversal",   label: "RSI Разворот",  color: "teal"    },
   { login: "server-breakout", strategy: "breakout",       label: "Пробой",        color: "orange"  },
   { login: "server-vwap",     strategy: "vwap-reversion", label: "VWAP Возврат",  color: "rose"    },
+  { login: "server-momentum", strategy: "momentum",       label: "Импульс (риск)", color: "red"     },
   { login: "server-vps",      strategy: "vps",            label: "VPS (все)",     color: "accent"  },
 ];
 
@@ -1765,6 +1766,7 @@ function getServerStrategyId(trade) {
   if (login === "server-rsi") return "rsi-reversal";
   if (login === "server-breakout") return "breakout";
   if (login === "server-vwap") return "vwap-reversion";
+  if (login === "server-momentum") return "momentum";
   if (login === "server-vps") return "vps";
   const preset = String(trade.botPreset || trade.strategySnapshot?.execution?.botPreset || "");
   if (preset.includes("pullback")) return "pullback";
@@ -1772,6 +1774,7 @@ function getServerStrategyId(trade) {
   if (preset.includes("rsi")) return "rsi-reversal";
   if (preset.includes("breakout")) return "breakout";
   if (preset.includes("vwap")) return "vwap-reversion";
+  if (preset.includes("momentum")) return "momentum";
   if (preset.includes("trend")) return "trend";
   const label = getServerStrategyLabel(trade).toLowerCase();
   if (label.includes("откат") || label.includes("pullback")) return "pullback";
@@ -1779,6 +1782,7 @@ function getServerStrategyId(trade) {
   if (label.includes("rsi")) return "rsi-reversal";
   if (label.includes("пробой") || label.includes("breakout")) return "breakout";
   if (label.includes("vwap")) return "vwap-reversion";
+  if (label.includes("импульс") || label.includes("momentum")) return "momentum";
   if (label.includes("ema") || label.includes("тренд")) return "trend";
   return "unknown";
 }

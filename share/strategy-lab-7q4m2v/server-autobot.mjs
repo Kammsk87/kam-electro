@@ -96,7 +96,7 @@ const serverProfiles = {
     // ~1 trade/day (24h log), ~100 days to reach the 100-closed-trades checkpoint.
     rsiReversalLow: 35,
     rsiReversalHigh: 65,
-    strategyMaxEntriesPerRun: { trend: 5, pullback: 5, scalping: 6, "rsi-reversal": 5, breakout: 5, "vwap-reversion": 5 }
+    strategyMaxEntriesPerRun: { trend: 5, pullback: 5, scalping: 6, "rsi-reversal": 5, breakout: 5, "vwap-reversion": 5, momentum: 5 }
   },
   real: {
     label: "Реальная торговля",
@@ -116,7 +116,8 @@ const serverProfiles = {
     dailyLossPctLimit: 3,
     feePct: 0.1,
     slippagePct: 0.05,
-    strategyMaxEntriesPerRun: { trend: 1, pullback: 1, scalping: 0, "rsi-reversal": 1, breakout: 1, "vwap-reversion": 0 }
+    // momentum остаётся отключённой в "real", пока не накопит собственную статистику в paper-режиме
+    strategyMaxEntriesPerRun: { trend: 1, pullback: 1, scalping: 0, "rsi-reversal": 1, breakout: 1, "vwap-reversion": 0, momentum: 0 }
   }
 };
 
@@ -189,6 +190,20 @@ const serverStrategies = {
     timeframes: ["5m", "15m"],
     minScoreOffset: 4,
     maxEntriesPerRun: 1
+  },
+  momentum: {
+    id: "momentum",
+    label: "Импульс (риск)",
+    enabled: true,
+    kind: "momentum",
+    strategyMode: "momentum",
+    signalTemplate: "intraday",
+    timeframes: ["15m", "1h"],
+    // Строже порог входа — берём только сильные, уже разогнавшиеся движения,
+    // расширенные стоп/цель и x2 риска на сделку делают редкий неверный вход дороже.
+    minScoreOffset: 6,
+    maxEntriesPerRun: 1,
+    riskMultiplier: 2
   }
 };
 
@@ -1255,13 +1270,19 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
     if (!vr.ok) return null;
     score += vr.scoreBoost;
   }
+  if (strategy.kind === "momentum") {
+    const mom = evaluateMomentumSignal(side, volumeRatio, adx, atrPct, rsi, impulsePct);
+    if (!mom.ok) return null;
+    score += mom.scoreBoost;
+  }
   if (history.trades >= 3) score += history.winRate >= 60 && history.avgPnlPct > 0 ? 10 : -25;
 
-  const atrStop = calculateAtrStopModel(last.close, atrPct, scalping);
+  const wideStop = strategy.kind === "momentum";
+  const atrStop = calculateAtrStopModel(last.close, atrPct, scalping, wideStop);
   const riskDistance = atrStop.distance;
   const isReversal = strategy.kind === "rsi-reversal" || strategy.kind === "vwap-reversion";
-  const rr1 = scalping ? 0.55 : strategy.kind === "pullback" ? 1.35 : isReversal ? 1.2 : 1.6;
-  const rr2 = scalping ? 0.9 : strategy.kind === "pullback" ? 2 : isReversal ? 1.8 : 2.2;
+  const rr1 = scalping ? 0.55 : strategy.kind === "pullback" ? 1.35 : strategy.kind === "momentum" ? 2.2 : isReversal ? 1.2 : 1.6;
+  const rr2 = scalping ? 0.9 : strategy.kind === "pullback" ? 2 : strategy.kind === "momentum" ? 3.8 : isReversal ? 1.8 : 2.2;
   const entry = getStrategyEntryPrice(last.close, side, strategy.kind);
   const scenario = side === "LONG"
     ? {
@@ -1296,6 +1317,7 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
     strategyKind: strategy.kind,
     strategyMode: strategy.strategyMode,
     signalTemplate: strategy.signalTemplate,
+    riskMultiplier: strategy.riskMultiplier || 1,
     price: last.close,
     rsi,
     atrPct,
@@ -1415,6 +1437,26 @@ function evaluateBreakoutSignal(candles, side, volumeRatio, adx, atrPct, openInt
   if (atrPct >= 0.3) scoreBoost += 4;
   if (openInterest.changePct >= 1) scoreBoost += 8;
   if (openInterest.changePct >= 2.5) scoreBoost += 6;
+  return { ok: true, scoreBoost };
+}
+
+// Риск-стратегия: ловит уже разогнавшееся движение (высокий ADX + объёмный всплеск +
+// RSI в зоне импульса, не на развороте), а не раннюю стадию тренда, как trend.
+// Расплата за более редкие и строгие входы — широкий стоп/цель (см. rr1/rr2 и wideStop в
+// evaluateCandidate) и x2 риск на сделку (strategy.riskMultiplier).
+function evaluateMomentumSignal(side, volumeRatio, adx, atrPct, rsi, impulsePct) {
+  if (volumeRatio < 1.5) return { ok: false, scoreBoost: 0 };
+  if (!Number.isFinite(adx) || adx < 25) return { ok: false, scoreBoost: 0 };
+  if (atrPct < 0.4) return { ok: false, scoreBoost: 0 };
+  const rsiOk = side === "LONG" ? rsi >= 52 && rsi <= 80 : rsi <= 48 && rsi >= 20;
+  if (!rsiOk) return { ok: false, scoreBoost: 0 };
+  const impulseOk = side === "LONG" ? impulsePct >= 0.5 : impulsePct <= -0.5;
+  if (!impulseOk) return { ok: false, scoreBoost: 0 };
+  let scoreBoost = 12;
+  if (volumeRatio >= 2) scoreBoost += 8;
+  if (adx >= 35) scoreBoost += 10;
+  if (atrPct >= 1) scoreBoost += 6;
+  if (Math.abs(impulsePct) >= 1.2) scoreBoost += 8;
   return { ok: true, scoreBoost };
 }
 
@@ -1594,10 +1636,12 @@ function evaluateFearGreedFilter(fearGreed, side) {
   return { block: false, scoreDelta: 2, reason: `Fear & Greed ${value}: без экстремума` };
 }
 
-function calculateAtrStopModel(price, atrPct, scalping = false) {
-  const minPct = scalping ? 0.15 : 0.35;
-  const maxPct = scalping ? 0.5 : 2.5;
-  const multiplier = scalping ? 0.58 : 0.75;
+function calculateAtrStopModel(price, atrPct, scalping = false, wide = false) {
+  // wide=true (momentum): шире стоп, чтобы не выбивало шумом на разогнавшемся движении —
+  // расширенные RR1/RR2 у momentum это компенсируют.
+  const minPct = scalping ? 0.15 : wide ? 0.5 : 0.35;
+  const maxPct = scalping ? 0.5 : wide ? 4 : 2.5;
+  const multiplier = scalping ? 0.58 : wide ? 1.1 : 0.75;
   const atrBasedPct = Number.isFinite(atrPct) ? atrPct * multiplier : minPct;
   const stopPct = Math.max(minPct, Math.min(maxPct, atrBasedPct));
   return {
@@ -1683,7 +1727,7 @@ function estimateScenarioExpectedNet(scenario, scalping) {
 
 async function buildServerTrade(candidate, trades) {
   const wallet = getWalletState(trades);
-  const maxBySingle = config.depositUsdt * (config.maxTradePct / 100);
+  const maxBySingle = config.depositUsdt * (config.maxTradePct / 100) * (candidate.riskMultiplier || 1);
   const maxByPortfolio = Math.max(0, config.depositUsdt * (config.maxPortfolioPct / 100) - wallet.reserved);
   const amount = Math.min(maxBySingle, maxByPortfolio, wallet.free);
   if (amount < config.minNotionalUsdt) return null;
@@ -1721,7 +1765,7 @@ async function buildServerTrade(candidate, trades) {
     budgetReserved: true,
     walletSettled: false,
     riskBudget: amount,
-    riskLimitPct: config.maxTradePct,
+    riskLimitPct: config.maxTradePct * (candidate.riskMultiplier || 1),
     autopilot: true,
     autopilotProfile: config.profileId,
     serverStrategyId: candidate.strategyId,
@@ -1777,7 +1821,7 @@ function buildStrategySnapshot(candidate, amount) {
       strategyMode: candidate.strategyMode,
       serverStrategyId: candidate.strategyId,
       serverStrategyLabel: candidate.strategyLabel,
-      risk: config.maxTradePct,
+      risk: config.maxTradePct * (candidate.riskMultiplier || 1),
       conservative: true,
       includeLongs: true,
       includeShorts: true,

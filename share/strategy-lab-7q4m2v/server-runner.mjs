@@ -15,10 +15,11 @@ const strategyMap = {
   scalping: { strategy: "scalping", userLogin: "server-scalping", label: "scalping" },
   "rsi-reversal": { strategy: "rsi-reversal", userLogin: "server-rsi", label: "RSI reversal" },
   breakout: { strategy: "breakout", userLogin: "server-breakout", label: "breakout" },
-  "vwap-reversion": { strategy: "vwap-reversion", userLogin: "server-vwap", label: "VWAP reversion" }
+  "vwap-reversion": { strategy: "vwap-reversion", userLogin: "server-vwap", label: "VWAP reversion" },
+  momentum: { strategy: "momentum", userLogin: "server-momentum", label: "momentum (риск)" }
 };
 
-const defaultStrategies = "trend,pullback,scalping,rsi-reversal,breakout,vwap-reversion";
+const defaultStrategies = "trend,pullback,scalping,rsi-reversal,breakout,vwap-reversion,momentum";
 const intervalSec = getPositiveNumber("BOTALIN_RUNNER_INTERVAL_SEC", 180);
 const staggerSec = getPositiveNumber("BOTALIN_RUNNER_STAGGER_SEC", 20);
 const healthEveryCycles = getPositiveNumber("BOTALIN_RUNNER_HEALTH_EVERY", 5);
