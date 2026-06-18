@@ -1509,35 +1509,38 @@ function evaluateMultiTimeframeFilter(mtf, side, scalping = false) {
 }
 
 async function fetchFundingIntel(symbol) {
-  const bybitSymbol = toBybitSymbol(symbol);
-  const response = await fetchWithTimeout(`https://api.bybit.com/v5/market/funding/history?category=linear&symbol=${bybitSymbol}&limit=1`, {}, 6_000);
+  // Bybit's funding API is geo-blocked for our VPS (CloudFront 403) — use OKX instead.
+  const instId = `${toOkxSymbol(symbol)}-SWAP`;
+  const response = await fetchWithTimeout(`https://www.okx.com/api/v5/public/funding-rate?instId=${instId}`, {}, 6_000);
   if (!response.ok) throw new Error(`funding ${response.status}`);
   const data = await response.json();
-  if (data.retCode !== 0) throw new Error(data.retMsg || "funding failed");
-  const fundingRatePct = Number(data.result?.list?.[0]?.fundingRate) * 100;
+  if (data.code !== "0") throw new Error(data.msg || "funding failed");
+  const fundingRatePct = Number(data.data?.[0]?.fundingRate) * 100;
   return {
     fundingRatePct: Number.isFinite(fundingRatePct) ? fundingRatePct : 0,
-    updatedAt: Number(data.result?.list?.[0]?.fundingRateTimestamp) || Date.now()
+    updatedAt: Number(data.data?.[0]?.fundingTime) || Date.now()
   };
 }
 
 async function fetchOpenInterestIntel(symbol) {
-  const bybitSymbol = toBybitSymbol(symbol);
-  // 1h window: real OI moves are typically 0.01-0.2% over 15min (the breakout score
-  // thresholds of 0.35/1/2.5% never fire at that window) but spread -0.7%..+1.4% over 1h.
-  const response = await fetchWithTimeout(`https://api.bybit.com/v5/market/open-interest?category=linear&symbol=${bybitSymbol}&intervalTime=1h&limit=2`, {}, 6_000);
+  // Bybit's open-interest API is geo-blocked for our VPS (CloudFront 403), so we use
+  // OKX's rubik OI history instead — 5m buckets, compared 1h apart (12 buckets) since
+  // real OI moves are typically 0.01-0.2% over 15min but spread -0.7%..+1.4% over 1h.
+  const ccy = symbol.split("/")[0];
+  const response = await fetchWithTimeout(`https://www.okx.com/api/v5/rubik/stat/contracts/open-interest-volume?ccy=${ccy}&period=5m`, {}, 6_000);
   if (!response.ok) throw new Error(`open interest ${response.status}`);
   const data = await response.json();
-  if (data.retCode !== 0) throw new Error(data.retMsg || "open interest failed");
-  const list = data.result?.list || [];
-  const current = Number(list[0]?.openInterest) || 0;
-  const previous = Number(list[1]?.openInterest) || current;
+  if (data.code !== "0") throw new Error(data.msg || "open interest failed");
+  const list = data.data || [];
+  if (list.length < 13) throw new Error("open interest history too short");
+  const current = Number(list[0]?.[1]) || 0;
+  const previous = Number(list[12]?.[1]) || current;
   const changePct = previous > 0 ? ((current - previous) / previous) * 100 : 0;
   return {
     openInterest: current,
     previousOpenInterest: previous,
     changePct,
-    updatedAt: Number(list[0]?.timestamp) || Date.now()
+    updatedAt: Number(list[0]?.[0]) || Date.now()
   };
 }
 
