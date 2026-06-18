@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-const supabaseUrl = "https://dcpenxsthdhvhhqgvgjq.supabase.co";
-const supabaseKey = "sb_publishable_BYYOhjwhgjZBP27Yw7YkVg_CEhF6ugc";
+const supabaseUrl = process.env.SUPABASE_URL || "https://dcpenxsthdhvhhqgvgjq.supabase.co";
+const supabaseKey = process.env.SUPABASE_KEY || "sb_publishable_BYYOhjwhgjZBP27Yw7YkVg_CEhF6ugc";
 const tableName = "crypto_strategy_trades";
 const settingsTableName = "crypto_strategy_settings";
 const githubRunsUrl = "https://api.github.com/repos/Kammsk87/kam-electro/actions/workflows/botalin-server-autobot.yml/runs?per_page=5";
