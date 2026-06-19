@@ -124,6 +124,14 @@ const serverProfiles = {
 const activeProfileId = serverProfiles[requestedProfile] ? requestedProfile : "balanced";
 const activeProfile = serverProfiles[activeProfileId];
 
+// Максимальный риск на сделку независимо от профиля и множителя стратегии.
+const maxRiskPct = 5;
+
+// riskMultiplier масштабирует config.maxTradePct (базовый риск профиля) под конкретную
+// стратегию, по факту её результатов в бэктесте 2026-06-14 (см. BOOTSTRAP_LEARNING_POLICY).
+// Итоговый риск всегда ограничен maxRiskPct — см. applyRiskCap().
+// Скальпинг сознательно НЕ увеличиваем: короткий TTL и высокая частота сделок
+// делают рост позиции на сделку более рискованным при той же логике входа.
 const serverStrategies = {
   trend: {
     id: "trend",
@@ -134,7 +142,8 @@ const serverStrategies = {
     signalTemplate: "intraday",
     timeframes: ["15m", "1h"],
     minScoreOffset: 0,
-    maxEntriesPerRun: 1
+    maxEntriesPerRun: 1,
+    riskMultiplier: 2
   },
   pullback: {
     id: "pullback",
@@ -145,7 +154,9 @@ const serverStrategies = {
     signalTemplate: "swing",
     timeframes: ["15m", "1h"],
     minScoreOffset: 2,
-    maxEntriesPerRun: 1
+    maxEntriesPerRun: 1,
+    // Лучшие результаты бэктеста (WR 55-79%, pnl +0.09..+0.50%) — максимальный риск.
+    riskMultiplier: 5
   },
   scalping: {
     id: "scalping",
@@ -156,7 +167,8 @@ const serverStrategies = {
     signalTemplate: "scalper",
     timeframes: ["5m", "15m"],
     minScoreOffset: 3,
-    maxEntriesPerRun: 1
+    maxEntriesPerRun: 1,
+    riskMultiplier: 1
   },
   rsiReversal: {
     id: "rsi-reversal",
@@ -167,7 +179,8 @@ const serverStrategies = {
     signalTemplate: "reversal",
     timeframes: ["15m", "1h"],
     minScoreOffset: 5,
-    maxEntriesPerRun: 1
+    maxEntriesPerRun: 1,
+    riskMultiplier: 2
   },
   breakout: {
     id: "breakout",
@@ -178,7 +191,9 @@ const serverStrategies = {
     signalTemplate: "breakout",
     timeframes: ["15m", "1h"],
     minScoreOffset: 3,
-    maxEntriesPerRun: 1
+    maxEntriesPerRun: 1,
+    // WR=0% на части активов в бэктесте — риск не увеличиваем.
+    riskMultiplier: 1
   },
   vwapReversion: {
     id: "vwap-reversion",
@@ -189,7 +204,9 @@ const serverStrategies = {
     signalTemplate: "scalper",
     timeframes: ["5m", "15m"],
     minScoreOffset: 4,
-    maxEntriesPerRun: 1
+    maxEntriesPerRun: 1,
+    // Хорошая точность бэктеста (WR 69-86%, pnl +0.04..+0.12%).
+    riskMultiplier: 4
   },
   momentum: {
     id: "momentum",
@@ -200,12 +217,16 @@ const serverStrategies = {
     signalTemplate: "intraday",
     timeframes: ["15m", "1h"],
     // Строже порог входа — берём только сильные, уже разогнавшиеся движения,
-    // расширенные стоп/цель и x2 риска на сделку делают редкий неверный вход дороже.
+    // расширенные стоп/цель делают редкий неверный вход дороже.
     minScoreOffset: 6,
     maxEntriesPerRun: 1,
-    riskMultiplier: 2
+    riskMultiplier: 5
   }
 };
+
+function applyRiskCap(basePct, multiplier) {
+  return Math.min(basePct * (multiplier || 1), maxRiskPct);
+}
 
 const enabledStrategies = Object.values(serverStrategies).filter(
   (strategy) => strategy.enabled && (requestedStrategy === "all" || strategy.id === requestedStrategy)
@@ -1006,10 +1027,11 @@ async function scanCandidates(trades, learningPolicy) {
   const dailyRisk = getDailyRisk(trades);
   if (dailyRisk.blocked) return [];
 
-  const [btcTrend, goldSentiment, fearGreed] = await Promise.all([
+  const [btcTrend, goldSentiment, fearGreed, newsMap] = await Promise.all([
     getBtcTrend(),
     getGoldSentiment(),
-    fetchFearGreedIntel().catch(() => null)
+    fetchFearGreedIntel().catch(() => null),
+    fetchNewsSentimentMap().catch(() => new Map())
   ]);
   const strategiesByInterval = groupStrategiesByInterval(enabledStrategies);
   const scanTasks = [];
@@ -1030,9 +1052,10 @@ async function scanCandidates(trades, learningPolicy) {
       fetchOpenInterestIntel(symbol).catch(() => null)
     ]);
     if (candles.length < (needsStandardHistory ? 90 : 60)) return [];
+    const news = newsMap.get(symbol.split("/")[0]) || null;
     return strategies
       .filter((strategy) => candles.length >= (strategy.kind === "scalping" ? 60 : 90))
-      .map((strategy) => evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend, goldSentiment, { mtf, funding, openInterest, fearGreed }))
+      .map((strategy) => evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend, goldSentiment, { mtf, funding, openInterest, fearGreed, news }))
       .filter((candidate) => candidate && !activeKeys.has(getCandidateStrategyExposureKey(candidate)));
   });
 
@@ -1168,6 +1191,9 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
   const fearGreedDecision = evaluateFearGreedFilter(fearGreed, side);
   if (fearGreedDecision.block) return null;
 
+  const news = externalFilters.news || null;
+  const newsDecision = evaluateNewsFilter(news, side);
+
   const history = getPatternStats(trades, symbol, interval, side, strategy.id);
   const patternKey = getLearningPatternKey(symbol, interval, side, strategy.id);
   const isSoftMode = config.blockedAssetMode === "soft";
@@ -1188,6 +1214,7 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
   score += mtfDecision.scoreDelta;
   score += fundingDecision.scoreDelta;
   score += fearGreedDecision.scoreDelta;
+  score += newsDecision.scoreDelta;
   const crossoverAge = getEmaCrossoverAge(ema34, ema89);
   if (crossoverAge <= 5) score += 10;
   else if (crossoverAge <= 15) score += 3;
@@ -1336,13 +1363,14 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
     mtf,
     funding,
     fearGreed,
+    news,
     openInterest: externalFilters.openInterest || null,
     history,
     crash,
     scenario,
     expected,
     patternKey,
-    reason: `${strategy.label}: EMA ${side}, RSI ${rsi.toFixed(1)}, MACD ${Number.isFinite(macd) && Number.isFinite(macdSig) ? (macd > macdSig ? "↑" : "↓") : "?"}, ADX ${Number.isFinite(adx) ? adx.toFixed(0) : "?"}, ST ${stDir === 1 ? "↑" : "↓"}, vol x${volumeRatio.toFixed(2)}, ATR ${atrPct.toFixed(2)}%, стоп ${atrStop.stopPct.toFixed(2)}%, F&G ${fearGreed ? `${fearGreed.value}` : "n/a"}, MTF ${mtf?.summary || "proxy"}, funding ${funding ? `${funding.fundingRatePct.toFixed(4)}%` : "n/a"}, OI ${externalFilters.openInterest ? `${externalFilters.openInterest.changePct.toFixed(2)}%` : "n/a"}, цель ${expected.weightedNetPct.toFixed(2)}%, BTC ${btcTrend}`
+    reason: `${strategy.label}: EMA ${side}, RSI ${rsi.toFixed(1)}, MACD ${Number.isFinite(macd) && Number.isFinite(macdSig) ? (macd > macdSig ? "↑" : "↓") : "?"}, ADX ${Number.isFinite(adx) ? adx.toFixed(0) : "?"}, ST ${stDir === 1 ? "↑" : "↓"}, vol x${volumeRatio.toFixed(2)}, ATR ${atrPct.toFixed(2)}%, стоп ${atrStop.stopPct.toFixed(2)}%, F&G ${fearGreed ? `${fearGreed.value}` : "n/a"}, MTF ${mtf?.summary || "proxy"}, funding ${funding ? `${funding.fundingRatePct.toFixed(4)}%` : "n/a"}, OI ${externalFilters.openInterest ? `${externalFilters.openInterest.changePct.toFixed(2)}%` : "n/a"}, новости ${news ? `${news.bias} ${news.score.toFixed(0)}` : "n/a"}, цель ${expected.weightedNetPct.toFixed(2)}%, BTC ${btcTrend}`
   };
 }
 
@@ -1618,6 +1646,110 @@ async function fetchFearGreedIntel() {
   };
 }
 
+// Серверный новостной фон. В отличие от браузерной версии (которая требует
+// CORS-proxy для CMC/CFTC), здесь Node делает прямой fetch без CORS-ограничений —
+// RSS публичных крипто-изданий читаются без ключей и без прокси.
+const newsRssFeeds = [
+  "https://www.coindesk.com/arc/outboundfeeds/rss/",
+  "https://cointelegraph.com/rss"
+];
+
+const newsBullishWords = [
+  "bull", "bullish", "listing", "approval", "approve", "etf inflow", "partnership",
+  "upgrade", "mainnet", "record inflow", "accumulation", "rally", "surge",
+  "all-time high", "soars", "breakout", "adoption"
+];
+const newsBearishWords = [
+  "bear", "bearish", "delist", "delisting", "hack", "exploit", "lawsuit", "fine",
+  "ban", "outflow", "liquidation", "default", "probe", "investigation", "crash",
+  "plunge", "sell-off", "selloff", "scam", "exploit"
+];
+const newsRegulatoryWords = ["cftc", "sec ", "regulator", "regulatory", "commission", "enforcement", "indict", "subpoena"];
+
+async function fetchNewsSentimentMap() {
+  const items = [];
+  await Promise.all(newsRssFeeds.map(async (url) => {
+    try {
+      const response = await fetchWithTimeout(url, {}, 8_000);
+      if (!response.ok) return;
+      const xml = await response.text();
+      items.push(...parseRssItems(xml));
+    } catch {
+      // один упавший фид не должен ронять весь цикл
+    }
+  }));
+  return buildNewsSentimentMap(items);
+}
+
+function parseRssItems(xml) {
+  const blocks = String(xml || "").split(/<item[\s>]/i).slice(1);
+  return blocks.map((block) => {
+    const titleMatch = block.match(/<title>([\s\S]*?)<\/title>/i);
+    const descMatch = block.match(/<description>([\s\S]*?)<\/description>/i);
+    return {
+      title: stripRssText(titleMatch?.[1] || ""),
+      description: stripRssText(descMatch?.[1] || "")
+    };
+  }).filter((item) => item.title);
+}
+
+function stripRssText(raw) {
+  return String(raw || "")
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function scoreNewsText(text) {
+  const lower = text.toLowerCase();
+  let score = 0;
+  newsBullishWords.forEach((word) => { if (lower.includes(word)) score += 14; });
+  newsBearishWords.forEach((word) => { if (lower.includes(word)) score -= 16; });
+  const isRegulatory = newsRegulatoryWords.some((word) => lower.includes(word));
+  if (isRegulatory && score < 0) score -= 8;
+  return { score: Math.max(-100, Math.min(100, score)), isRegulatory };
+}
+
+function buildNewsSentimentMap(items) {
+  const baseSymbols = [...new Set(config.assets.map((symbol) => symbol.split("/")[0]))];
+  const map = new Map();
+  for (const symbol of baseSymbols) {
+    // Регистрозависимое сравнение: тикеры в крипто-заголовках почти всегда в верхнем
+    // регистре (BTC, LINK), что отличает их от обычных слов английского текста (link, near, uni).
+    const pattern = new RegExp(`\\b${symbol}\\b`);
+    const relevant = items.filter((item) => pattern.test(item.title) || pattern.test(item.description));
+    if (!relevant.length) continue;
+    const scored = relevant.map((item) => scoreNewsText(`${item.title} ${item.description}`));
+    const avgScore = scored.reduce((sum, s) => sum + s.score, 0) / scored.length;
+    const regulatoryRisk = scored.some((s) => s.isRegulatory && s.score <= -18);
+    const bias = avgScore >= 14 ? "BULLISH" : avgScore <= -14 ? "BEARISH" : "NEUTRAL";
+    map.set(symbol, { score: avgScore, bias, regulatoryRisk, count: relevant.length });
+  }
+  return map;
+}
+
+function evaluateNewsFilter(news, side) {
+  if (!news || !Number.isFinite(news.score)) return { block: false, scoreDelta: 0, reason: "новости нет данных" };
+  if (news.regulatoryRisk) {
+    return { block: false, scoreDelta: -14, reason: `новости: регуляторный риск (${news.score.toFixed(0)})` };
+  }
+  if (news.bias === "BEARISH" && side === "LONG") {
+    return { block: false, scoreDelta: -10, reason: `новости BEARISH против LONG (${news.score.toFixed(0)})` };
+  }
+  if (news.bias === "BULLISH" && side === "SHORT") {
+    return { block: false, scoreDelta: -10, reason: `новости BULLISH против SHORT (${news.score.toFixed(0)})` };
+  }
+  if (news.bias === "BULLISH" && side === "LONG") {
+    return { block: false, scoreDelta: 6, reason: `новости BULLISH поддерживают LONG (${news.score.toFixed(0)})` };
+  }
+  if (news.bias === "BEARISH" && side === "SHORT") {
+    return { block: false, scoreDelta: 6, reason: `новости BEARISH поддерживают SHORT (${news.score.toFixed(0)})` };
+  }
+  return { block: false, scoreDelta: 0, reason: `новости нейтральны (${news.score.toFixed(0)})` };
+}
+
 function evaluateFundingFilter(funding, side) {
   if (!funding || !Number.isFinite(funding.fundingRatePct)) return { block: false, scoreDelta: 0, reason: "funding нет данных" };
   const value = funding.fundingRatePct;
@@ -1743,7 +1875,7 @@ function estimateScenarioExpectedNet(scenario, scalping) {
 
 async function buildServerTrade(candidate, trades) {
   const wallet = getWalletState(trades);
-  const maxBySingle = config.depositUsdt * (config.maxTradePct / 100) * (candidate.riskMultiplier || 1);
+  const maxBySingle = config.depositUsdt * (applyRiskCap(config.maxTradePct, candidate.riskMultiplier) / 100);
   const maxByPortfolio = Math.max(0, config.depositUsdt * (config.maxPortfolioPct / 100) - wallet.reserved);
   const amount = Math.min(maxBySingle, maxByPortfolio, wallet.free);
   if (amount < config.minNotionalUsdt) return null;
@@ -1781,7 +1913,7 @@ async function buildServerTrade(candidate, trades) {
     budgetReserved: true,
     walletSettled: false,
     riskBudget: amount,
-    riskLimitPct: config.maxTradePct * (candidate.riskMultiplier || 1),
+    riskLimitPct: applyRiskCap(config.maxTradePct, candidate.riskMultiplier),
     autopilot: true,
     autopilotProfile: config.profileId,
     serverStrategyId: candidate.strategyId,
@@ -1837,7 +1969,8 @@ function buildStrategySnapshot(candidate, amount) {
       strategyMode: candidate.strategyMode,
       serverStrategyId: candidate.strategyId,
       serverStrategyLabel: candidate.strategyLabel,
-      risk: config.maxTradePct * (candidate.riskMultiplier || 1),
+      risk: applyRiskCap(config.maxTradePct, candidate.riskMultiplier),
+      news: candidate.news ? `${candidate.news.bias} ${candidate.news.score.toFixed(0)} (${candidate.news.count} нов.)` : "нет данных",
       conservative: true,
       includeLongs: true,
       includeShorts: true,
@@ -1861,6 +1994,7 @@ function buildStrategySnapshot(candidate, amount) {
       marketCrash: candidate.crash,
       multiTimeframe: candidate.mtf || null,
       sentiment: candidate.fearGreed || null,
+      news: candidate.news || null,
       derivatives: {
         ...(candidate.funding ? {
           fundingRatePct: candidate.funding.fundingRatePct,
