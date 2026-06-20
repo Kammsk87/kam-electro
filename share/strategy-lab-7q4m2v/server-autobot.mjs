@@ -221,6 +221,23 @@ const serverStrategies = {
     minScoreOffset: 6,
     maxEntriesPerRun: 1,
     riskMultiplier: 5
+  },
+  donchianBreakout: {
+    id: "donchian-breakout",
+    label: "Donchian-пробой",
+    enabled: true,
+    kind: "donchian-breakout",
+    strategyMode: "breakout",
+    signalTemplate: "breakout",
+    // Бэктест на 120 днях/8 активах (2026-06): систематический N=20 канал даёт слабый, но
+    // не нулевой сигнал ДО издержек только на 1h (XRP +26.7%, AVAX +8.06% за период без
+    // комиссии); на 15m и без подтверждения объём/ADX съедается издержками. В отличие от
+    // обычного breakout (вход на retest уровня), здесь вход в момент пробоя — поэтому нужен
+    // более строгий гейт по объёму/ADX, чтобы не повторить WR=7% старого chase-входа.
+    timeframes: ["1h"],
+    minScoreOffset: 5,
+    maxEntriesPerRun: 1,
+    riskMultiplier: 1
   }
 };
 
@@ -1176,6 +1193,11 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
   } else if (strategy.kind === "vwap-reversion") {
     side = getVwapReversionSide(candles, atr);
     if (!side) return null;
+  } else if (strategy.kind === "donchian-breakout") {
+    const donchianSignal = getDonchianBreakoutSide(candles);
+    if (!donchianSignal) return null;
+    side = donchianSignal.side;
+    breakoutLevel = donchianSignal.level;
   } else {
     if (trend === "NEUTRAL") return null;
     side = trend;
@@ -1318,6 +1340,11 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
     const bo = evaluateBreakoutSignal(candles, side, volumeRatio, adx, atrPct, externalFilters.openInterest);
     if (!bo.ok) return null;
     score += bo.scoreBoost;
+  }
+  if (strategy.kind === "donchian-breakout") {
+    const db = evaluateDonchianBreakoutSignal(volumeRatio, adx, adx14, i, atrPct);
+    if (!db.ok) return null;
+    score += db.scoreBoost;
   }
   if (strategy.kind === "vwap-reversion") {
     const vr = evaluateVwapReversion(candles, atr, side, rsi, volumeRatio);
@@ -1463,6 +1490,36 @@ function getBreakoutSide(candles, lookback = 20) {
   if (last.close > highN * 1.002) return { side: "LONG", level: highN };
   if (last.close < lowN * 0.998) return { side: "SHORT", level: lowN };
   return null;
+}
+
+// Систематический N-периодный канал (Donchian/Turtle) — в отличие от getBreakoutSide
+// (детект пробоя + вход на retest), здесь вход сразу в момент пробоя канала, поэтому
+// нужен более заметный зазор (0.4%, не 0.2%) и отдельный гейт по объёму/ADX ниже.
+function getDonchianBreakoutSide(candles, lookback = 20) {
+  if (candles.length < lookback + 2) return null;
+  const slice = candles.slice(-lookback - 1, -1);
+  const highN = Math.max(...slice.map((c) => c.high));
+  const lowN = Math.min(...slice.map((c) => c.low));
+  const last = candles[candles.length - 1];
+  if (last.close > highN * 1.004) return { side: "LONG", level: highN };
+  if (last.close < lowN * 0.996) return { side: "SHORT", level: lowN };
+  return null;
+}
+
+// Бэктест (120 дней/8 активов, 1h, 2026-06): голый Donchian-пробой без подтверждения
+// убыточен после издержек везде. Гейт по объёму + растущему ADX — попытка отсечь
+// ложные пробои без объёма за ними (главная причина провала в бэктесте).
+function evaluateDonchianBreakoutSignal(volumeRatio, adx, adxSeries, i, atrPct) {
+  if (volumeRatio < 1.5) return { ok: false, scoreBoost: 0 };
+  if (!Number.isFinite(adx) || adx < 25) return { ok: false, scoreBoost: 0 };
+  const adxPrev = adxSeries[Math.max(0, i - 3)];
+  if (Number.isFinite(adxPrev) && adx <= adxPrev) return { ok: false, scoreBoost: 0 };
+  if (atrPct < 0.3) return { ok: false, scoreBoost: 0 };
+  let scoreBoost = 8;
+  if (volumeRatio >= 2.0) scoreBoost += 8;
+  if (adx >= 32) scoreBoost += 8;
+  if (atrPct >= 0.7) scoreBoost += 4;
+  return { ok: true, scoreBoost };
 }
 
 function getVwapReversionSide(candles, atr) {
