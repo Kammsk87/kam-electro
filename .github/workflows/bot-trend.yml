@@ -19,7 +19,7 @@ jobs:
       - name: Run trend bot
         env:
           BOTALIN_SERVER_PROFILE: training
-          BOTALIN_REMOTE_BACKEND: supabase
+          BOTALIN_REMOTE_BACKEND: firebase
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
