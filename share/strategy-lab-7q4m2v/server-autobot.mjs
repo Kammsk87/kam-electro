@@ -1712,14 +1712,32 @@ function scoreNewsText(text) {
   return { score: Math.max(-100, Math.min(100, score)), isRegulatory };
 }
 
+// CoinDesk/CoinTelegraph почти всегда пишут полное название монеты в заголовке
+// ("Bitcoin", "Aave"), а не тикер ("BTC", "AAVE") — без алиасов совпадений почти нет.
+const newsAssetAliases = {
+  BTC: "bitcoin", ETH: "ethereum", SOL: "solana", XRP: "ripple|xrp", BNB: "binance coin|bnb",
+  ADA: "cardano", DOGE: "dogecoin", AVAX: "avalanche", DOT: "polkadot", LINK: "chainlink",
+  MATIC: "polygon", LTC: "litecoin", TRX: "tron", ATOM: "cosmos", UNI: "uniswap", AAVE: "aave",
+  ARB: "arbitrum", OP: "optimism", SUI: "sui", APT: "aptos", TON: "toncoin|ton ", ICP: "internet computer",
+  FIL: "filecoin", ETC: "ethereum classic", INJ: "injective", RUNE: "thorchain", LDO: "lido",
+  CRV: "curve", MKR: "maker|sky protocol", GRT: "the graph", SNX: "synthetix", PYTH: "pyth",
+  WLD: "worldcoin", ZEC: "zcash", BLUR: "blur", SEI: "sei network", TIA: "celestia", JUP: "jupiter exchange",
+  WIF: "dogwifhat", BONK: "bonk", JTO: "jito", PEPE: "pepe coin", HBAR: "hedera", VET: "vechain",
+  ALGO: "algorand", STX: "stacks", ORDI: "ordinals", IMX: "immutable", SAND: "the sandbox",
+  TWT: "trust wallet", XAUT: "tether gold", XAG: "tether silver", NEAR: "near protocol", BCH: "bitcoin cash"
+};
+
 function buildNewsSentimentMap(items) {
   const baseSymbols = [...new Set(config.assets.map((symbol) => symbol.split("/")[0]))];
   const map = new Map();
   for (const symbol of baseSymbols) {
-    // Регистрозависимое сравнение: тикеры в крипто-заголовках почти всегда в верхнем
-    // регистре (BTC, LINK), что отличает их от обычных слов английского текста (link, near, uni).
-    const pattern = new RegExp(`\\b${symbol}\\b`);
-    const relevant = items.filter((item) => pattern.test(item.title) || pattern.test(item.description));
+    // Тикер ищем регистрозависимо (BTC vs обычное слово), название монеты — без учёта регистра.
+    const tickerPattern = new RegExp(`\\b${symbol}\\b`);
+    const aliasPattern = newsAssetAliases[symbol] ? new RegExp(`\\b(${newsAssetAliases[symbol]})\\b`, "i") : null;
+    const relevant = items.filter((item) => {
+      const text = `${item.title} ${item.description}`;
+      return tickerPattern.test(text) || (aliasPattern && aliasPattern.test(text));
+    });
     if (!relevant.length) continue;
     const scored = relevant.map((item) => scoreNewsText(`${item.title} ${item.description}`));
     const avgScore = scored.reduce((sum, s) => sum + s.score, 0) / scored.length;
