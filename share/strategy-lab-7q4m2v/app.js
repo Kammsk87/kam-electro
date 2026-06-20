@@ -857,8 +857,10 @@ const walletReserved = document.querySelector("[data-wallet-reserved]");
 const walletServerEquity = document.querySelector("[data-server-wallet-equity]");
 const walletServerFree = document.querySelector("[data-server-wallet-free]");
 const walletServerReserved = document.querySelector("[data-server-wallet-reserved]");
-const botsGrid = document.querySelector("[data-bots-grid]");
-const botsLastUpdate = document.querySelector("[data-bots-last-update]");
+const statsPeriodBar = document.querySelector("[data-stats-period]");
+const statsSummary = document.querySelector("[data-stats-summary]");
+const statsRows = document.querySelector("[data-stats-rows]");
+const statsLastUpdate = document.querySelector("[data-stats-last-update]");
 const serverOpenPositions = document.querySelector("[data-server-open-positions]");
 const paperEnter = document.querySelector("[data-paper-enter]");
 const paperReset = document.querySelector("[data-paper-reset]");
@@ -1731,7 +1733,7 @@ function renderServerWalletReadout() {
   if (walletServerEquity) walletServerEquity.textContent = `${s.equity.toFixed(2)} USDT`;
   if (walletServerFree) walletServerFree.textContent = `${s.free.toFixed(2)} USDT`;
   if (walletServerReserved) walletServerReserved.textContent = `${s.reserved.toFixed(2)} USDT`;
-  renderStrategyDashboard();
+  renderTradeStats();
 }
 
 const SERVER_BOTS = [
@@ -1787,32 +1789,34 @@ function getServerStrategyId(trade) {
   return "unknown";
 }
 
-function buildBotStatsFromTrades(trades) {
-  const active  = trades.filter(isPaperTradeActive);
-  const closed  = trades.filter((t) => !isPaperTradeActive(t) && t.status !== "cancelled");
-  const wins    = closed.filter((t) => (Number(t.pnl) || 0) > 0);
-  const losses  = closed.filter((t) => (Number(t.pnl) || 0) <= 0);
-  const pnl     = closed.reduce((s, t) => s + (Number(t.pnl) || 0), 0);
-  const avgW    = wins.length   ? wins.reduce((s,t) => s+(Number(t.pnl)||0),0)/wins.length   : 0;
-  const avgL    = losses.length ? losses.reduce((s,t)=> s+(Number(t.pnl)||0),0)/losses.length : 0;
-  const wr      = closed.length ? (wins.length / closed.length) * 100 : null;
-  const rr      = avgL !== 0 ? Math.abs(avgW / avgL) : null;
-  const expect  = wr !== null ? (wr/100)*avgW + (1-wr/100)*avgL : null;
-  const lastTrade = trades.reduce((best, t) => {
-    const ts = Number(t.updatedAt) || Number(t.openedAt) || 0;
-    return ts > (Number(best?.updatedAt) || Number(best?.openedAt) || 0) ? t : best;
-  }, null);
-  return { active: active.length, closed: closed.length, wins: wins.length, losses: losses.length, pnl, wr, rr, expect, avgW, avgL, lastTrade };
+function getTradeTimestamp(trade) {
+  return Number(trade.closedAt) || Number(trade.updatedAt) || Number(trade.openedAt) || 0;
 }
 
-function getBotStats(bot) {
+const tradeStatsPeriodKey = "crypto-strategy-bot-stats-period-v1";
+let tradeStatsPeriod = localStorage.getItem(tradeStatsPeriodKey) || "today";
+
+function getTradeStatsPeriodSinceMs(period) {
+  if (period === "today") { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); }
+  if (period === "week") return Date.now() - 7 * 24 * 60 * 60 * 1000;
+  if (period === "month") return Date.now() - 30 * 24 * 60 * 60 * 1000;
+  return 0; // all time
+}
+
+function getBotStatsForPeriod(bot, sinceMs) {
   const trades = state.paperTrades.filter((trade) => {
     if (bot.strategy === "vps") return getTradeUserLogin(trade) === "server-vps";
     if (!isServerTrade(trade)) return false;
     if (bot.strategy === "all") return getTradeUserLogin(trade) !== "server-vps";
     return getServerStrategyId(trade) === bot.strategy;
   });
-  return buildBotStatsFromTrades(trades);
+  const active = trades.filter(isPaperTradeActive);
+  const closedAll = trades.filter((t) => !isPaperTradeActive(t) && t.status !== "cancelled");
+  const closed = sinceMs > 0 ? closedAll.filter((t) => getTradeTimestamp(t) >= sinceMs) : closedAll;
+  const wins = closed.filter((t) => (Number(t.pnl) || 0) > 0);
+  const pnl = closed.reduce((s, t) => s + (Number(t.pnl) || 0), 0);
+  const wr = closed.length ? (wins.length / closed.length) * 100 : null;
+  return { active: active.length, closed: closed.length, wins: wins.length, pnl, wr };
 }
 
 function formatAgo(trade) {
@@ -1827,59 +1831,55 @@ function formatAgo(trade) {
   return `${Math.floor(h/24)}д ${h%24}ч назад`;
 }
 
-function renderStrategyDashboard() {
-  if (!botsGrid) return;
-  const html = SERVER_BOTS.map((bot) => {
-    const { label, color } = bot;
-    const s = getBotStats(bot);
+function setTradeStatsPeriod(period) {
+  tradeStatsPeriod = period;
+  localStorage.setItem(tradeStatsPeriodKey, period);
+  renderTradeStats();
+}
+
+function renderTradeStats() {
+  if (!statsRows) return;
+  const sinceMs = getTradeStatsPeriodSinceMs(tradeStatsPeriod);
+  const rows = SERVER_BOTS.map((bot) => ({ bot, s: getBotStatsForPeriod(bot, sinceMs) }));
+  const totalRow = rows.find((r) => r.bot.strategy === "all");
+  if (statsSummary && totalRow) {
+    const { s } = totalRow;
     const pnlClass = s.pnl > 0 ? "pos" : s.pnl < 0 ? "neg" : "";
-    const badgeClass = s.pnl > 0 ? "strategy-card__badge--profit" : s.pnl < 0 ? "strategy-card__badge--loss" : "";
-    const pnlStr = `${s.pnl >= 0 ? "+" : ""}${s.pnl.toFixed(2)} USDT`;
-    const wrStr  = s.wr  !== null ? `${s.wr.toFixed(0)}%` : "—";
-    const rrStr  = s.rr  !== null ? s.rr.toFixed(2) : "—";
-    const expStr = s.expect !== null ? `${s.expect >= 0 ? "+" : ""}${s.expect.toFixed(3)}` : "—";
-    return `
-      <div class="strategy-card strategy-card--${color}">
-        <div class="strategy-card__header">
-          <span class="strategy-card__name">${label}</span>
-          <span class="strategy-card__badge ${badgeClass}">${pnlStr}</span>
-        </div>
-        <div class="strategy-card__metrics">
-          <div class="strategy-card__metric">
-            <span>Активных</span>
-            <strong>${s.active}</strong>
-          </div>
-          <div class="strategy-card__metric">
-            <span>Закрытых</span>
-            <strong>${s.closed}</strong>
-          </div>
-          <div class="strategy-card__metric">
-            <span>Winrate</span>
-            <strong class="${s.wr !== null && s.wr >= 50 ? "pos" : s.wr !== null ? "neg" : ""}">${wrStr}</strong>
-          </div>
-          <div class="strategy-card__metric">
-            <span>R:R</span>
-            <strong class="${s.rr !== null && s.rr >= 1 ? "pos" : s.rr !== null && s.rr > 0 ? "neg" : ""}">${rrStr}</strong>
-          </div>
-          <div class="strategy-card__metric">
-            <span>Avg W / L</span>
-            <strong>${s.wins > 0 ? `+${s.avgW.toFixed(2)}` : "—"} / ${s.losses > 0 ? s.avgL.toFixed(2) : "—"}</strong>
-          </div>
-          <div class="strategy-card__metric">
-            <span>Ожидание</span>
-            <strong class="${s.expect !== null && s.expect > 0 ? "pos" : s.expect !== null ? "neg" : ""}">${expStr}</strong>
-          </div>
-        </div>
-        <div class="strategy-card__footer">Сделки: ${s.wins}W / ${s.losses}L · ${formatAgo(s.lastTrade)}</div>
-      </div>
+    statsSummary.innerHTML = `
+      <div><span>Активных</span><strong>${s.active}</strong></div>
+      <div><span>Закрыто</span><strong>${s.closed}</strong></div>
+      <div><span>Win Rate</span><strong>${s.wr !== null ? `${s.wr.toFixed(0)}%` : "—"}</strong></div>
+      <div><span>PNL</span><strong class="${pnlClass}">${s.pnl >= 0 ? "+" : ""}${s.pnl.toFixed(2)} USDT</strong></div>
     `;
+  }
+  statsRows.innerHTML = rows.map(({ bot, s }) => {
+    const pnlClass = s.pnl > 0 ? "pos" : s.pnl < 0 ? "neg" : "";
+    const wrStr = s.wr !== null ? `${s.wr.toFixed(0)}%` : "—";
+    return `<tr>
+      <td>${escapeHtml(bot.label)}</td>
+      <td>${s.active + s.closed}</td>
+      <td>${s.closed}</td>
+      <td>${wrStr}</td>
+      <td class="${pnlClass}">${s.pnl >= 0 ? "+" : ""}${s.pnl.toFixed(2)}</td>
+    </tr>`;
   }).join("");
-  botsGrid.innerHTML = html;
-  if (botsLastUpdate) {
+  if (statsLastUpdate) {
     const now = new Date();
-    botsLastUpdate.textContent = `обновлено ${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}:${now.getSeconds().toString().padStart(2,"0")}`;
+    statsLastUpdate.textContent = `обновлено ${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}:${now.getSeconds().toString().padStart(2,"0")}`;
+  }
+  if (statsPeriodBar) {
+    statsPeriodBar.querySelectorAll("[data-period]").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.period === tradeStatsPeriod);
+    });
   }
   renderServerOpenPositions();
+}
+
+if (statsPeriodBar) {
+  statsPeriodBar.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-period]");
+    if (btn) setTradeStatsPeriod(btn.dataset.period);
+  });
 }
 
 function renderServerOpenPositions() {
@@ -7534,6 +7534,7 @@ window.setInterval(() => refreshOpenPaperTradePrices(), 10000);
 window.setInterval(() => runAutopilotScan(), autopilotScanMs);
 window.setInterval(() => runDailyLearningReview(false), learningReviewMs);
 window.setInterval(() => syncRemoteJournal(false), 30000);
+window.setInterval(() => renderTradeStats(), 120000);
 window.setInterval(() => refreshCmcRadar(false), 10 * 60 * 1000);
 window.setInterval(() => refreshNewsAnalytics(false), 15 * 60 * 1000);
 

@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="styles.css">
     <script src="remote-journal-config.js?v=20260617-0205"></script>
     <script src="market-radar-config.js"></script>
-    <script src="app.js?v=20260617-0415" defer></script>
+    <script src="app.js?v=20260620-1340" defer></script>
   </head>
   <body class="auth-locked">
 
@@ -408,14 +408,36 @@
 
           </div>
 
-          <!-- Strategy dashboard: all 4 server bots -->
-          <div class="strategy-dashboard">
+          <!-- Trade stats: money result by period, per server bot -->
+          <div class="trade-stats">
             <div class="output-header">
-              <span>Серверные стратегии — сравнение в реальном времени</span>
-              <span class="status-pill" data-bots-last-update style="font-size:11px">—</span>
+              <span>Статистика торговли</span>
+              <span class="status-pill" data-stats-last-update style="font-size:11px">—</span>
             </div>
-            <div class="bots-grid" data-bots-grid>
+            <div class="stats-period" data-stats-period>
+              <button class="stats-period__btn" type="button" data-period="today">Сегодня</button>
+              <button class="stats-period__btn" type="button" data-period="week">7 дней</button>
+              <button class="stats-period__btn" type="button" data-period="month">30 дней</button>
+              <button class="stats-period__btn" type="button" data-period="all">Всё время</button>
+            </div>
+            <div class="journal-summary" data-stats-summary>
               <!-- rendered by JS -->
+            </div>
+            <div class="journal-table-wrap">
+              <table class="journal-table">
+                <thead>
+                  <tr>
+                    <th>Бот</th>
+                    <th>Сделок</th>
+                    <th>Закрыто</th>
+                    <th>Win Rate</th>
+                    <th>PNL, USDT</th>
+                  </tr>
+                </thead>
+                <tbody data-stats-rows>
+                  <tr><td colspan="5">Загрузка...</td></tr>
+                </tbody>
+              </table>
             </div>
             <div class="server-open-positions" data-server-open-positions>
               <!-- rendered by JS -->
