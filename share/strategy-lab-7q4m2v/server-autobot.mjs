@@ -1978,7 +1978,10 @@ async function buildServerTrade(candidate, trades) {
     sessionId: "server-autobot",
     asset: candidate.symbol,
     timeframe: candidate.interval,
-    mode: candidate.strategyKind === "pullback" ? "pullback" : candidate.scalping ? "scalping" : "trend",
+    // Раньше тут был тройной тернарник pullback/scalping/"trend"-по-умолчанию, который
+    // схлопывал breakout/rsi-reversal/vwap-reversion/momentum в "trend" — искажало всю
+    // аналитику журнала по стратегиям. serverStrategyId (= strategy.id) — настоящий ключ.
+    mode: candidate.strategyKind,
     modeSource: "server-auto",
     side: candidate.side,
     amount,
@@ -2040,7 +2043,7 @@ function buildStrategySnapshot(candidate, amount) {
     context: {
       asset: candidate.symbol,
       timeframe: candidate.interval,
-      mode: candidate.strategyKind === "pullback" ? "pullback" : candidate.scalping ? "scalping" : "trend",
+      mode: candidate.strategyKind,
       modeSource: "server-auto",
       strategyMode: candidate.strategyMode,
       serverStrategyId: candidate.strategyId,
