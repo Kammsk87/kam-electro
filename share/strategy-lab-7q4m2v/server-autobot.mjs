@@ -1184,7 +1184,16 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
   const slopePct = emaFast > 0 ? ((emaFast - ema34[Math.max(0, i - 5)]) / emaFast) * 100 : 0;
   const atrPct = atr / last.close * 100;
   const avgVolume = average(candles.slice(-30, -1).map((candle) => candle.volume));
-  const volumeRatio = avgVolume > 0 ? last.volume / avgVolume : 1;
+  // Биржевые API отдают последней свечой ещё формирующийся (незакрытый) бар — его объём
+  // сравнивается с avgVolume по ПОЛНЫМ свечам, систематически занижая volumeRatio в первой
+  // половине каждого периода (диагностика 2026-06-20: volumeRatio 0.01-0.3 почти на всех
+  // активах одновременно — не "тихий рынок", а артефакт сравнения частичного бара с целыми).
+  // Нормализуем объём текущего бара на долю прошедшего времени, прежде чем считать ratio.
+  const barDurationMs = intervalToMs(interval);
+  const elapsedMs = Math.max(1, Date.now() - (last.openTime || 0));
+  const elapsedFraction = Math.min(1, elapsedMs / barDurationMs);
+  const projectedLastVolume = elapsedFraction > 0.05 ? last.volume / elapsedFraction : last.volume;
+  const volumeRatio = avgVolume > 0 ? projectedLastVolume / avgVolume : 1;
   const impulsePct = prev.close > 0 ? ((last.close - prev.close) / prev.close) * 100 : 0;
   const crash = detectCrash(candles);
   if (crash.severe || atrPct > 4.5 || atrPct < 0.18) return null;
