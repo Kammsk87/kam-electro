@@ -2587,6 +2587,11 @@ function getDailyRisk(trades) {
   const stops = today.filter((trade) => trade.status === "stop" || Number(trade.pnl) < 0).length;
   const stopLimit = config.dailyStopLimit || 3;
   const lossPctLimit = config.dailyLossPctLimit || 3;
+  // На этапе сбора данных (profile=training) цель — максимум сигналов/сделок для статистики,
+  // а не защита капитала (это paper-режим). Дневной стоп-лимит здесь намеренно отключён —
+  // иначе он обрывает накопление телеметрии (и исполненных, и отклонённых сигналов) ровно
+  // тогда, когда она нужнее всего. Для других профилей (real/active/protective) лимит остаётся.
+  if (config.profileId === "training") return { pnl, lossPct, stops, blocked: false };
   return { pnl, lossPct, stops, blocked: lossPct >= lossPctLimit || stops >= stopLimit };
 }
 
