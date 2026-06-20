@@ -696,6 +696,7 @@ async function saveRejectedSignals(rejected, enteredCount) {
       score: c.score,
       reject_reason: rejectReason,
       reason_detail: c.reason || "",
+      features: c.features || null,
       recorded_at: new Date(now).toISOString()
     };
   });
@@ -1275,13 +1276,14 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
   // В журнале почти все LONG-сделки шли с тегом "BTC LONG", но альты явно были слабее BTC —
   // классический признак того, что лонг идёт против реальной относительной силы.
   const btcReturnPct = externalFilters.btcReturnPct ?? 0;
+  let altBtcRelStrength = null;
   if (symbol !== "BTC/USDT" && i >= 20 && Number.isFinite(closes[i - 20]) && closes[i - 20] > 0) {
     const altReturnPct = ((closes[i] - closes[i - 20]) / closes[i - 20]) * 100;
-    const relStrength = altReturnPct - btcReturnPct;
-    if (side === "LONG" && relStrength < -1.5) score -= 8;
-    else if (side === "LONG" && relStrength > 1.5) score += 4;
-    else if (side === "SHORT" && relStrength > 1.5) score -= 8;
-    else if (side === "SHORT" && relStrength < -1.5) score += 4;
+    altBtcRelStrength = altReturnPct - btcReturnPct;
+    if (side === "LONG" && altBtcRelStrength < -1.5) score -= 8;
+    else if (side === "LONG" && altBtcRelStrength > 1.5) score += 4;
+    else if (side === "SHORT" && altBtcRelStrength > 1.5) score -= 8;
+    else if (side === "SHORT" && altBtcRelStrength < -1.5) score += 4;
   }
   // Золото/серебро: RISK_OFF = деньги уходят в защитные активы = осторожность с LONG
   if (goldSentiment === "RISK_OFF") {
@@ -1431,6 +1433,33 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
     scenario,
     expected,
     patternKey,
+    // Структурированный снимок признаков для будущего ML-слоя — то же, что уже идёт в reason
+    // строкой для людей, но в стабильном машиночитаемом виде, без регулярок по тексту.
+    features: {
+      asset: symbol,
+      timeframe: interval,
+      side,
+      strategy: strategy.id,
+      score: Math.round(Math.max(0, Math.min(100, score))),
+      rsi: Number(rsi.toFixed(2)),
+      emaTrend: trend,
+      macdBullish: Number.isFinite(macd) && Number.isFinite(macdSig) ? macd > macdSig : null,
+      adx: Number.isFinite(adx) ? Number(adx.toFixed(2)) : null,
+      supertrendBullish: Number.isFinite(stDir) ? stDir === 1 : null,
+      volumeRatio: Number(volumeRatio.toFixed(3)),
+      atrPct: Number(atrPct.toFixed(3)),
+      mtfScoreDelta: mtfDecision.scoreDelta,
+      btcTrend,
+      altBtcRelStrength: altBtcRelStrength === null ? null : Number(altBtcRelStrength.toFixed(3)),
+      fundingRatePct: funding ? Number(funding.fundingRatePct.toFixed(4)) : null,
+      fearGreed: fearGreed ? fearGreed.value : null,
+      oiChangePct: externalFilters.openInterest ? Number(externalFilters.openInterest.changePct.toFixed(3)) : null,
+      newsBias: news ? news.bias : null,
+      newsScore: news ? Number(news.score.toFixed(1)) : null,
+      historyTrades: history.trades,
+      historyWinRate: history.trades ? Number(history.winRate.toFixed(1)) : null,
+      historyAvgPnlPct: history.trades ? Number(history.avgPnlPct.toFixed(3)) : null
+    },
     reason: `${strategy.label}: EMA ${side}, RSI ${rsi.toFixed(1)}, MACD ${Number.isFinite(macd) && Number.isFinite(macdSig) ? (macd > macdSig ? "↑" : "↓") : "?"}, ADX ${Number.isFinite(adx) ? adx.toFixed(0) : "?"}, ST ${stDir === 1 ? "↑" : "↓"}, vol x${volumeRatio.toFixed(2)}, ATR ${atrPct.toFixed(2)}%, стоп ${atrStop.stopPct.toFixed(2)}%, F&G ${fearGreed ? `${fearGreed.value}` : "n/a"}, MTF ${mtf?.summary || "proxy"}, funding ${funding ? `${funding.fundingRatePct.toFixed(4)}%` : "n/a"}, OI ${externalFilters.openInterest ? `${externalFilters.openInterest.changePct.toFixed(2)}%` : "n/a"}, новости ${news ? `${news.bias} ${news.score.toFixed(0)}` : "n/a"}, цель ${expected.weightedNetPct.toFixed(2)}%, BTC ${btcTrend}`
   };
 }
@@ -2051,6 +2080,7 @@ async function buildServerTrade(candidate, trades) {
     signalTemplate: candidate.signalTemplate,
     botPreset: `server-${candidate.strategyId}`,
     autopilotReason: `server-autobot ${config.profileLabel}/${candidate.strategyLabel}: ${candidate.reason}, score ${candidate.score}/100`,
+    features: candidate.features || null,
     entry: scenario.entry,
     quantity,
     initialQuantity: quantity,
