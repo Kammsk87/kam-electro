@@ -1027,13 +1027,17 @@ async function scanCandidates(trades, learningPolicy) {
   const dailyRisk = getDailyRisk(trades);
   if (dailyRisk.blocked) return [];
 
-  const [btcTrend, goldSentiment, fearGreed, newsMap] = await Promise.all([
+  const strategiesByInterval = groupStrategiesByInterval(enabledStrategies);
+  const intervalsUsed = [...strategiesByInterval.keys()];
+
+  const [btcTrend, goldSentiment, fearGreed, newsMap, btcReturnEntries] = await Promise.all([
     getBtcTrend(),
     getGoldSentiment(),
     fetchFearGreedIntel().catch(() => null),
-    fetchNewsSentimentMap().catch(() => new Map())
+    fetchNewsSentimentMap().catch(() => new Map()),
+    Promise.all(intervalsUsed.map(async (interval) => [interval, await getBtcReturnPct(interval)]))
   ]);
-  const strategiesByInterval = groupStrategiesByInterval(enabledStrategies);
+  const btcReturnByInterval = new Map(btcReturnEntries);
   const scanTasks = [];
   for (const symbol of config.assets) {
     if ((activeAssetCounts.get(symbol) || 0) >= config.maxActivePerAsset) continue;
@@ -1053,9 +1057,10 @@ async function scanCandidates(trades, learningPolicy) {
     ]);
     if (candles.length < (needsStandardHistory ? 90 : 60)) return [];
     const news = newsMap.get(symbol.split("/")[0]) || null;
+    const btcReturnPct = btcReturnByInterval.get(interval) ?? 0;
     return strategies
       .filter((strategy) => candles.length >= (strategy.kind === "scalping" ? 60 : 90))
-      .map((strategy) => evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend, goldSentiment, { mtf, funding, openInterest, fearGreed, news }))
+      .map((strategy) => evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend, goldSentiment, { mtf, funding, openInterest, fearGreed, news, btcReturnPct }))
       .filter((candidate) => candidate && !activeKeys.has(getCandidateStrategyExposureKey(candidate)));
   });
 
@@ -1204,13 +1209,33 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
   const blockPenalty = isSoftMode ? getSoftBlockPenalty(symbol, interval, side, strategy, learningPolicy) : 0;
   let score = 45 - blockPenalty;
   score += side === "LONG" ? Math.max(-10, Math.min(14, slopePct * 8)) : Math.max(-10, Math.min(14, -slopePct * 8));
-  if (side === "LONG" && rsi >= 48 && rsi <= 66) score += 15;
+  // RSI: узкая "здоровая" зона + штраф за уход в зону, уже разогнанную в сторону сделки.
+  // Журнал (414 закрытых сделок): LONG при RSI>=60 — winrate 13.6% против 35.2% в зоне 40-60 —
+  // самый сильный предиктор проигрыша из всех (логрегрессия: rsi_ext коэф. -1.03, сильнее объёма).
+  if (side === "LONG" && rsi >= 48 && rsi <= 58) score += 15;
   if (side === "SHORT" && rsi >= 34 && rsi <= 52) score += 15;
-  if (volumeRatio >= 1.15) score += 12;
-  if (volumeRatio >= 1.6) score += 5;
+  const rsiExtension = (rsi - 50) * (side === "LONG" ? 1 : -1);
+  if (rsiExtension > 8) score -= Math.min(18, (rsiExtension - 8) * 1.5);
+  // Объём: высокий относительный объём в журнале коррелирует с ПРОИГРЫШЕМ, а не подтверждением —
+  // winrate монотонно падает с 41.5% (vol<0.5x) до 9.1% (vol>2.5x). Похоже на новостной спайк/
+  // истощение движения, а не здоровый импульс. Для breakout/scalping логика обратная (там объём
+  // на пробое — это и есть сигнал), поэтому штраф применяем только к trend/pullback.
+  if (strategy.kind === "trend" || strategy.kind === "pullback") {
+    if (volumeRatio > 2.5) score -= 14;
+    else if (volumeRatio > 1.5) score -= 6;
+  } else {
+    if (volumeRatio >= 1.15) score += 12;
+    if (volumeRatio >= 1.6) score += 5;
+  }
   if (atrPct >= 0.25 && atrPct <= 1.8) score += 10;
   if (Math.abs(impulsePct) > 3.2) score -= 12;
-  if (interval === "5m" || interval === "15m") score += 3;
+  // На 5m/15m trend-сигналы чаще ловят шум, а не реальный тренд (почти все худшие паттерны в
+  // журнале — LONG+5m/15m+trend на альтах) — там нужен заметно сильнее ADX, иначе штраф.
+  if (strategy.kind === "trend" && (interval === "5m" || interval === "15m")) {
+    if (!Number.isFinite(adx) || adx < 24) score -= 12;
+  } else if (interval === "5m" || interval === "15m") {
+    score += 3;
+  }
   score += mtfDecision.scoreDelta;
   score += fundingDecision.scoreDelta;
   score += fearGreedDecision.scoreDelta;
@@ -1228,6 +1253,19 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
     else if (btcTrend === "SHORT" && side === "SHORT") score += 6;
     else if (btcTrend === "LONG" && side === "LONG") score += 5;
     else if (btcTrend === "LONG" && side === "SHORT") score -= 5;
+  }
+  // Относительная сила альта к BTC за тот же период — грубый тег btcTrend не видит дивергенцию:
+  // альт может технически быть LONG по EMA, но отставать от BTC за то же время (или наоборот).
+  // В журнале почти все LONG-сделки шли с тегом "BTC LONG", но альты явно были слабее BTC —
+  // классический признак того, что лонг идёт против реальной относительной силы.
+  const btcReturnPct = externalFilters.btcReturnPct ?? 0;
+  if (symbol !== "BTC/USDT" && i >= 20 && Number.isFinite(closes[i - 20]) && closes[i - 20] > 0) {
+    const altReturnPct = ((closes[i] - closes[i - 20]) / closes[i - 20]) * 100;
+    const relStrength = altReturnPct - btcReturnPct;
+    if (side === "LONG" && relStrength < -1.5) score -= 8;
+    else if (side === "LONG" && relStrength > 1.5) score += 4;
+    else if (side === "SHORT" && relStrength > 1.5) score -= 8;
+    else if (side === "SHORT" && relStrength < -1.5) score += 4;
   }
   // Золото/серебро: RISK_OFF = деньги уходят в защитные активы = осторожность с LONG
   if (goldSentiment === "RISK_OFF") {
@@ -1249,19 +1287,22 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
       score -= 6; // extreme volatility, risky entry
     }
   }
-  // MACD confluence: independent momentum confirmation
+  // MACD confluence: логрегрессия на журнале даёт коэф. ~-0.15 (шум/избыточен при наличии
+  // EMA+Supertrend) — это совпадает с тем, что losing-сделки чаще совпадали по MACD (74%),
+  // чем winning (56%). Вес снижен, но не убран — отдельной отрицательной сигнальности нет.
   if (Number.isFinite(macd) && Number.isFinite(macdSig)) {
     const macdBullish = macd > macdSig;
-    if (side === "LONG" && macdBullish) score += 8;
-    else if (side === "SHORT" && !macdBullish) score += 8;
-    else score -= 7; // MACD contradicts direction
+    if (side === "LONG" && macdBullish) score += 3;
+    else if (side === "SHORT" && !macdBullish) score += 3;
+    else score -= 4; // MACD contradicts direction
   }
-  // Supertrend direction confirmation
+  // Supertrend direction confirmation — логрегрессия: коэф. +0.84, один из самых сильных
+  // независимых предикторов победы в журнале. Вес повышен.
   if (Number.isFinite(stDir)) {
     const stBullish = stDir === 1;
-    if (side === "LONG" && stBullish) score += 6;
-    else if (side === "SHORT" && !stBullish) score += 6;
-    else score -= 8; // Supertrend contradicts direction
+    if (side === "LONG" && stBullish) score += 8;
+    else if (side === "SHORT" && !stBullish) score += 8;
+    else score -= 10; // Supertrend contradicts direction
   }
   // RSI divergence: price vs RSI disagree over last 8 candles → weakening momentum
   const divLookback = 8;
@@ -1835,6 +1876,23 @@ async function getBtcTrend() {
     return "NEUTRAL";
   } catch {
     return "NEUTRAL";
+  }
+}
+
+// BTC % изменение за тот же тайм-фрейм/lookback, что у альта — для сравнения относительной силы.
+// Грубый тег btcTrend (LONG/SHORT/NEUTRAL) не видит дивергенцию: альт может технически быть
+// LONG по EMA, но отставать от BTC за тот же период — именно такие сделки чаще ловили стоп в журнале.
+async function getBtcReturnPct(interval, lookback = 20) {
+  try {
+    const candles = await fetchCandles("BTC/USDT", interval, lookback + 5);
+    if (candles.length < lookback + 1) return 0;
+    const closes = candles.map((c) => c.close);
+    const i = closes.length - 1;
+    const base = closes[i - lookback];
+    if (!Number.isFinite(base) || base <= 0) return 0;
+    return ((closes[i] - base) / base) * 100;
+  } catch {
+    return 0;
   }
 }
 
