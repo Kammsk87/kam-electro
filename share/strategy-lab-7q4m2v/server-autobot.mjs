@@ -1209,33 +1209,17 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
   const blockPenalty = isSoftMode ? getSoftBlockPenalty(symbol, interval, side, strategy, learningPolicy) : 0;
   let score = 45 - blockPenalty;
   score += side === "LONG" ? Math.max(-10, Math.min(14, slopePct * 8)) : Math.max(-10, Math.min(14, -slopePct * 8));
-  // RSI: узкая "здоровая" зона + штраф за уход в зону, уже разогнанную в сторону сделки.
-  // Журнал (414 закрытых сделок): LONG при RSI>=60 — winrate 13.6% против 35.2% в зоне 40-60 —
-  // самый сильный предиктор проигрыша из всех (логрегрессия: rsi_ext коэф. -1.03, сильнее объёма).
-  if (side === "LONG" && rsi >= 48 && rsi <= 58) score += 15;
+  // RSI, объём и ADX/5m-15m: 20.06 были подкручены по выборке 414 сделок из старой облачной базы.
+  // На полном журнале (1098 сделок из db.kamtok.ru, после восстановления синхронизации) эти три
+  // правки не подтвердились — у объёма и ADX<24 эффект ушёл в шум, а RSI>=60 для LONG в trend/
+  // pullback оказался даже лучше (wr 57% vs 45.8%), не хуже. Откатываем к исходной логике.
+  if (side === "LONG" && rsi >= 48 && rsi <= 66) score += 15;
   if (side === "SHORT" && rsi >= 34 && rsi <= 52) score += 15;
-  const rsiExtension = (rsi - 50) * (side === "LONG" ? 1 : -1);
-  if (rsiExtension > 8) score -= Math.min(18, (rsiExtension - 8) * 1.5);
-  // Объём: высокий относительный объём в журнале коррелирует с ПРОИГРЫШЕМ, а не подтверждением —
-  // winrate монотонно падает с 41.5% (vol<0.5x) до 9.1% (vol>2.5x). Похоже на новостной спайк/
-  // истощение движения, а не здоровый импульс. Для breakout/scalping логика обратная (там объём
-  // на пробое — это и есть сигнал), поэтому штраф применяем только к trend/pullback.
-  if (strategy.kind === "trend" || strategy.kind === "pullback") {
-    if (volumeRatio > 2.5) score -= 14;
-    else if (volumeRatio > 1.5) score -= 6;
-  } else {
-    if (volumeRatio >= 1.15) score += 12;
-    if (volumeRatio >= 1.6) score += 5;
-  }
+  if (volumeRatio >= 1.15) score += 12;
+  if (volumeRatio >= 1.6) score += 5;
   if (atrPct >= 0.25 && atrPct <= 1.8) score += 10;
   if (Math.abs(impulsePct) > 3.2) score -= 12;
-  // На 5m/15m trend-сигналы чаще ловят шум, а не реальный тренд (почти все худшие паттерны в
-  // журнале — LONG+5m/15m+trend на альтах) — там нужен заметно сильнее ADX, иначе штраф.
-  if (strategy.kind === "trend" && (interval === "5m" || interval === "15m")) {
-    if (!Number.isFinite(adx) || adx < 24) score -= 12;
-  } else if (interval === "5m" || interval === "15m") {
-    score += 3;
-  }
+  if (interval === "5m" || interval === "15m") score += 3;
   score += mtfDecision.scoreDelta;
   score += fundingDecision.scoreDelta;
   score += fearGreedDecision.scoreDelta;
@@ -1287,22 +1271,21 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
       score -= 6; // extreme volatility, risky entry
     }
   }
-  // MACD confluence: логрегрессия на журнале даёт коэф. ~-0.15 (шум/избыточен при наличии
-  // EMA+Supertrend) — это совпадает с тем, что losing-сделки чаще совпадали по MACD (74%),
-  // чем winning (56%). Вес снижен, но не убран — отдельной отрицательной сигнальности нет.
+  // MACD/Supertrend веса тоже откатываем: на 414-сделочной выборке логрегрессия давала MACD
+  // коэф. ~-0.15 и ST коэф. +0.84, на полном журнале (1098 сделок) — наоборот: MACD +0.39
+  // (реально помогает), ST ~-0.03 (никакого independent-эффекта). Малая выборка была шумом.
   if (Number.isFinite(macd) && Number.isFinite(macdSig)) {
     const macdBullish = macd > macdSig;
-    if (side === "LONG" && macdBullish) score += 3;
-    else if (side === "SHORT" && !macdBullish) score += 3;
-    else score -= 4; // MACD contradicts direction
+    if (side === "LONG" && macdBullish) score += 8;
+    else if (side === "SHORT" && !macdBullish) score += 8;
+    else score -= 7; // MACD contradicts direction
   }
-  // Supertrend direction confirmation — логрегрессия: коэф. +0.84, один из самых сильных
-  // независимых предикторов победы в журнале. Вес повышен.
+  // Supertrend direction confirmation
   if (Number.isFinite(stDir)) {
     const stBullish = stDir === 1;
-    if (side === "LONG" && stBullish) score += 8;
-    else if (side === "SHORT" && !stBullish) score += 8;
-    else score -= 10; // Supertrend contradicts direction
+    if (side === "LONG" && stBullish) score += 6;
+    else if (side === "SHORT" && !stBullish) score += 6;
+    else score -= 8; // Supertrend contradicts direction
   }
   // RSI divergence: price vs RSI disagree over last 8 candles → weakening momentum
   const divLookback = 8;
