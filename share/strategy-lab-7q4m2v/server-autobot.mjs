@@ -11,6 +11,7 @@ const supabaseUrl = (process.env.SUPABASE_URL || "https://dcpenxsthdhvhhqgvgjq.s
 const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY || "sb_publishable_BYYOhjwhgjZBP27Yw7YkVg_CEhF6ugc";
 const supabaseTradesTable = process.env.BOTALIN_TRADES_TABLE || "crypto_strategy_trades";
 const supabaseSettingsTable = process.env.BOTALIN_SETTINGS_TABLE || "crypto_strategy_settings";
+const supabaseRejectedTable = process.env.BOTALIN_REJECTED_TABLE || "rejected_signals";
 const remoteBackend = process.env.BOTALIN_REMOTE_BACKEND || "supabase";
 const localJournalPath = process.env.BOTALIN_LOCAL_JOURNAL_PATH || resolve(process.cwd(), ".botalin", "server-journal.jsonl");
 const firestoreFallbackCachePath = process.env.BOTALIN_FIRESTORE_CACHE_PATH || resolve(process.cwd(), ".botalin", "firestore-fallback-cache.json");
@@ -679,15 +680,12 @@ function getJournalDocTime(doc) {
 
 async function saveRejectedSignals(rejected, enteredCount) {
   if (!rejected.length) return;
-  if (remoteBackend === "supabase") {
-    return;
-  }
   const now = Date.now();
-  const writes = rejected.slice(0, 40).map((c) => {
+  const docs = rejected.slice(0, 40).map((c) => {
     const minScore = getStrategyMinScore(serverStrategies[c.strategyId] || serverStrategies.trend);
     const rejectReason = c.score < minScore ? `score_low:${c.score}<${minScore}` : `limit_or_cooldown:entered_${enteredCount}`;
     const id = `rej-${now}-${c.symbol.replace("/", "")}-${c.interval}-${c.side}-${c.strategyId}`;
-    const doc = {
+    return {
       id,
       user_login: config.userLogin,
       profile: config.profileId,
@@ -700,8 +698,20 @@ async function saveRejectedSignals(rejected, enteredCount) {
       reason_detail: c.reason || "",
       recorded_at: new Date(now).toISOString()
     };
-    return { update: { name: `${firestoreDocPath}/rejected_signals/${id}`, fields: toFirestoreFields(doc) } };
   });
+  if (remoteBackend === "supabase") {
+    // Без этого ML-слой на журнале учится только на сделках, прошедших фильтр —
+    // классический survivorship bias. Пишем отклонённые сигналы в ту же Postgres-базу.
+    await supabaseFetch(`/${encodeURIComponent(supabaseRejectedTable)}?on_conflict=id`, {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify(docs)
+    });
+    return;
+  }
+  const writes = docs.map((doc) => ({
+    update: { name: `${firestoreDocPath}/rejected_signals/${doc.id}`, fields: toFirestoreFields(doc) }
+  }));
   await firestoreBatch(writes);
 }
 
