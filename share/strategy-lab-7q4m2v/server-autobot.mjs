@@ -1078,18 +1078,19 @@ async function scanCandidates(trades, learningPolicy) {
   const groups = await mapLimit(scanTasks, 5, async ({ symbol, interval, strategies }) => {
     await wait(80);
     const needsStandardHistory = strategies.some((strategy) => strategy.kind !== "scalping");
-    const [candles, mtf, funding, openInterest] = await Promise.all([
+    const [candles, mtf, funding, openInterest, spread] = await Promise.all([
       fetchCandles(symbol, interval, needsStandardHistory ? 220 : 160).catch(() => []),
       fetchMultiTimeframeConfirmation(symbol, interval).catch(() => null),
       fetchFundingIntel(symbol).catch(() => null),
-      fetchOpenInterestIntel(symbol).catch(() => null)
+      fetchOpenInterestIntel(symbol).catch(() => null),
+      fetchSpreadIntel(symbol).catch(() => null)
     ]);
     if (candles.length < (needsStandardHistory ? 90 : 60)) return [];
     const news = newsMap.get(symbol.split("/")[0]) || null;
     const btcReturnPct = btcReturnByInterval.get(interval) ?? 0;
     return strategies
       .filter((strategy) => candles.length >= (strategy.kind === "scalping" ? 60 : 90))
-      .map((strategy) => evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend, goldSentiment, { mtf, funding, openInterest, fearGreed, news, btcReturnPct }, gateRejections))
+      .map((strategy) => evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend, goldSentiment, { mtf, funding, openInterest, spread, news, btcReturnPct }, gateRejections))
       .filter((candidate) => candidate && !activeKeys.has(getCandidateStrategyExposureKey(candidate)));
   });
 
@@ -1226,20 +1227,49 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
     side = trend;
   }
 
-  if (crash.riskOff && side === "LONG") return null;
-  if (volumeRatio < (scalping ? config.minScalpingVolumeRatio : config.minVolumeRatio)) return null;
+  // Лёгкий снимок для гейтов ДО того, как известны score/mtf/funding/fearGreed/history —
+  // closure ниже (recordGateRejection) использует полный снимок, но он доступен только
+  // после этих ранних фильтров. Без этого confirmation-фильтры (MTF/funding/F&G/policy)
+  // были вторым по объёму слепым пятном в rejected_signals после самих стратегических гейтов.
+  const recordEarlyRejection = (gateName, extra = {}) => {
+    if (!gateRejections) return;
+    gateRejections.push({
+      symbol,
+      interval,
+      side,
+      strategyId: strategy.id,
+      score: null,
+      gateReason: `early:${gateName}`,
+      features: {
+        asset: symbol,
+        timeframe: interval,
+        side,
+        strategy: strategy.id,
+        rsi: Number(rsi.toFixed(2)),
+        emaTrend: trend,
+        adx: Number.isFinite(adx) ? Number(adx.toFixed(2)) : null,
+        volumeRatio: Number(volumeRatio.toFixed(3)),
+        atrPct: Number(atrPct.toFixed(3)),
+        bidAskSpreadPct: externalFilters.spread && Number.isFinite(externalFilters.spread.spreadPct) ? Number(externalFilters.spread.spreadPct.toFixed(4)) : null,
+        ...extra
+      }
+    });
+  };
+
+  if (crash.riskOff && side === "LONG") { recordEarlyRejection("crash-riskoff"); return null; }
+  if (volumeRatio < (scalping ? config.minScalpingVolumeRatio : config.minVolumeRatio)) { recordEarlyRejection("volume-floor"); return null; }
 
   const mtf = externalFilters.mtf || getProxyMultiTimeframeConfirmation(candles, interval);
   const mtfDecision = evaluateMultiTimeframeFilter(mtf, side, scalping);
-  if (mtfDecision.block) return null;
+  if (mtfDecision.block) { recordEarlyRejection("mtf", { mtfScoreDelta: mtfDecision.scoreDelta }); return null; }
 
   const funding = externalFilters.funding || null;
   const fundingDecision = evaluateFundingFilter(funding, side);
-  if (fundingDecision.block) return null;
+  if (fundingDecision.block) { recordEarlyRejection("funding", { fundingRatePct: funding ? Number(funding.fundingRatePct.toFixed(4)) : null }); return null; }
 
   const fearGreed = externalFilters.fearGreed || null;
   const fearGreedDecision = evaluateFearGreedFilter(fearGreed, side);
-  if (fearGreedDecision.block) return null;
+  if (fearGreedDecision.block) { recordEarlyRejection("feargreed", { fearGreed: fearGreed ? fearGreed.value : null }); return null; }
 
   const news = externalFilters.news || null;
   const newsDecision = evaluateNewsFilter(news, side);
@@ -1248,8 +1278,9 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
   const patternKey = getLearningPatternKey(symbol, interval, side, strategy.id);
   const isSoftMode = config.blockedAssetMode === "soft";
   if (!isSoftMode) {
-    if (isAssetBlockedByPolicy(symbol, learningPolicy) || learningPolicy?.blockedPatterns?.includes(patternKey)) return null;
-    if (learningPolicy?.blockedAssetSides?.includes(`${symbol}|${side}`)) return null;
+    const historyExtra = { historyTrades: history.trades, historyWinRate: history.trades ? Number(history.winRate.toFixed(1)) : null };
+    if (isAssetBlockedByPolicy(symbol, learningPolicy) || learningPolicy?.blockedPatterns?.includes(patternKey)) { recordEarlyRejection("policy-blocked", historyExtra); return null; }
+    if (learningPolicy?.blockedAssetSides?.includes(`${symbol}|${side}`)) { recordEarlyRejection("policy-blocked-side", historyExtra); return null; }
   }
   const blockPenalty = isSoftMode ? getSoftBlockPenalty(symbol, interval, side, strategy, learningPolicy) : 0;
   let score = 45 - blockPenalty;
@@ -1368,6 +1399,7 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
     fundingRatePct: funding ? Number(funding.fundingRatePct.toFixed(4)) : null,
     fearGreed: fearGreed ? fearGreed.value : null,
     oiChangePct: externalFilters.openInterest ? Number(externalFilters.openInterest.changePct.toFixed(3)) : null,
+    bidAskSpreadPct: externalFilters.spread && Number.isFinite(externalFilters.spread.spreadPct) ? Number(externalFilters.spread.spreadPct.toFixed(4)) : null,
     distancePastLevelPct: distancePastLevelPct === null ? null : Number(distancePastLevelPct.toFixed(3)),
     newsBias: news ? news.bias : null,
     newsScore: news ? Number(news.score.toFixed(1)) : null,
@@ -1423,7 +1455,11 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
     if (!mom.ok) { recordGateRejection("momentum"); return null; }
     score += mom.scoreBoost;
   }
-  if (history.trades >= 3) score += history.winRate >= 60 && history.avgPnlPct > 0 ? 10 : -25;
+  // Порог был 3 сделки — при n=3 один исход меняет winRate на 33пп, чистый шум маленькой
+  // выборки. Майнинг 374 гипотез (2026-06-22) показал, что высокий historyWinRate сейчас
+  // СТАБИЛЬНО предсказывает ХУДШИЙ следующий результат (regression to the mean на короткой
+  // "удачной полосе") — а текущий код её, наоборот, поощряет +10. Поднимаем порог доверия.
+  if (history.trades >= 8) score += history.winRate >= 60 && history.avgPnlPct > 0 ? 10 : -25;
 
   const wideStop = strategy.kind === "momentum";
   const atrStop = calculateAtrStopModel(last.close, atrPct, scalping, wideStop);
@@ -1456,8 +1492,8 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
         stopModel: atrStop
       };
   const expected = estimateScenarioExpectedNet(scenario, scalping);
-  if (expected.weightedNetPct < (scalping ? config.minScalpingExpectedNetPct : config.minExpectedNetPct)) return null;
-  if (expected.target2NetPct <= 0) return null;
+  if (expected.weightedNetPct < (scalping ? config.minScalpingExpectedNetPct : config.minExpectedNetPct)) { recordGateRejection("expected-value-low"); return null; }
+  if (expected.target2NetPct <= 0) { recordGateRejection("target2-negative"); return null; }
   if (learningPolicy?.preferredPatterns?.includes(patternKey)) score += 14;
 
   return {
@@ -1791,6 +1827,26 @@ async function fetchOpenInterestIntel(symbol) {
     previousOpenInterest: previous,
     changePct,
     updatedAt: Number(list[0]?.[0]) || Date.now()
+  };
+}
+
+async function fetchSpreadIntel(symbol) {
+  // Известный пробел ML-плана: спред bid/ask никогда не запрашивался (нет ни одного
+  // orderbook-вызова в этом файле) — добавляем как лёгкий тикер-запрос (не полный стакан,
+  // его не нужно для оценки реальной "проторгованности" сигнала).
+  const instId = `${toOkxSymbol(symbol)}-SWAP`;
+  const response = await fetchWithTimeout(`https://www.okx.com/api/v5/market/ticker?instId=${instId}`, {}, 6_000);
+  if (!response.ok) throw new Error(`ticker ${response.status}`);
+  const data = await response.json();
+  if (data.code !== "0") throw new Error(data.msg || "ticker failed");
+  const item = data.data?.[0] || {};
+  const bid = Number(item.bidPx);
+  const ask = Number(item.askPx);
+  if (!Number.isFinite(bid) || !Number.isFinite(ask) || bid <= 0 || ask <= 0) throw new Error("invalid bid/ask");
+  const mid = (bid + ask) / 2;
+  return {
+    spreadPct: mid > 0 ? ((ask - bid) / mid) * 100 : null,
+    updatedAt: Number(item.ts) || Date.now()
   };
 }
 
