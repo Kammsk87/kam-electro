@@ -404,7 +404,7 @@ async function main() {
   const basePolicy = mergeLearningPolicies(backtestPolicy || BOOTSTRAP_LEARNING_POLICY, rejectedPolicy, remotePolicy);
   const learningPolicy = mergeLearningPolicies(basePolicy, journalPolicy);
   const changedTrades = await updateActiveTrades(trades);
-  const candidates = await scanCandidates(trades, learningPolicy);
+  const { candidates, gateRejections } = await scanCandidates(trades, learningPolicy);
   const entryCandidates = selectEntryCandidates(candidates, trades);
   const best = entryCandidates[0] || candidates[0] || null;
   const newTrades = [];
@@ -446,7 +446,7 @@ async function main() {
   await saveSharedLearningPolicy(nextPolicy).catch((error) => log(`shared learning save skipped: ${error.message}`));
   const enteredSet = new Set(entryCandidates.map((c) => `${c.symbol}|${c.interval}|${c.side}|${c.strategyId}`));
   const rejected = candidates.filter((c) => !enteredSet.has(`${c.symbol}|${c.interval}|${c.side}|${c.strategyId}`));
-  await saveRejectedSignals(rejected, entryCandidates.length).catch((err) => log(`rejected signals skipped: ${err.message}`));
+  await saveRejectedSignals([...rejected, ...gateRejections], entryCandidates.length).catch((err) => log(`rejected signals skipped: ${err.message}`));
   log(`server-autobot done: profile ${config.profileId}, strategies ${enabledStrategies.map((strategy) => strategy.id).join("/")}, updated ${changedTrades.length}, new ${newTrades.length}, rejected ${rejected.length}, best ${best ? `${best.symbol} ${best.interval} ${best.side} ${best.score}` : "none"}`);
 }
 
@@ -683,7 +683,7 @@ async function saveRejectedSignals(rejected, enteredCount) {
   const now = Date.now();
   const docs = rejected.slice(0, 40).map((c) => {
     const minScore = getStrategyMinScore(serverStrategies[c.strategyId] || serverStrategies.trend);
-    const rejectReason = c.score < minScore ? `score_low:${c.score}<${minScore}` : `limit_or_cooldown:entered_${enteredCount}`;
+    const rejectReason = c.gateReason || (c.score < minScore ? `score_low:${c.score}<${minScore}` : `limit_or_cooldown:entered_${enteredCount}`);
     const id = `rej-${now}-${c.symbol.replace("/", "")}-${c.interval}-${c.side}-${c.strategyId}`;
     return {
       id,
@@ -1053,7 +1053,8 @@ async function scanCandidates(trades, learningPolicy) {
   const activeKeys = new Set(trades.filter(isActiveTrade).map((trade) => getTradeStrategyExposureKey(trade)));
   const activeAssetCounts = countActiveAssets(trades);
   const dailyRisk = getDailyRisk(trades);
-  if (dailyRisk.blocked) return [];
+  if (dailyRisk.blocked) return { candidates: [], gateRejections: [] };
+  const gateRejections = [];
 
   const strategiesByInterval = groupStrategiesByInterval(enabledStrategies);
   const intervalsUsed = [...strategiesByInterval.keys()];
@@ -1088,15 +1089,16 @@ async function scanCandidates(trades, learningPolicy) {
     const btcReturnPct = btcReturnByInterval.get(interval) ?? 0;
     return strategies
       .filter((strategy) => candles.length >= (strategy.kind === "scalping" ? 60 : 90))
-      .map((strategy) => evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend, goldSentiment, { mtf, funding, openInterest, fearGreed, news, btcReturnPct }))
+      .map((strategy) => evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend, goldSentiment, { mtf, funding, openInterest, fearGreed, news, btcReturnPct }, gateRejections))
       .filter((candidate) => candidate && !activeKeys.has(getCandidateStrategyExposureKey(candidate)));
   });
 
   const results = groups.flat();
-  return results
+  const candidates = results
     .filter((candidate) => !hasRecentDuplicate(trades, candidate))
     .sort((a, b) => b.score - a.score)
     .slice(0, 24);
+  return { candidates, gateRejections };
 }
 
 function groupStrategiesByInterval(strategies) {
@@ -1157,7 +1159,7 @@ function classifyMarketRegime(adx, slopePct, atrPct) {
   return `${trending ? "trending" : "ranging"}-${up ? "up" : "down"}-${highVol ? "highvol" : "lowvol"}`;
 }
 
-function evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend = "NEUTRAL", goldSentiment = "NEUTRAL", externalFilters = {}) {
+function evaluateCandidate(symbol, interval, candles, strategy, trades, learningPolicy, btcTrend = "NEUTRAL", goldSentiment = "NEUTRAL", externalFilters = {}, gateRejections = null) {
   const scalping = strategy.kind === "scalping";
   const closes = candles.map((candle) => candle.close);
   const last = candles[candles.length - 1];
@@ -1201,6 +1203,7 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
   // Determine trade direction — EMA-based for standard strategies; signal-based for reversal/breakout
   let side;
   let breakoutLevel = null;
+  let distancePastLevelPct = null;
   if (strategy.kind === "rsi-reversal") {
     if (rsi < config.rsiReversalLow) side = "LONG";
     else if (rsi > config.rsiReversalHigh) side = "SHORT";
@@ -1342,40 +1345,82 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
     if (priceUp && rsiUp && side === "LONG") score += 4; // momentum confirmed
     if (!priceUp && !rsiUp && side === "SHORT") score += 4; // momentum confirmed
   }
+  // Снимок признаков на момент проверки гейта качества сигнала стратегии — используется,
+  // только если сигнал не прошёл гейт (return null ниже), чтобы не терять его в rejected_signals
+  // (до этого фикса breakout/donchian/rsi-reversal/vwap/momentum никогда не попадали в эту таблицу,
+  // т.к. return null происходил раньше, чем кандидат успевал стать объектом).
+  const buildGateFeatures = () => ({
+    asset: symbol,
+    timeframe: interval,
+    side,
+    strategy: strategy.id,
+    score: Math.round(Math.max(0, Math.min(100, score))),
+    rsi: Number(rsi.toFixed(2)),
+    emaTrend: trend,
+    macdBullish: Number.isFinite(macd) && Number.isFinite(macdSig) ? macd > macdSig : null,
+    adx: Number.isFinite(adx) ? Number(adx.toFixed(2)) : null,
+    supertrendBullish: Number.isFinite(stDir) ? stDir === 1 : null,
+    volumeRatio: Number(volumeRatio.toFixed(3)),
+    atrPct: Number(atrPct.toFixed(3)),
+    mtfScoreDelta: mtfDecision.scoreDelta,
+    btcTrend,
+    altBtcRelStrength: altBtcRelStrength === null ? null : Number(altBtcRelStrength.toFixed(3)),
+    fundingRatePct: funding ? Number(funding.fundingRatePct.toFixed(4)) : null,
+    fearGreed: fearGreed ? fearGreed.value : null,
+    oiChangePct: externalFilters.openInterest ? Number(externalFilters.openInterest.changePct.toFixed(3)) : null,
+    distancePastLevelPct: distancePastLevelPct === null ? null : Number(distancePastLevelPct.toFixed(3)),
+    newsBias: news ? news.bias : null,
+    newsScore: news ? Number(news.score.toFixed(1)) : null,
+    historyTrades: history.trades,
+    historyWinRate: history.trades ? Number(history.winRate.toFixed(1)) : null,
+    historyAvgPnlPct: history.trades ? Number(history.avgPnlPct.toFixed(3)) : null
+  });
+  const recordGateRejection = (gateName) => {
+    if (!gateRejections) return;
+    gateRejections.push({
+      symbol,
+      interval,
+      side,
+      strategyId: strategy.id,
+      score: Math.round(Math.max(0, Math.min(100, score))),
+      gateReason: `gate:${gateName}`,
+      features: buildGateFeatures()
+    });
+  };
   if (strategy.kind === "pullback") {
     const pullback = evaluatePullback(closes, candles, side, rsi, atrPct, volumeRatio);
-    if (!pullback.ok) return null;
+    if (!pullback.ok) { recordGateRejection("pullback"); return null; }
     score += pullback.scoreBoost;
   }
   if (scalping) {
     const scalp = evaluateScalp(closes, candles, side, rsi, atrPct, volumeRatio);
-    if (!scalp.ok) return null;
+    if (!scalp.ok) { recordGateRejection("scalping"); return null; }
     score = Math.max(score, scalp.score);
   }
   if (strategy.kind === "rsi-reversal") {
     const reversal = evaluateRsiReversal(candles, rsi, side, atrPct, volumeRatio);
-    if (!reversal.ok) return null;
+    if (!reversal.ok) { recordGateRejection("rsi-reversal"); return null; }
     score += reversal.scoreBoost;
   }
   if (strategy.kind === "breakout") {
-    const distancePastLevelPct = breakoutLevel > 0 ? Math.abs((last.close - breakoutLevel) / breakoutLevel) * 100 : null;
+    distancePastLevelPct = breakoutLevel > 0 ? Math.abs((last.close - breakoutLevel) / breakoutLevel) * 100 : null;
     const bo = evaluateBreakoutSignal(candles, side, volumeRatio, adx, atrPct, externalFilters.openInterest, distancePastLevelPct);
-    if (!bo.ok) return null;
+    if (!bo.ok) { recordGateRejection("breakout"); return null; }
     score += bo.scoreBoost;
   }
   if (strategy.kind === "donchian-breakout") {
     const db = evaluateDonchianBreakoutSignal(volumeRatio, adx, adx14, i, atrPct);
-    if (!db.ok) return null;
+    if (!db.ok) { recordGateRejection("donchian-breakout"); return null; }
     score += db.scoreBoost;
   }
   if (strategy.kind === "vwap-reversion") {
     const vr = evaluateVwapReversion(candles, atr, side, rsi, volumeRatio);
-    if (!vr.ok) return null;
+    if (!vr.ok) { recordGateRejection("vwap-reversion"); return null; }
     score += vr.scoreBoost;
   }
   if (strategy.kind === "momentum") {
     const mom = evaluateMomentumSignal(side, volumeRatio, adx, atrPct, rsi, impulsePct);
-    if (!mom.ok) return null;
+    if (!mom.ok) { recordGateRejection("momentum"); return null; }
     score += mom.scoreBoost;
   }
   if (history.trades >= 3) score += history.winRate >= 60 && history.avgPnlPct > 0 ? 10 : -25;
@@ -1445,31 +1490,9 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
     patternKey,
     // Структурированный снимок признаков для будущего ML-слоя — то же, что уже идёт в reason
     // строкой для людей, но в стабильном машиночитаемом виде, без регулярок по тексту.
-    features: {
-      asset: symbol,
-      timeframe: interval,
-      side,
-      strategy: strategy.id,
-      score: Math.round(Math.max(0, Math.min(100, score))),
-      rsi: Number(rsi.toFixed(2)),
-      emaTrend: trend,
-      macdBullish: Number.isFinite(macd) && Number.isFinite(macdSig) ? macd > macdSig : null,
-      adx: Number.isFinite(adx) ? Number(adx.toFixed(2)) : null,
-      supertrendBullish: Number.isFinite(stDir) ? stDir === 1 : null,
-      volumeRatio: Number(volumeRatio.toFixed(3)),
-      atrPct: Number(atrPct.toFixed(3)),
-      mtfScoreDelta: mtfDecision.scoreDelta,
-      btcTrend,
-      altBtcRelStrength: altBtcRelStrength === null ? null : Number(altBtcRelStrength.toFixed(3)),
-      fundingRatePct: funding ? Number(funding.fundingRatePct.toFixed(4)) : null,
-      fearGreed: fearGreed ? fearGreed.value : null,
-      oiChangePct: externalFilters.openInterest ? Number(externalFilters.openInterest.changePct.toFixed(3)) : null,
-      newsBias: news ? news.bias : null,
-      newsScore: news ? Number(news.score.toFixed(1)) : null,
-      historyTrades: history.trades,
-      historyWinRate: history.trades ? Number(history.winRate.toFixed(1)) : null,
-      historyAvgPnlPct: history.trades ? Number(history.avgPnlPct.toFixed(3)) : null
-    },
+    // Та же функция используется для записи отказов гейтов в rejected_signals (см. recordGateRejection) —
+    // одно место правды для формы снимка признаков.
+    features: buildGateFeatures(),
     reason: `${strategy.label}: EMA ${side}, RSI ${rsi.toFixed(1)}, MACD ${Number.isFinite(macd) && Number.isFinite(macdSig) ? (macd > macdSig ? "↑" : "↓") : "?"}, ADX ${Number.isFinite(adx) ? adx.toFixed(0) : "?"}, ST ${stDir === 1 ? "↑" : "↓"}, vol x${volumeRatio.toFixed(2)}, ATR ${atrPct.toFixed(2)}%, стоп ${atrStop.stopPct.toFixed(2)}%, F&G ${fearGreed ? `${fearGreed.value}` : "n/a"}, MTF ${mtf?.summary || "proxy"}, funding ${funding ? `${funding.fundingRatePct.toFixed(4)}%` : "n/a"}, OI ${externalFilters.openInterest ? `${externalFilters.openInterest.changePct.toFixed(2)}%` : "n/a"}, новости ${news ? `${news.bias} ${news.score.toFixed(0)}` : "n/a"}, цель ${expected.weightedNetPct.toFixed(2)}%, BTC ${btcTrend}`
   };
 }
