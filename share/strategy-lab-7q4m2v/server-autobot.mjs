@@ -2584,12 +2584,15 @@ function getTradeStrategyId(trade) {
   return trade.serverStrategyId || trade.strategySnapshot?.execution?.serverStrategyId || trade.strategyMode || "legacy";
 }
 
+// Без таймфрейма в ключе намеренно (2026-06-21) — иначе одна и та же стратегия может
+// держать одновременно открытые 15m- и 1h-позиции по одному активу/стороне: формально
+// "разные" сделки, по факту коррелированная экспозиция на одно и то же движение цены.
 function getTradeStrategyExposureKey(trade) {
-  return `${trade.asset}|${trade.timeframe}|${trade.side}|${getTradeStrategyId(trade)}`;
+  return `${trade.asset}|${trade.side}|${getTradeStrategyId(trade)}`;
 }
 
 function getCandidateStrategyExposureKey(candidate) {
-  return `${candidate.symbol}|${candidate.interval}|${candidate.side}|${candidate.strategyId}`;
+  return `${candidate.symbol}|${candidate.side}|${candidate.strategyId}`;
 }
 
 function getDailyRisk(trades) {
@@ -2836,7 +2839,13 @@ function detectCrash(candles) {
 function hasRecentDuplicate(trades, candidate) {
   const now = Date.now();
   return trades.some((trade) => {
-    if (!trade.autopilot || trade.asset !== candidate.symbol || trade.timeframe !== candidate.interval || trade.side !== candidate.side) return false;
+    // Раньше требовалось точное совпадение таймфрейма — 15m и 1h на одном активе/стороне
+    // считались "разными" сделками, хотя по факту это часто одно и то же ценовое движение,
+    // замеченное на двух окнах почти одновременно (2026-06-21: подтверждено на живых данных —
+    // breakout: SOL/ETH/SUI/PEPE вошли на 15m И 1h с разницей <1с, исходы идеально совпали —
+    // риск удваивался на коррелированной ставке). Теперь cooldown общий по активу+стороне+
+    // стратегии независимо от таймфрейма.
+    if (!trade.autopilot || trade.asset !== candidate.symbol || trade.side !== candidate.side) return false;
     if (getTradeStrategyId(trade) !== candidate.strategyId) return false;
     const openedAt = Number(trade.openedAt) || 0;
     return openedAt > 0 && now - openedAt < config.duplicateCooldownMs;
