@@ -1358,7 +1358,8 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
     score += reversal.scoreBoost;
   }
   if (strategy.kind === "breakout") {
-    const bo = evaluateBreakoutSignal(candles, side, volumeRatio, adx, atrPct, externalFilters.openInterest);
+    const distancePastLevelPct = breakoutLevel > 0 ? Math.abs((last.close - breakoutLevel) / breakoutLevel) * 100 : null;
+    const bo = evaluateBreakoutSignal(candles, side, volumeRatio, adx, atrPct, externalFilters.openInterest, distancePastLevelPct);
     if (!bo.ok) return null;
     score += bo.scoreBoost;
   }
@@ -1599,10 +1600,15 @@ function evaluateRsiReversal(candles, rsi, side, atrPct, volumeRatio) {
   return { ok: true, scoreBoost };
 }
 
-function evaluateBreakoutSignal(candles, side, volumeRatio, adx, atrPct, openInterest = null) {
+function evaluateBreakoutSignal(candles, side, volumeRatio, adx, atrPct, openInterest = null, distancePastLevelPct = null) {
   if (volumeRatio < 1.3) return { ok: false, scoreBoost: 0 };
   if (!openInterest || !Number.isFinite(openInterest.changePct)) return { ok: false, scoreBoost: 0 };
   if (openInterest.changePct < 0.35) return { ok: false, scoreBoost: 0 };
+  // Свечной анализ на 6 мес/2 независимых прогона (2026-06-21, out-of-sample подтверждено
+  // оба раза): вход в первые 0.3% после уровня — это в основном ложные пробои (51% стопов),
+  // даже с сильной свечой/объёмом этого не вытащить. Вход дальше уровня — наоборот, лучшая
+  // зона (avgPnl ~1.4%/сделку против -0.05% у "свежих"). Блокируем самые свежие пробои.
+  if (Number.isFinite(distancePastLevelPct) && distancePastLevelPct < 0.3) return { ok: false, scoreBoost: 0 };
   let scoreBoost = 10;
   if (volumeRatio >= 1.6) scoreBoost += 8;
   if (volumeRatio >= 2.0) scoreBoost += 5;
@@ -1610,6 +1616,8 @@ function evaluateBreakoutSignal(candles, side, volumeRatio, adx, atrPct, openInt
   if (atrPct >= 0.3) scoreBoost += 4;
   if (openInterest.changePct >= 1) scoreBoost += 8;
   if (openInterest.changePct >= 2.5) scoreBoost += 6;
+  if (Number.isFinite(distancePastLevelPct) && distancePastLevelPct >= 1.0) scoreBoost += 10;
+  else if (Number.isFinite(distancePastLevelPct) && distancePastLevelPct >= 0.6) scoreBoost += 5;
   return { ok: true, scoreBoost };
 }
 
@@ -3096,9 +3104,115 @@ function formatRemoteError(status, text) {
   return `${status} ${message || "Remote request failed"}`;
 }
 
+// --- Историческая реконструкция внешних данных для честного бэктеста (2026-06-20) ---
+// Раньше runBacktest() гонял evaluateCandidate с externalFilters={} — funding/F&G/OI/
+// BTC-тренд были эффективно отключены (BTC-тренд тихо считался "NEUTRAL", relative
+// strength сравнивался с "BTC вырос на 0%"). Эти функции тянут реальную историю.
+
+async function fetchFearGreedHistory(days) {
+  const response = await fetchWithTimeout(`https://api.alternative.me/fng/?limit=${days + 10}&format=json`, {}, 15_000);
+  if (!response.ok) throw new Error(`F&G history ${response.status}`);
+  const data = await response.json();
+  const map = new Map();
+  for (const item of data.data || []) {
+    const day = new Date(Number(item.timestamp) * 1000).toISOString().slice(0, 10);
+    map.set(day, Number(item.value) || 50);
+  }
+  return map;
+}
+
+function lookupFearGreed(fgMap, timestampMs) {
+  const day = new Date(timestampMs).toISOString().slice(0, 10);
+  return fgMap.get(day) ?? 50;
+}
+
+async function fetchFundingHistoryOkx(symbol, sinceMs, maxPages = 8) {
+  const instId = `${toOkxSymbol(symbol)}-SWAP`;
+  const rows = [];
+  let after = null;
+  for (let page = 0; page < maxPages; page++) {
+    const params = new URLSearchParams({ instId, limit: "100" });
+    if (after) params.set("after", String(after));
+    const response = await fetchWithTimeout(`https://www.okx.com/api/v5/public/funding-rate-history?${params.toString()}`, {}, 10_000).catch(() => null);
+    if (!response || !response.ok) break;
+    const data = await response.json().catch(() => null);
+    const list = data?.data || [];
+    if (!list.length) break;
+    for (const item of list) rows.push({ time: Number(item.fundingTime), fundingRatePct: Number(item.fundingRate) * 100 });
+    const oldest = Number(list[list.length - 1].fundingTime);
+    if (!Number.isFinite(oldest) || oldest <= sinceMs) break;
+    after = oldest;
+    await wait(120);
+  }
+  return rows.sort((a, b) => a.time - b.time);
+}
+
+async function fetchOpenInterestHistoryBybit(symbol, sinceMs, maxPages = 24) {
+  const rows = [];
+  let cursor = null;
+  for (let page = 0; page < maxPages; page++) {
+    const params = new URLSearchParams({ category: "linear", symbol: toBybitSymbol(symbol), intervalTime: "1h", limit: "200" });
+    if (cursor) params.set("cursor", cursor);
+    const response = await fetchWithTimeout(`https://api.bybit.com/v5/market/open-interest?${params.toString()}`, {}, 10_000).catch(() => null);
+    if (!response || !response.ok) break;
+    const data = await response.json().catch(() => null);
+    const list = data?.result?.list || [];
+    if (!list.length) break;
+    for (const item of list) rows.push({ time: Number(item.timestamp), openInterest: Number(item.openInterest) });
+    const oldest = Number(list[list.length - 1].timestamp);
+    cursor = data.result.nextPageCursor;
+    if (!cursor || !Number.isFinite(oldest) || oldest <= sinceMs) break;
+    await wait(120);
+  }
+  return rows.sort((a, b) => a.time - b.time);
+}
+
+// Бинарный поиск последнего элемента с time <= timestamp (массив должен быть сортирован по time)
+function findNearestPrior(sortedRows, timestamp) {
+  let lo = 0, hi = sortedRows.length - 1, result = null;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (sortedRows[mid].time <= timestamp) { result = sortedRows[mid]; lo = mid + 1; }
+    else hi = mid - 1;
+  }
+  return result;
+}
+
+function buildOiChangeLookup(oiRows) {
+  // changePct = (current - значение ~1ч назад) / значение ~1ч назад — тот же горизонт,
+  // что и live-фильтр (там 12×5м=1ч через OKX), просто на часовых точках Bybit.
+  return (timestamp) => {
+    const current = findNearestPrior(oiRows, timestamp);
+    if (!current) return null;
+    const prior = findNearestPrior(oiRows, current.time - 55 * 60 * 1000);
+    if (!prior || !(prior.openInterest > 0)) return { openInterest: current.openInterest, changePct: 0 };
+    return { openInterest: current.openInterest, changePct: ((current.openInterest - prior.openInterest) / prior.openInterest) * 100 };
+  };
+}
+
+// Реальный исторический BTC-тренд (EMA34/89) + 20-баровый return для alt/BTC relative
+// strength — раньше это всегда было "NEUTRAL"/"0%", теперь считается из настоящих свечей BTC.
+function buildBtcSeries(btcCandles) {
+  const closes = btcCandles.map((c) => c.close);
+  const ema34 = calculateEma(closes, 34);
+  const ema89 = calculateEma(closes, 89);
+  return btcCandles.map((c, i) => {
+    let trend = "NEUTRAL";
+    if (Number.isFinite(ema34[i]) && Number.isFinite(ema89[i])) {
+      if (ema34[i] > ema89[i] * 1.003) trend = "LONG";
+      else if (ema34[i] < ema89[i] * 0.997) trend = "SHORT";
+    }
+    const base = i >= 20 ? closes[i - 20] : null;
+    const returnPct = base && base > 0 ? ((c.close - base) / base) * 100 : 0;
+    return { time: c.openTime, trend, returnPct };
+  });
+}
+
 async function runBacktest() {
   log("=== BACKTEST MODE (6 months) ===");
   const results = [];
+  const resultsFirstHalf = [];
+  const resultsSecondHalf = [];
   // Live trading only ever enters the single highest-scoring candidate per cycle
   // (selectEntryCandidates), while this backtest counts every bar that merely clears
   // minScore. Bucketing by score lets us check whether picking the best-of-best (as
@@ -3139,21 +3253,66 @@ async function runBacktest() {
   }
   log(`backtest: loaded ${candleCache.size}/${uniquePairs.size} pairs`);
 
+  // Историческая реконструкция внешних данных (2026-06-20): раньше funding/F&G/OI/
+  // BTC-тренд были эффективно отключены в бэктесте. F&G — один запрос на весь рынок;
+  // BTC-тренд/relative strength — из уже закэшированных свечей BTC/USDT; funding (OKX)
+  // и Open Interest (Bybit, как приближение — у OKX глубина OI всего ~2 дня) — по каждому
+  // активу отдельно, с пагинацией.
+  const sinceMs = Date.now() - 190 * 24 * 60 * 60 * 1000;
+  log("backtest: fetching external history (F&G, BTC trend, funding, OI)");
+  const fgMap = await fetchFearGreedHistory(190).catch((err) => { log(`F&G history failed: ${err.message}`); return new Map(); });
+
+  const btcSeriesByInterval = new Map();
+  for (const interval of new Set([...uniquePairs].map((k) => k.split("|")[1]))) {
+    const btcCandles = candleCache.get(`BTC/USDT|${interval}`);
+    if (btcCandles) btcSeriesByInterval.set(interval, buildBtcSeries(btcCandles));
+  }
+
+  const fundingBySymbol = new Map();
+  const oiLookupBySymbol = new Map();
+  for (const symbol of backtestAssets) {
+    const funding = await fetchFundingHistoryOkx(symbol, sinceMs).catch(() => []);
+    fundingBySymbol.set(symbol, funding);
+    const oi = await fetchOpenInterestHistoryBybit(symbol, sinceMs).catch(() => []);
+    oiLookupBySymbol.set(symbol, buildOiChangeLookup(oi));
+    await wait(100);
+  }
+  log(`backtest: external history loaded for ${backtestAssets.length} assets (F&G days=${fgMap.size})`);
+
   // Run all strategies against cached candles (no extra API calls)
   for (const strategy of enabledStrategies) {
     for (const symbol of backtestAssets) {
       for (const interval of strategy.timeframes) {
         const candles = candleCache.get(`${symbol}|${interval}`);
         if (!candles || candles.length < 150) continue;
+        const btcSeries = btcSeriesByInterval.get(interval) || [];
+        const fundingRows = fundingBySymbol.get(symbol) || [];
+        const oiLookup = oiLookupBySymbol.get(symbol);
 
         const signals = [];
+        // Out-of-sample split: разбиваем тот же прогон на "первую" и "вторую" половину
+        // календарного периода (не индексов — у разных пар может быть разная глубина
+        // истории). Список годных монет нельзя выбирать и проверять на одних данных.
+        const signalsFirstHalf = [];
+        const signalsSecondHalf = [];
         const warmup = 100;
+        const splitMs = (candles[warmup].openTime + candles[candles.length - 1].openTime) / 2;
 
         for (let i = warmup; i < candles.length - 20; i++) {
           const window = candles.slice(0, i + 1);
+          const barTime = candles[i].openTime;
+          const btcAtBar = findNearestPrior(btcSeries, barTime);
+          const fundingAtBar = findNearestPrior(fundingRows, barTime);
+          const oiAtBar = oiLookup ? oiLookup(barTime) : null;
+          const externalFilters = {
+            btcReturnPct: btcAtBar ? btcAtBar.returnPct : 0,
+            funding: fundingAtBar ? { fundingRatePct: fundingAtBar.fundingRatePct } : null,
+            fearGreed: { value: lookupFearGreed(fgMap, barTime) },
+            openInterest: oiAtBar
+          };
           let candidate;
           try {
-            candidate = evaluateCandidate(symbol, interval, window, strategy, [], {});
+            candidate = evaluateCandidate(symbol, interval, window, strategy, [], {}, btcAtBar ? btcAtBar.trend : "NEUTRAL", "NEUTRAL", externalFilters);
           } catch {
             continue;
           }
@@ -3179,7 +3338,9 @@ async function runBacktest() {
 
           const direction = side === "LONG" ? 1 : -1;
           const pnlPct = entry > 0 ? ((exitPrice - entry) / entry) * direction * 100 - feeRoundTrip : 0;
-          signals.push({ outcome, pnlPct, score: candidate.score });
+          const signal = { outcome, pnlPct, score: candidate.score };
+          signals.push(signal);
+          (barTime < splitMs ? signalsFirstHalf : signalsSecondHalf).push(signal);
           (signalsByStrategy[strategy.id] ||= []).push({ score: candidate.score, pnlPct });
         }
 
@@ -3196,6 +3357,21 @@ async function runBacktest() {
             totalPnlPct: Number(totalPnl.toFixed(2))
           });
         }
+        const summarizeHalf = (half) => {
+          if (half.length < 3) return null;
+          const wins = half.filter((s) => s.pnlPct > 0);
+          const totalPnl = half.reduce((a, s) => a + s.pnlPct, 0);
+          return {
+            strategy: strategy.id, symbol, interval, signals: half.length,
+            winRate: Math.round(wins.length / half.length * 100),
+            avgPnlPct: Number((totalPnl / half.length).toFixed(3)),
+            totalPnlPct: Number(totalPnl.toFixed(2))
+          };
+        };
+        const firstStat = summarizeHalf(signalsFirstHalf);
+        const secondStat = summarizeHalf(signalsSecondHalf);
+        if (firstStat) resultsFirstHalf.push(firstStat);
+        if (secondStat) resultsSecondHalf.push(secondStat);
       }
     }
   }
@@ -3244,14 +3420,45 @@ async function runBacktest() {
     avgPnlPct: Number((rows.reduce((a, r) => a + r.avgPnlPct, 0) / rows.length).toFixed(3))
   }])) }, null, 2));
 
-  // Сохраняем выводы в Supabase — боты подберут при следующем запуске
+  // Out-of-sample проверка (2026-06-21): монеты для curated-списка выбираются ТОЛЬКО по
+  // первой половине периода, затем смотрим, держится ли отбор на второй половине,
+  // которую отбор не видел. Без этого "хороший список монет" — просто подгонка под шум.
+  log("=== OUT-OF-SAMPLE VALIDATION (first half selects, second half tests) ===");
+  const MIN_SIGNALS_OOS = 15;
+  const secondHalfByKey = new Map(resultsSecondHalf.map((r) => [`${r.strategy}|${r.symbol}|${r.interval}`, r]));
+  const oosReport = {};
+  for (const strat of new Set(resultsFirstHalf.map((r) => r.strategy))) {
+    const firstReliable = resultsFirstHalf.filter((r) => r.strategy === strat && r.signals >= MIN_SIGNALS_OOS);
+    const firstProfitable = firstReliable.filter((r) => r.avgPnlPct > 0);
+    const matched = firstProfitable.map((r) => ({
+      symbol: r.symbol, interval: r.interval,
+      firstHalf: { signals: r.signals, winRate: r.winRate, avgPnlPct: r.avgPnlPct },
+      secondHalf: secondHalfByKey.get(`${r.strategy}|${r.symbol}|${r.interval}`) || null
+    }));
+    const heldUp = matched.filter((m) => m.secondHalf && m.secondHalf.avgPnlPct > 0);
+    const failed = matched.filter((m) => !m.secondHalf || m.secondHalf.avgPnlPct <= 0);
+    oosReport[strat] = { selectedOnFirstHalf: matched.length, heldUpOnSecondHalf: heldUp.length, failedOnSecondHalf: failed.length, pairs: matched };
+    log(`[${strat}] out-of-sample: ${matched.length} монет выбрано на 1-й половине, из них ${heldUp.length} остались в плюсе на 2-й (не видела при отборе), ${failed.length} — не подтвердились`);
+    matched.forEach((m) => {
+      const sh = m.secondHalf;
+      log(`  ${m.symbol} ${m.interval}: 1я пол. avg${m.firstHalf.avgPnlPct}%(n${m.firstHalf.signals}) → 2я пол. ${sh ? `avg${sh.avgPnlPct}%(n${sh.signals})` : "нет сигналов"}`);
+    });
+  }
+  log(JSON.stringify({ outOfSampleValidation: oosReport }, null, 2));
+
+  // Сохраняем выводы в Supabase — боты подберут при следующем запуске.
+  // --no-save: только посмотреть результат, не трогая боевую learningPolicy сразу.
   const policy = backtestResultsToPolicy(results);
   log(`backtest policy: ${policy.preferredPatterns.length} preferred, ${policy.blockedPatterns.length} blocked`);
-  try {
-    await saveBacktestPolicy(policy);
-    log("backtest policy saved to Supabase ✓");
-  } catch (err) {
-    log(`backtest policy save failed: ${err.message}`);
+  if (process.argv.includes("--no-save")) {
+    log("backtest policy NOT saved (--no-save flag) — review results first");
+  } else {
+    try {
+      await saveBacktestPolicy(policy);
+      log("backtest policy saved to Supabase ✓");
+    } catch (err) {
+      log(`backtest policy save failed: ${err.message}`);
+    }
   }
 }
 
