@@ -203,7 +203,12 @@ const serverStrategies = {
     kind: "vwap-reversion",
     strategyMode: "reversion",
     signalTemplate: "scalper",
-    timeframes: ["5m", "15m"],
+    // 5m убран 2026-06-23: train/test на 650 живых сделках показал 15m стабильно лучше
+    // (winrate 55-60% vs 42-45%, gross/сделка ~2-3x выше) на обеих половинах хронологического
+    // сплита. На текущих spot-комиссиях весь портфель vwap-reversion был в минусе (-$182 net)
+    // почти целиком из-за частого 5m с тонким edge; без него -$39 (ближе к нулю, но всё ещё
+    // не плюс — комиссии остаются доминирующей проблемой, см. память проекта).
+    timeframes: ["15m"],
     minScoreOffset: 4,
     maxEntriesPerRun: 1,
     // Хорошая точность бэктеста (WR 69-86%, pnl +0.04..+0.12%).
