@@ -14,14 +14,14 @@ const report = {
 };
 
 async function main() {
-  const [supabase, bybit, github] = await Promise.all([
+  const [supabase, marketData, github] = await Promise.all([
     checkSupabase(),
-    checkBybit(),
+    checkMarketData(),
     checkGithubActions()
   ]);
 
-  report.checks = { supabase, bybit, github };
-  report.ok = supabase.ok && bybit.ok;
+  report.checks = { supabase, marketData, github };
+  report.ok = supabase.ok && marketData.ok;
   printReport(report);
   if (!report.ok) process.exitCode = 1;
 }
@@ -37,12 +37,17 @@ async function checkSupabase() {
     activeTrades: 0,
     lastServerTradeAt: null,
     lastServerTradeAgeMinutes: null,
+    stale: false,
     error: ""
   };
 
   try {
+    // user_login=eq.server смотрел на старый generic-логин, под которым с появления
+    // отдельных логинов на стратегию (server-pullback, server-vwap, ...) никто реально
+    // не торгует — отсюда ложное "lastServerTrade=37+ часов назад" при полностью живой
+    // торговле. server-* без "=server" ловит все реальные боевые логины разом.
     const [serverRows, activeRows, settingsRows] = await Promise.all([
-      supabaseFetch(`/${encodeURIComponent(tableName)}?select=id,asset,timeframe,side,status,updated_at&user_login=eq.server&order=updated_at.desc&limit=20`),
+      supabaseFetch(`/${encodeURIComponent(tableName)}?select=id,asset,timeframe,side,status,updated_at&user_login=like.server-*&order=updated_at.desc&limit=20`),
       supabaseFetch(`/${encodeURIComponent(tableName)}?select=id,asset,timeframe,side,status,updated_at&status=in.(pending,open,partial)&order=updated_at.desc&limit=20`),
       supabaseFetch(`/${encodeURIComponent(settingsTableName)}?select=key,updated_at&limit=1`)
     ]);
@@ -55,7 +60,12 @@ async function checkSupabase() {
     if (result.lastServerTradeAt) {
       result.lastServerTradeAgeMinutes = Math.round((now - Date.parse(result.lastServerTradeAt)) / 60000);
     }
-    result.ok = [serverRows, activeRows, settingsRows].every((item) => item.ok);
+    // Раньше staleness вообще не влиял на ok — запрос мог успешно вернуть HTTP 200 с
+    // древней строкой, и health всё равно бы сказал "OK". Раннер крутит каждую стратегию
+    // раз в несколько минут, так что 20+ минут без единого обновления — реальный признак,
+    // что раннер встал, а не просто шум таймингов одного цикла.
+    result.stale = result.lastServerTradeAgeMinutes !== null && result.lastServerTradeAgeMinutes > 20;
+    result.ok = [serverRows, activeRows, settingsRows].every((item) => item.ok) && !result.stale;
   } catch (error) {
     result.error = normalizeError(error);
   } finally {
@@ -66,7 +76,11 @@ async function checkSupabase() {
   return result;
 }
 
-async function checkBybit() {
+async function checkMarketData() {
+  // Был прямой запрос к api.bybit.com — гео-блокируется CloudFront с этого VPS (тот же
+  // повод, по которому funding/OI/bid-ask в самом боте давно ходят через OKX, не Bybit).
+  // Этот health-check годами бил тревогу не по делу, проверяя источник, который бот
+  // и не использует. Переключаем на OKX, чтобы проверка отражала реальную зависимость.
   const started = Date.now();
   const result = {
     ok: false,
@@ -78,12 +92,12 @@ async function checkBybit() {
   };
 
   try {
-    const response = await fetchWithTimeout("https://api.bybit.com/v5/market/kline?category=spot&symbol=BTCUSDT&interval=15&limit=5", {}, 8000);
+    const response = await fetchWithTimeout("https://www.okx.com/api/v5/market/candles?instId=BTC-USDT-SWAP&bar=15m&limit=5", {}, 8000);
     result.status = response.status;
     const body = await response.json();
-    result.retCode = body.retCode;
-    result.rows = Array.isArray(body.result?.list) ? body.result.list.length : 0;
-    result.ok = response.ok && body.retCode === 0 && result.rows > 0;
+    result.retCode = body.code;
+    result.rows = Array.isArray(body.data) ? body.data.length : 0;
+    result.ok = response.ok && body.code === "0" && result.rows > 0;
   } catch (error) {
     result.error = normalizeError(error);
   } finally {
@@ -158,12 +172,12 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 9000) {
 
 function printReport(value) {
   const supabase = value.checks.supabase;
-  const bybit = value.checks.bybit;
+  const marketData = value.checks.marketData;
   const github = value.checks.github;
   const lines = [
     `Botalin server health: ${value.ok ? "OK" : "PROBLEM"}`,
-    `Supabase: ${supabase.ok ? supabase.slow ? "SLOW" : "OK" : "FAIL"} (${supabase.ms} ms) serverTrades=${supabase.serverTrades}, active=${supabase.activeTrades}${supabase.lastServerTradeAgeMinutes !== null ? `, lastServerTrade=${supabase.lastServerTradeAgeMinutes} min ago` : ""}${supabase.error ? `, error=${supabase.error}` : ""}`,
-    `Bybit: ${bybit.ok ? "OK" : "FAIL"} (${bybit.ms} ms) rows=${bybit.rows}${bybit.error ? `, error=${bybit.error}` : ""}`,
+    `Supabase: ${supabase.ok ? supabase.slow ? "SLOW" : "OK" : "FAIL"} (${supabase.ms} ms) serverTrades=${supabase.serverTrades}, active=${supabase.activeTrades}${supabase.lastServerTradeAgeMinutes !== null ? `, lastServerTrade=${supabase.lastServerTradeAgeMinutes} min ago` : ""}${supabase.stale ? " [STALE]" : ""}${supabase.error ? `, error=${supabase.error}` : ""}`,
+    `OKX market data: ${marketData.ok ? "OK" : "FAIL"} (${marketData.ms} ms) rows=${marketData.rows}${marketData.error ? `, error=${marketData.error}` : ""}`,
     `GitHub Actions: ${github.ok ? "OK" : "WARN"} (${github.ms} ms) last=${github.lastConclusion || "none"}${github.lastRunAgeMinutes !== null ? `, ${github.lastRunAgeMinutes} min ago` : ""}${github.warning ? `, ${github.warning}` : ""}${github.error ? `, error=${github.error}` : ""}`
   ];
   console.log(lines.join("\n"));
