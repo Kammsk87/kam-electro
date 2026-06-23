@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KAM Fit Coach</title>
-    <link rel="stylesheet" href="./styles.css?v=focuswarmup1" />
+    <link rel="stylesheet" href="./styles.css?v=circuits1" />
   </head>
   <body>
     <div id="authOverlay" class="auth-overlay">
@@ -238,6 +238,23 @@
                   <option value="advanced">опытный</option>
                 </select>
               </label>
+              <label>
+                Дней в неделю
+                <select id="trainingDays">
+                  <option value="2">2 дня</option>
+                  <option value="3" selected>3 дня</option>
+                  <option value="4">4 дня</option>
+                  <option value="5">5 дней</option>
+                </select>
+              </label>
+              <label>
+                Стиль
+                <select id="trainingStyle">
+                  <option value="split">сплит / группы мышц</option>
+                  <option value="circuit">круговые тренировки</option>
+                  <option value="mixed">смешанный</option>
+                </select>
+              </label>
               <label id="cycleField">
                 Фаза цикла
                 <select id="cyclePhase">
@@ -368,6 +385,6 @@
       </div>
     </div>
 
-    <script src="./app.js?v=focuswarmup1"></script>
+    <script src="./app.js?v=circuits1"></script>
   </body>
 </html>

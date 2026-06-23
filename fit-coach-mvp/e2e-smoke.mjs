@@ -44,8 +44,14 @@ await expectText(page, "#coachWhy", /есть боль|бережем суста
 
 await page.click('[data-plan="week"]');
 await expectText(page, "#planOptions", /Неделя/);
+await page.selectOption("#trainingDays", "4");
+await page.selectOption("#trainingStyle", "circuit");
+await expectText(page, "#workoutName", /Круговая/);
+await expectText(page, "#coachWhy", /4 круговых/);
+await expectText(page, "#planOptions", /4 круговых|круговой стиль/i);
 await page.click('[data-plan="month"]');
-await expectText(page, "#planOptions", /4 недели|месяц/i);
+await expectText(page, "#planOptions", /круговая база|4 недели|месяц/i);
+await page.selectOption("#trainingStyle", "split");
 
 await page.selectOption("#place", "home");
 await expectText(page, "#workoutBlocks", /резинки|рюкзак|быстрая ходьба|присед/);

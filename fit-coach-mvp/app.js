@@ -4,6 +4,8 @@ const defaults = {
     goal: "strength",
     place: "gym",
     level: "beginner",
+    trainingDays: "3",
+    trainingStyle: "split",
     cyclePhase: "none",
     limitations: "",
   },
@@ -75,7 +77,7 @@ function bindInputs() {
   $("demoLoginButton").addEventListener("click", () => login("Демо атлет", "0000"));
   $("logoutButton").addEventListener("click", logout);
 
-  ["sex", "goal", "place", "level", "cyclePhase", "limitations"].forEach((id) => {
+  ["sex", "goal", "place", "level", "trainingDays", "trainingStyle", "cyclePhase", "limitations"].forEach((id) => {
     $(id).value = data.profile[id];
     $(id).addEventListener("input", () => {
       data.profile[id] = $(id).value;
@@ -263,7 +265,7 @@ function stateImpactItems() {
 }
 
 function context(score) {
-  const { goal, place, level, limitations, cyclePhase, sex } = data.profile;
+  const { goal, place, level, trainingDays, trainingStyle, limitations, cyclePhase, sex } = data.profile;
   const injuryText = limitations.toLowerCase();
   const needsLowImpact = /колен|спин|плеч|таз|голен|поясн/i.test(injuryText) || score < 55 || data.quickMode === "pain";
   const cycleDeload = sex === "female" && cyclePhase === "menstruation";
@@ -271,7 +273,7 @@ function context(score) {
   const intensity = score >= 78 ? "high" : score >= 58 ? "medium" : "low";
   const experience = { beginner: 2, middle: 3, advanced: 4 }[level];
 
-  return { goal, place, level, needsLowImpact, cycleDeload, luteal, intensity, experience, quickMode: data.quickMode, focus: data.state.trainingFocus };
+  return { goal, place, level, trainingDays: Number(trainingDays), trainingStyle, needsLowImpact, cycleDeload, luteal, intensity, experience, quickMode: data.quickMode, focus: data.state.trainingFocus };
 }
 
 function exerciseLibrary(place) {
@@ -333,6 +335,7 @@ function chooseWorkout(score) {
   if (ctx.focus === "back") title = "Спина + бицепс";
   if (ctx.focus === "legs") title = "Ноги + ягодицы";
   if (ctx.focus === "cardioMobility") title = "Дорожка + растяжка";
+  if (ctx.trainingStyle === "circuit" && ctx.focus === "auto") title = "Круговая тренировка";
 
   const focusLine = getFocusLine(ctx, lib, rounds, reps);
   const heavyLine = focusLine || (cardioFirst
@@ -360,6 +363,9 @@ function startProtocol(ctx, lib) {
 }
 
 function getFocusLine(ctx, lib, rounds, reps) {
+  if (ctx.trainingStyle === "circuit" && ctx.focus === "auto") {
+    return `${rounds} круга: ${lib.legs[0]}, ${lib.push[0]}, ${lib.pull[0]}, ${lib.core[0]}, ${lib.cardio[1]}. Работа 40 сек, отдых 20-40 сек`;
+  }
   if (ctx.focus === "chest") {
     return `${rounds} подхода: ${lib.chest[0]}, ${lib.chest[1]}, ${lib.chest[2]}. Добивка: ${lib.shoulders[1]}, ${lib.arms[0]}, ${lib.arms[1]}`;
   }
@@ -393,6 +399,7 @@ function correctionText(ctx) {
 function coachWhy(score) {
   const ctx = context(score);
   const reasons = [];
+  if (ctx.trainingStyle === "circuit") reasons.push(`${ctx.trainingDays} круговых в неделю`);
   if (ctx.quickMode !== "normal") reasons.push(modeLabel(ctx.quickMode));
   if (score < 58) reasons.push("готовность низкая");
   if (score >= 78) reasons.push("можно прогрессировать");
@@ -451,7 +458,27 @@ function buildWeekPlans(score) {
   const ctx = context(score);
   const lib = exerciseLibrary(ctx.place);
   const cardioDose = ctx.goal === "fatloss" ? "30-40 мин" : "18-25 мин";
-  const strengthDays = ctx.level === "advanced" ? 4 : ctx.level === "middle" ? 3 : 2;
+  const strengthDays = ctx.trainingDays;
+
+  if (ctx.trainingStyle === "circuit") {
+    return [
+      {
+        title: `Неделя: ${ctx.trainingDays} круговых`,
+        meta: ["круговой стиль", `${ctx.trainingDays} дня`, "40/20"],
+        body: circuitWeekBody(ctx, lib),
+      },
+      {
+        title: "Круговая + восстановление",
+        meta: ["если усталость", "пульс под контролем", "без отказа"],
+        body: "2-3 круга, работа 30-40 сек. Между днями: ходьба, растяжка, сон.",
+      },
+      {
+        title: "Круговая прогрессия",
+        meta: ["каждую неделю", "+1 круг", "или меньше отдых"],
+        body: "Сначала добавляй качество техники. Потом +1 круг или -10 сек отдыха.",
+      },
+    ];
+  }
 
   return [
     {
@@ -472,6 +499,16 @@ function buildWeekPlans(score) {
   ];
 }
 
+function circuitWeekBody(ctx, lib) {
+  const variants = {
+    2: `День 1: полный корпус. День 2: ${lib.cardio[0]} + круг легче.`,
+    3: "Пн: полный корпус. Ср: верх + кор. Пт: ноги + кардио.",
+    4: "Пн: полный корпус. Вт: кардио-кор. Чт: верх. Сб: ноги + мобилизация.",
+    5: "3 круговых дня, 1 кардио, 1 восстановительная растяжка. Один день обязательно легкий.",
+  };
+  return variants[ctx.trainingDays] || variants[3];
+}
+
 function buildMonthPlans(score) {
   const ctx = context(score);
   const goalLine = {
@@ -483,9 +520,11 @@ function buildMonthPlans(score) {
 
   return [
     {
-      title: "4 недели: базовый мезоцикл",
+      title: ctx.trainingStyle === "circuit" ? "4 недели: круговая база" : "4 недели: базовый мезоцикл",
       meta: ["месяц", "3+1", "умная разгрузка"],
-      body: `1: вход. 2: +объем. 3: пик. 4: разгрузка 60-70%. Фокус: ${goalLine}.`,
+      body: ctx.trainingStyle === "circuit"
+        ? `1: техника кругов. 2: +1 круг. 3: меньше отдых. 4: разгрузка 60-70%. ${ctx.trainingDays} дня/нед.`
+        : `1: вход. 2: +объем. 3: пик. 4: разгрузка 60-70%. Фокус: ${goalLine}.`,
     },
     {
       title: "4 недели: жиросжигание без слива сил",
@@ -587,6 +626,7 @@ function buildActiveExercises(score) {
 
 function activeExerciseNames(ctx, lib) {
   const warmup = ctx.place === "gym" ? "дорожка 4,5-5 / наклон 15 + растяжка" : `${lib.cardio[0]} + растяжка`;
+  if (ctx.trainingStyle === "circuit" && ctx.focus === "auto") return [warmup, lib.legs[0], lib.push[0], lib.pull[0], lib.core[0], lib.cardio[1]];
   if (ctx.focus === "chest") return [warmup, ...lib.chest, lib.shoulders[1], lib.arms[0], lib.arms[1]];
   if (ctx.focus === "back") return [warmup, ...lib.pull, lib.arms[1]];
   if (ctx.focus === "legs") return [warmup, ...lib.legs, lib.core[0]];
@@ -601,6 +641,7 @@ function isWarmupExercise(name) {
 
 function targetForExercise(name, index, ctx, baseSets, reps) {
   if (isWarmupExercise(name)) return index === 0 ? "8-12 мин + растяжка" : "10-15 мин";
+  if (ctx.trainingStyle === "circuit" && ctx.focus === "auto") return `${baseSets} круга · 40 сек`;
   if (ctx.quickMode === "cardio" && index === 1) return "20-35 мин";
   return `${baseSets} x ${reps}`;
 }
