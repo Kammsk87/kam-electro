@@ -98,7 +98,7 @@ def fetch_combined_dataset():
         if not dt:
             continue
         rows.append({"dt": dt, "label": 1 if r["status"] == "target" else 0, "f": feats,
-                     "src": "trade", "reject_reason": None})
+                     "pnl_pct": t.get("pnlPct"), "src": "trade", "reject_reason": None})
 
     for r in rejected:
         feats = r.get("features") or {}
@@ -109,7 +109,10 @@ def fetch_combined_dataset():
         if not dt:
             continue
         label = 1 if ho["outcome"] in ("target1", "target2") else 0
-        rows.append({"dt": dt, "label": label, "f": feats,
+        # pnlPct здесь — net of cost начиная с label_outcomes.py v2 (2026-06-23); у записей,
+        # размеченных старой версией (gross, без издержек), expectancy будет смещена в плюс —
+        # переразметка старых строк запускается тем же скриптом, см. tools/hypothesis_mining/label_outcomes.py
+        rows.append({"dt": dt, "label": label, "f": feats, "pnl_pct": ho.get("pnlPct"),
                      "src": "rejected", "reject_reason": r.get("reject_reason")})
 
     rows.sort(key=lambda r: r["dt"])
@@ -135,16 +138,27 @@ def quartile_thresh(data, feat):
     return vals[q - 1], vals[3 * q]
 
 
+def expectancy(rows_subset):
+    """Средний pnlPct (net of cost) по подвыборке — None, если у большинства строк его нет
+    (старые rejected-метки до label_outcomes.py v2 не имеют net pnlPct)."""
+    vals = [r["pnl_pct"] for r in rows_subset if r.get("pnl_pct") is not None]
+    if len(vals) < max(MIN_BUCKET // 2, len(rows_subset) // 2):
+        return None
+    return statistics.fmean(vals)
+
+
 def eval_rule(data, feat, thresh, direction):
     if direction == "high":
-        pos = [r["label"] for r in data if r["f"].get(feat) is not None and r["f"].get(feat) >= thresh]
-        neg = [r["label"] for r in data if r["f"].get(feat) is not None and r["f"].get(feat) < thresh]
+        pos = [r for r in data if r["f"].get(feat) is not None and r["f"].get(feat) >= thresh]
+        neg = [r for r in data if r["f"].get(feat) is not None and r["f"].get(feat) < thresh]
     else:
-        pos = [r["label"] for r in data if r["f"].get(feat) is not None and r["f"].get(feat) <= thresh]
-        neg = [r["label"] for r in data if r["f"].get(feat) is not None and r["f"].get(feat) > thresh]
+        pos = [r for r in data if r["f"].get(feat) is not None and r["f"].get(feat) <= thresh]
+        neg = [r for r in data if r["f"].get(feat) is not None and r["f"].get(feat) > thresh]
     if len(pos) < MIN_BUCKET or len(neg) < MIN_BUCKET:
         return None
-    return statistics.fmean(pos), statistics.fmean(neg), len(pos), len(neg)
+    wr_pos = statistics.fmean(r["label"] for r in pos)
+    wr_neg = statistics.fmean(r["label"] for r in neg)
+    return wr_pos, wr_neg, len(pos), len(neg), expectancy(pos), expectancy(neg)
 
 
 COMBOS = [
@@ -184,9 +198,10 @@ def run_sweep(rows):
 
     results = []
 
-    def add_result(group, label, train_lift, test_lift, test_n):
+    def add_result(group, label, train_lift, test_lift, test_n, train_exp=None, test_exp=None):
         results.append({"group": group, "label": label, "train_lift": train_lift,
-                         "test_lift": test_lift, "test_n": test_n})
+                         "test_lift": test_lift, "test_n": test_n,
+                         "train_exp": train_exp, "test_exp": test_exp})
 
     # Group A: single feature, pooled per strategy
     for strat, tr in train_by_strat.items():
@@ -205,10 +220,12 @@ def run_sweep(rows):
                 if not r_tr:
                     continue
                 train_lift = r_tr[0] - r_tr[1]
+                train_exp = (r_tr[4] - r_tr[5]) if r_tr[4] is not None and r_tr[5] is not None else None
                 r_te = eval_rule(te, feat, thresh, direction)
                 test_lift = (r_te[0] - r_te[1]) if r_te else None
                 test_n = (r_te[2] + r_te[3]) if r_te else 0
-                add_result("A", f"{strat} | {feat} {tag}", train_lift, test_lift, test_n)
+                test_exp = (r_te[4] - r_te[5]) if r_te and r_te[4] is not None and r_te[5] is not None else None
+                add_result("A", f"{strat} | {feat} {tag}", train_lift, test_lift, test_n, train_exp, test_exp)
 
     # Group B: single feature, per (strategy, side)
     for strat, tr in train_by_strat.items():
@@ -229,15 +246,17 @@ def run_sweep(rows):
                     if not r_tr:
                         continue
                     train_lift = r_tr[0] - r_tr[1]
+                    train_exp = (r_tr[4] - r_tr[5]) if r_tr[4] is not None and r_tr[5] is not None else None
                     r_te = eval_rule(te_sub, feat, thresh, direction)
                     test_lift = (r_te[0] - r_te[1]) if r_te else None
                     test_n = (r_te[2] + r_te[3]) if r_te else 0
-                    add_result("B", f"{strat}/{side} | {feat} {tag}", train_lift, test_lift, test_n)
+                    test_exp = (r_te[4] - r_te[5]) if r_te and r_te[4] is not None and r_te[5] is not None else None
+                    add_result("B", f"{strat}/{side} | {feat} {tag}", train_lift, test_lift, test_n, train_exp, test_exp)
 
     # Group C: curated combos
     def combo_eval(data, cond_fn):
-        pos = [r["label"] for r in data if cond_fn(r["f"])]
-        neg = [r["label"] for r in data if not cond_fn(r["f"])]
+        pos = [r for r in data if cond_fn(r["f"])]
+        neg = [r for r in data if not cond_fn(r["f"])]
         return pos, neg
 
     for strat, tr in train_by_strat.items():
@@ -248,14 +267,18 @@ def run_sweep(rows):
             pos_tr, neg_tr = combo_eval(tr, cond)
             if len(pos_tr) < MIN_BUCKET or len(neg_tr) < MIN_BUCKET:
                 continue
-            train_lift = statistics.fmean(pos_tr) - statistics.fmean(neg_tr)
+            train_lift = statistics.fmean(r["label"] for r in pos_tr) - statistics.fmean(r["label"] for r in neg_tr)
+            exp_pos_tr, exp_neg_tr = expectancy(pos_tr), expectancy(neg_tr)
+            train_exp = (exp_pos_tr - exp_neg_tr) if exp_pos_tr is not None and exp_neg_tr is not None else None
             pos_te, neg_te = combo_eval(te, cond)
             if len(pos_te) >= MIN_BUCKET and len(neg_te) >= MIN_BUCKET:
-                test_lift = statistics.fmean(pos_te) - statistics.fmean(neg_te)
+                test_lift = statistics.fmean(r["label"] for r in pos_te) - statistics.fmean(r["label"] for r in neg_te)
                 test_n = len(pos_te) + len(neg_te)
+                exp_pos_te, exp_neg_te = expectancy(pos_te), expectancy(neg_te)
+                test_exp = (exp_pos_te - exp_neg_te) if exp_pos_te is not None and exp_neg_te is not None else None
             else:
-                test_lift, test_n = None, len(pos_te) + len(neg_te)
-            add_result("C", f"{strat} | {name}", train_lift, test_lift, test_n)
+                test_lift, test_n, test_exp = None, len(pos_te) + len(neg_te), None
+            add_result("C", f"{strat} | {name}", train_lift, test_lift, test_n, train_exp, test_exp)
 
     # Group D: by-asset, top assets within best-sampled strategies
     for strat in ("vwap-reversion", "pullback", "rsi-reversal", "breakout"):
@@ -278,10 +301,12 @@ def run_sweep(rows):
                 if not r_tr:
                     continue
                 train_lift = r_tr[0] - r_tr[1]
+                train_exp = (r_tr[4] - r_tr[5]) if r_tr[4] is not None and r_tr[5] is not None else None
                 r_te = eval_rule(te_sub, feat, q4, "high")
                 test_lift = (r_te[0] - r_te[1]) if r_te else None
                 test_n = (r_te[2] + r_te[3]) if r_te else 0
-                add_result("D", f"{strat}/{asset} | {feat} topQ", train_lift, test_lift, test_n)
+                test_exp = (r_te[4] - r_te[5]) if r_te and r_te[4] is not None and r_te[5] is not None else None
+                add_result("D", f"{strat}/{asset} | {feat} topQ", train_lift, test_lift, test_n, train_exp, test_exp)
 
     # Group E: gap between rejected-signal hypothetical winrate and the strategy's own
     # executed winrate, by reject_reason bucket — нашли вручную 2026-06-23 (score_low и
@@ -299,37 +324,43 @@ def run_sweep(rows):
             return "limit_or_cooldown"
         return reason
 
-    def executed_wr(data, strat):
-        sub = [r["label"] for r in data if r["src"] == "trade" and r["f"].get("strategy") == strat]
-        return (statistics.fmean(sub), len(sub)) if len(sub) >= MIN_BUCKET else (None, 0)
+    def executed_stats(data, strat):
+        sub = [r for r in data if r["src"] == "trade" and r["f"].get("strategy") == strat]
+        if len(sub) < MIN_BUCKET:
+            return None, 0, None
+        return statistics.fmean(r["label"] for r in sub), len(sub), expectancy(sub)
 
-    def rejected_wr(data, strat, bucket):
-        sub = [r["label"] for r in data if r["src"] == "rejected" and r["f"].get("strategy") == strat
+    def rejected_stats(data, strat, bucket):
+        sub = [r for r in data if r["src"] == "rejected" and r["f"].get("strategy") == strat
                and reason_bucket(r["reject_reason"]) == bucket]
-        return (statistics.fmean(sub), len(sub)) if len(sub) >= MIN_BUCKET else (None, 0)
+        if len(sub) < MIN_BUCKET:
+            return None, 0, None
+        return statistics.fmean(r["label"] for r in sub), len(sub), expectancy(sub)
 
     all_strats = set(r["f"].get("strategy") for r in rows if r["f"].get("strategy"))
     all_buckets = set(reason_bucket(r["reject_reason"]) for r in rows if r["reject_reason"]) - {None}
     for strat in all_strats:
-        exec_wr_tr, exec_n_tr = executed_wr(train, strat)
+        exec_wr_tr, exec_n_tr, exec_exp_tr = executed_stats(train, strat)
         if exec_wr_tr is None:
             continue
-        exec_wr_te, exec_n_te = executed_wr(test, strat)
+        exec_wr_te, exec_n_te, exec_exp_te = executed_stats(test, strat)
         for bucket in all_buckets:
-            rej_wr_tr, rej_n_tr = rejected_wr(train, strat, bucket)
+            rej_wr_tr, rej_n_tr, rej_exp_tr = rejected_stats(train, strat, bucket)
             if rej_wr_tr is None:
                 continue
             train_lift = rej_wr_tr - exec_wr_tr
+            train_exp = (rej_exp_tr - exec_exp_tr) if rej_exp_tr is not None and exec_exp_tr is not None else None
             if exec_wr_te is None:
-                test_lift, test_n = None, 0
+                test_lift, test_n, test_exp = None, 0, None
             else:
-                rej_wr_te, rej_n_te = rejected_wr(test, strat, bucket)
+                rej_wr_te, rej_n_te, rej_exp_te = rejected_stats(test, strat, bucket)
                 if rej_wr_te is None:
-                    test_lift, test_n = None, 0
+                    test_lift, test_n, test_exp = None, 0, None
                 else:
                     test_lift = rej_wr_te - exec_wr_te
                     test_n = rej_n_te + exec_n_te
-            add_result("E", f"{strat} | rejected({bucket}) vs executed", train_lift, test_lift, test_n)
+                    test_exp = (rej_exp_te - exec_exp_te) if rej_exp_te is not None and exec_exp_te is not None else None
+            add_result("E", f"{strat} | rejected({bucket}) vs executed", train_lift, test_lift, test_n, train_exp, test_exp)
 
     return results
 
@@ -371,10 +402,21 @@ def main():
     reconfirmed = []
     newly_ready = []
     streak_broken = []
+    expectancy_contradicts = []
 
     for r in testable:
-        confirmed_this_round = (abs(r["train_lift"]) >= STRONG_TRAIN and abs(r["test_lift"]) >= STRONG_TEST
-                                 and (r["train_lift"] > 0) == (r["test_lift"] > 0))
+        winrate_confirmed = (abs(r["train_lift"]) >= STRONG_TRAIN and abs(r["test_lift"]) >= STRONG_TEST
+                              and (r["train_lift"] > 0) == (r["test_lift"] > 0))
+        # Учим разрыв winrate vs реальная доходность (см. vwap-reversion 2026-06-22: winrate>50%,
+        # деньги в минусе) — гипотеза с улучшением winrate, но ПРОТИВОРЕЧАЩим net-of-cost
+        # expectancy, не подтверждается, даже если есть числа на обе стороны.
+        has_exp = r["train_exp"] is not None and r["test_exp"] is not None
+        exp_agrees = (not has_exp) or (
+            (r["train_exp"] > 0) == (r["train_lift"] > 0) and (r["test_exp"] > 0) == (r["test_lift"] > 0)
+        )
+        confirmed_this_round = winrate_confirmed and exp_agrees
+        if winrate_confirmed and has_exp and not exp_agrees:
+            expectancy_contradicts.append(r)
         existing = registry.get(r["label"])
         if existing:
             prev_streak = existing.get("consecutive_confirmations", 0)
@@ -398,7 +440,10 @@ def main():
         status = "ready_for_review" if new_streak >= 2 else ("confirmed_once" if new_streak == 1 else "not_confirmed")
         hist = (hist + [{
             "tested_at": now_iso, "train_lift": round(r["train_lift"], 4),
-            "test_lift": round(r["test_lift"], 4), "confirmed": confirmed_this_round
+            "test_lift": round(r["test_lift"], 4),
+            "train_exp": round(r["train_exp"], 4) if r["train_exp"] is not None else None,
+            "test_exp": round(r["test_exp"], 4) if r["test_exp"] is not None else None,
+            "confirmed": confirmed_this_round
         }])[-10:]
 
         updates.append({
@@ -422,6 +467,11 @@ def main():
     print(f"\n💔 Серия прервана (было подтверждено, в этот раз нет): {len(streak_broken)}")
     for label in streak_broken[:15]:
         print(f"  {label}")
+
+    print(f"\n⚠️  Winrate улучшился, но net-of-cost доходность ПРОТИВОРЕЧИТ (отклонено из-за этого): {len(expectancy_contradicts)}")
+    for r in expectancy_contradicts[:15]:
+        print(f"  [{r['group']}] {r['label']:55} winrate train={r['train_lift']*100:+.1f}pp test={r['test_lift']*100:+.1f}pp"
+              f"  |  expectancy train={r['train_exp']:+.3f}pp test={r['test_exp']:+.3f}pp")
     print(f"{'='*70}")
 
     if dry_run:
