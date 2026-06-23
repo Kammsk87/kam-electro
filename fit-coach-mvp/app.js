@@ -525,47 +525,81 @@ function exerciseTechnique(name) {
 const techniqueLibrary = {
   push: {
     title: "Жим / отжимание",
+    kind: "push",
     purpose: "Для груди, плеч и трицепса. Толкай вес от себя без потери контроля плеч.",
-    image: "https://www.anterides.com/media/exercises/flat-bench-dumbbell-press-resized.png",
     source: "https://www.anterides.com/exercise/213/flat-bench-dumbbell-press",
     steps: ["Лопатки собрать, стопы поставить устойчиво.", "Опустить вес контролируемо к линии груди.", "Выжать вверх без рывка и без жесткого замка в локтях."],
   },
   pull: {
     title: "Тяга на спину",
+    kind: "pull",
     purpose: "Для широчайших и верхней части спины. Начинай движение плечами и лопатками.",
-    image: "https://scoutlife.org/wp-content/uploads/2019/06/fitness-latpulldowns.jpg",
     source: "https://scoutlife.org/fitness-first/blgym/173590/how-to-do-lat-pulldowns-correctly/",
     steps: ["Зафиксировать корпус и не заваливаться назад.", "Потянуть локти вниз и назад, свести лопатки.", "Вернуть вес медленно, сохраняя контроль."],
   },
   legs: {
     title: "Ноги / жим платформы",
+    kind: "legs",
     purpose: "Для квадрицепса, ягодиц и задней поверхности бедра. Колени идут по линии носков.",
-    image: "https://goodmindandbody.com/wp-content/uploads/2025/02/How-to-Use-the-Leg-Press-Machine-1024x1024.png",
     source: "https://goodmindandbody.com/reasons-for-knee-pain-after-leg-press/",
     steps: ["Поставить стопы устойчиво, колени не заваливать внутрь.", "Опускаться контролируемо до комфортной глубины.", "Толкать через всю стопу, не выпрямлять колени в жесткий замок."],
   },
   core: {
     title: "Кор / планка",
+    kind: "core",
     purpose: "Для корпуса. Держи ребра, таз и поясницу под контролем.",
-    image: "https://www.skimble.com/assets/1867600/image_iphone.jpg",
     source: "https://www.skimble.com/exercises/58675-bridge-to-plank-how-to-do-exercise",
     steps: ["Локти или ладони поставить под плечами.", "Напрячь пресс и ягодицы, вытянуть тело в линию.", "Дышать спокойно, не проваливать поясницу."],
   },
   cardio: {
     title: "Кардио",
+    kind: "cardio",
     purpose: "Для сердца и выносливости. Держи темп, при котором можно говорить короткими фразами.",
-    image: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Treadmill_running.jpg/1024px-Treadmill_running.jpg",
     source: "https://en.wikipedia.org/wiki/Treadmill",
     steps: ["Начать с 3-5 минут легкого темпа.", "Держать ровное дыхание и устойчивую технику.", "Закончить 2-3 минутами заминки."],
   },
   general: {
     title: "Техника упражнения",
+    kind: "general",
     purpose: "Делай движение спокойно, без боли и без потери контроля.",
-    image: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Exercise_%2825714684614%29.jpg/1024px-Exercise_%2825714684614%29.jpg",
     source: "https://commons.wikimedia.org/",
     steps: ["Сначала настрой позицию и дыхание.", "Сделай повтор медленно и контролируемо.", "Остановись, если боль усиливается."],
   },
 };
+
+function techniqueDiagram(technique) {
+  const captions = {
+    push: ["Раз: опусти", "Два: выжми"],
+    pull: ["Раз: потяни", "Два: верни"],
+    legs: ["Раз: согни", "Два: толкни"],
+    core: ["Раз: линия", "Два: держи"],
+    cardio: ["Раз: разгон", "Два: ровно"],
+    general: ["Раз: контроль", "Два: спокойно"],
+  }[technique.kind || "general"];
+
+  const figures = {
+    push: '<path d="M115 205h120M140 175l55 30M195 205l40-32M385 185h120M410 170l55 15M465 185l40-18" />',
+    pull: '<path d="M110 95h130M175 95v110M140 145l35 60M210 145l-35 60M370 95h130M435 95v110M398 145l37 60M472 145l-37 60" />',
+    legs: '<path d="M125 110l70 65M195 175l-35 55M375 110l95 40M470 150l-10 80M95 235h160M340 235h180" />',
+    core: '<path d="M95 205h150M115 205l40-50M245 205l-70-50M360 190h170M380 190l65-28M530 190l-75-28" />',
+    cardio: '<path d="M90 230h180M125 185l55 45M180 230l45-55M350 230h180M388 175l68 55M456 230l48-42" />',
+    general: '<path d="M110 215h130M140 165l65 50M205 215l35-40M370 215h130M400 165l65 50M465 215l35-40" />',
+  }[technique.kind || "general"];
+
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 360">
+      <rect width="620" height="360" fill="#f5f7ef"/>
+      <rect x="24" y="24" width="270" height="280" rx="18" fill="#101611"/>
+      <rect x="326" y="24" width="270" height="280" rx="18" fill="#101611"/>
+      <text x="48" y="64" font-family="Arial" font-size="28" font-weight="800" fill="#d7ff38">${captions[0]}</text>
+      <text x="350" y="64" font-family="Arial" font-size="28" font-weight="800" fill="#d7ff38">${captions[1]}</text>
+      <g fill="none" stroke="#f4f7ef" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">${figures}</g>
+      <circle cx="155" cy="125" r="24" fill="#16d48f"/>
+      <circle cx="415" cy="125" r="24" fill="#16d48f"/>
+      <text x="34" y="336" font-family="Arial" font-size="19" font-weight="700" fill="#17211b">${technique.title}: схема выполнения</text>
+    </svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
 
 function openTechnique(exerciseIndex) {
   const exercise = data.activeWorkout?.exercises[exerciseIndex];
@@ -573,7 +607,7 @@ function openTechnique(exerciseIndex) {
   const technique = exerciseTechnique(exercise.name);
   $("techniqueTitle").textContent = exercise.name;
   $("techniquePurpose").textContent = technique.purpose;
-  $("techniqueImage").src = technique.image;
+  $("techniqueImage").src = techniqueDiagram(technique);
   $("techniqueImage").alt = technique.title;
   $("techniqueSource").href = technique.source;
   $("techniqueSteps").innerHTML = technique.steps.map((step) => `<li>${step}</li>`).join("");

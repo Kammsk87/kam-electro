@@ -49,6 +49,7 @@ await page.click("[data-swap='0']");
 await page.click("[data-info='0']");
 await expectVisible(page, "#techniqueModal");
 await expectText(page, "#techniqueSteps", /контрол|стоп|корпус|дых/i);
+await expectImageLoaded(page, "#techniqueImage");
 await page.click("#closeTechnique");
 await page.click("[data-exercise='0'][data-set='0']");
 await page.click("[data-exercise='1'][data-set='0']");
@@ -122,4 +123,9 @@ async function assertNoHorizontalOverflow(page, width) {
   if (overflow > 2) {
     throw new Error(`Horizontal overflow ${overflow}px at ${width}px viewport`);
   }
+}
+
+async function expectImageLoaded(page, selector) {
+  const loaded = await page.locator(selector).first().evaluate((image) => image.naturalWidth > 0 && image.naturalHeight > 0);
+  if (!loaded) throw new Error(`${selector} did not load`);
 }
