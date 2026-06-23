@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KAM Fit Coach</title>
-    <link rel="stylesheet" href="./styles.css?v=dashboardresponsive1" />
+    <link rel="stylesheet" href="./styles.css?v=plaincopy1" />
   </head>
   <body>
     <div id="authOverlay" class="auth-overlay">
@@ -12,7 +12,7 @@
         <span class="brand-mark">K</span>
         <p class="eyebrow">личный журнал</p>
         <h1>Войти в Fit Coach</h1>
-        <p class="auth-copy">Имя и код создают отдельный локальный профиль: тренировки, состояние и прогресс будут видны только этому пользователю на этом устройстве.</p>
+        <p class="auth-copy">Имя и код создают отдельный профиль на этом устройстве. Так каждый видит только свои тренировки, самочувствие и прогресс.</p>
         <label>
           Имя
           <input id="authName" autocomplete="name" placeholder="например: Александр" />
@@ -32,7 +32,7 @@
           <span class="brand-mark">K</span>
           <div>
             <strong>KAM Fit Coach</strong>
-            <small>адаптивный тренер</small>
+            <small>умный тренер</small>
           </div>
         </div>
 
@@ -47,7 +47,7 @@
         <nav class="nav">
           <a href="#today" class="active">Тренировка</a>
           <a href="#plans">Планы</a>
-          <a href="#profile">Атлет</a>
+          <a href="#profile">Профиль</a>
           <a href="#nutrition">Питание</a>
           <a href="#progress">Прогресс</a>
         </nav>
@@ -56,10 +56,10 @@
       <main>
         <section id="today" class="hero">
           <div class="hero-copy">
-            <p class="eyebrow">адаптивный тренер</p>
+            <p class="eyebrow">умный тренер</p>
             <h1>Тренировка, которая подстраивается под тело</h1>
             <p id="readinessText" class="hero-text"></p>
-            <div class="quick-checkin" aria-label="Быстрый чек-ин">
+            <div class="quick-checkin" aria-label="Быстрая оценка самочувствия">
               <button class="quick-chip active" data-mode="normal">Готов</button>
               <button class="quick-chip" data-mode="tired">Устал</button>
               <button class="quick-chip" data-mode="short">25 мин</button>
@@ -95,7 +95,7 @@
           <div class="journey-step active">
             <span>1</span>
             <strong>Открыл</strong>
-            <small>чек-ин 5 сек</small>
+            <small>оценил себя</small>
           </div>
           <div class="journey-step">
             <span>2</span>
@@ -209,7 +209,7 @@
             <div class="panel-header compact">
               <div>
                 <p class="eyebrow">профиль</p>
-              <h2>Атлет и ограничения</h2>
+                <h2>Профиль и ограничения</h2>
               </div>
               <span class="badge subtle">сохраняется</span>
             </div>
@@ -270,9 +270,9 @@
                 <select id="cyclePhase">
                   <option value="none">не учитывать</option>
                   <option value="menstruation">менструация</option>
-                  <option value="follicular">фолликулярная</option>
-                  <option value="ovulation">овуляция</option>
-                  <option value="luteal">лютеиновая</option>
+                  <option value="follicular">после менструации</option>
+                  <option value="ovulation">середина цикла</option>
+                  <option value="luteal">перед менструацией</option>
                 </select>
               </label>
               <label>
@@ -373,10 +373,10 @@
     </div>
 
     <nav class="mobile-gym-bar" aria-label="Быстрые действия тренировки">
-      <a href="#today">Чек-ин</a>
+      <a href="#today">Старт</a>
       <a href="#activeWorkout">Подходы</a>
       <a href="#progress">Прогресс</a>
-          <button id="mobileSaveWorkout" type="button">Сохранить</button>
+      <button id="mobileSaveWorkout" type="button">Сохранить</button>
     </nav>
 
     <button id="tourLauncher" class="tour-launcher" type="button">Помощь</button>
@@ -411,6 +411,6 @@
       </div>
     </div>
 
-    <script src="./app.js?v=dashboardresponsive1"></script>
+    <script src="./app.js?v=plaincopy1"></script>
   </body>
 </html>

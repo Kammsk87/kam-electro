@@ -48,7 +48,7 @@ await expectText(page, "#nextAction", /25 минут/);
 
 await page.click('[data-mode="pain"]');
 await page.waitForTimeout(50);
-await expectText(page, "#workoutName", /Низкоударный день/);
+await expectText(page, "#workoutName", /День без прыжков/);
 await expectText(page, "#coachWhy", /есть боль|бережем суставы/);
 await page.click('[data-focus="back"]');
 await expectText(page, "#workoutName", /Спина/);
