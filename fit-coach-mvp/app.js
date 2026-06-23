@@ -26,12 +26,26 @@ const defaults = {
 };
 
 const storageKey = "kam-fit-coach-mvp";
+const sessionKey = `${storageKey}:current-user`;
 const $ = (id) => document.getElementById(id);
 
-let data = load();
+let currentUser = loadCurrentUser();
+let data = currentUser ? load() : structuredClone(defaults);
+
+function loadCurrentUser() {
+  try {
+    return JSON.parse(localStorage.getItem(sessionKey));
+  } catch {
+    return null;
+  }
+}
+
+function userStorageKey(user = currentUser) {
+  return `${storageKey}:user:${user?.id || "guest"}`;
+}
 
 function load() {
-  const saved = localStorage.getItem(storageKey);
+  const saved = localStorage.getItem(userStorageKey());
   if (!saved) return structuredClone(defaults);
   try {
     const parsed = JSON.parse(saved);
@@ -47,10 +61,19 @@ function load() {
 }
 
 function save() {
-  localStorage.setItem(storageKey, JSON.stringify(data));
+  if (!currentUser) return;
+  localStorage.setItem(userStorageKey(), JSON.stringify(data));
+  localStorage.setItem(sessionKey, JSON.stringify(currentUser));
 }
 
 function bindInputs() {
+  $("authForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    login($("authName").value, $("authCode").value);
+  });
+  $("demoLoginButton").addEventListener("click", () => login("Демо атлет", "0000"));
+  $("logoutButton").addEventListener("click", logout);
+
   ["sex", "goal", "place", "level", "cyclePhase", "limitations"].forEach((id) => {
     $(id).value = data.profile[id];
     $(id).addEventListener("input", () => {
@@ -126,6 +149,36 @@ function bindInputs() {
   });
 }
 
+function login(name, code) {
+  const cleanName = name.trim();
+  const cleanCode = code.trim();
+  if (!cleanName || !cleanCode) {
+    $("authForm").classList.add("shake");
+    window.setTimeout(() => $("authForm").classList.remove("shake"), 260);
+    return;
+  }
+  currentUser = {
+    id: `${slugify(cleanName)}-${slugify(cleanCode)}`,
+    name: cleanName,
+  };
+  localStorage.setItem(sessionKey, JSON.stringify(currentUser));
+  data = load();
+  syncInputs();
+  render();
+}
+
+function logout() {
+  localStorage.removeItem(sessionKey);
+  currentUser = null;
+  data = structuredClone(defaults);
+  syncInputs();
+  render();
+}
+
+function slugify(value) {
+  return value.toLowerCase().replace(/[^a-zа-я0-9]+/gi, "-").replace(/^-|-$/g, "") || "user";
+}
+
 function syncInputs() {
   ["sleep", "energy", "stress", "pain", "readinessNote", "feedback", "resultMinutes", "resultEffort", "resultPain", "resultCompletion"].forEach((id) => {
     $(id).value = data.state[id];
@@ -157,6 +210,42 @@ function getReadiness() {
   if (lastPartial) score -= 5;
 
   return Math.max(20, Math.min(98, score));
+}
+
+function scaleMeta(id, value) {
+  const map = {
+    sleep: [
+      [4, "мало сна: минус к нагрузке", "bad"],
+      [6, "сон средний: без рекордов", "warn"],
+      [10, "сон нормальный: можно работать", "good"],
+    ],
+    energy: [
+      [4, "энергии мало: короткий план", "bad"],
+      [7, "энергия рабочая: держим план", "warn"],
+      [10, "энергии много: можно прогрессировать", "good"],
+    ],
+    stress: [
+      [3, "стресс низкий: фокус на прогресс", "good"],
+      [6, "стресс средний: оставить запас", "warn"],
+      [10, "стресс высокий: снизить интенсивность", "bad"],
+    ],
+    pain: [
+      [3, "боль низкая: контролируем технику", "good"],
+      [6, "дискомфорт: нужны замены", "warn"],
+      [10, "боль высокая: низкоударный режим", "bad"],
+    ],
+  }[id];
+  return map.find(([limit]) => value <= limit);
+}
+
+function stateImpactItems() {
+  return ["sleep", "energy", "stress", "pain"].map((id) => {
+    const value = data.state[id];
+    const [, text, tone] = scaleMeta(id, value);
+    const label = { sleep: "Сон", energy: "Энергия", stress: "Стресс", pain: "Боль" }[id];
+    const effect = { good: "+", warn: "=", bad: "-" }[tone];
+    return { label, value, text, tone, effect };
+  });
 }
 
 function context(score) {
@@ -756,6 +845,10 @@ function renderActiveWorkout(score) {
 function render() {
   const score = getReadiness();
   const workout = chooseWorkout(score);
+  $("authOverlay").hidden = Boolean(currentUser);
+  document.body.classList.toggle("locked", !currentUser);
+  $("currentUserLabel").textContent = currentUser?.name || "Гость";
+  $("userHistoryCount").textContent = `${data.history.length} ${plural(data.history.length, "тренировка", "тренировки", "тренировок")}`;
 
   document.querySelectorAll(".quick-chip").forEach((button) => {
     button.classList.toggle("active", button.dataset.mode === data.quickMode);
@@ -770,6 +863,8 @@ function render() {
       : score >= 58
         ? "Нагрузка рабочая: тренируемся уверенно, но оставляем запас и слушаем суставы."
         : "Тело просит мягкий формат: движение, кровоток, техника и восстановление без героизма.";
+
+  renderStateScales();
 
   $("signals").innerHTML = getSignals(score)
     .map(([title, body]) => `<div class="signal"><strong>${title}</strong><span>${body}</span></div>`)
@@ -815,6 +910,27 @@ function render() {
 
   $("achievement").innerHTML = getAchievement(counts);
   $("reminder").textContent = getReminder(counts);
+}
+
+function renderStateScales() {
+  ["sleep", "energy", "stress", "pain"].forEach((id) => {
+    const value = data.state[id];
+    const [, text, tone] = scaleMeta(id, value);
+    $(`${id}Value`).textContent = `${value}/10`;
+    $(`${id}Hint`).textContent = text;
+    $(`${id}Hint`).dataset.tone = tone;
+  });
+  $("stateImpact").innerHTML = stateImpactItems()
+    .map((item) => `<div class="impact-pill ${item.tone}"><strong>${item.effect}</strong><span>${item.label}: ${item.text}</span></div>`)
+    .join("");
+}
+
+function plural(count, one, few, many) {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
 }
 
 function labelFeedback(value) {

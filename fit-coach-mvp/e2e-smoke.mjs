@@ -18,6 +18,11 @@ page.on("console", (message) => {
 });
 
 await page.goto(pageUrl);
+await page.evaluate(() => localStorage.clear());
+await page.reload();
+await page.fill("#authName", "Атлет 1");
+await page.fill("#authCode", "1111");
+await page.click("#loginButton");
 await page.waitForSelector("#workoutName");
 
 await expectVisible(page, "text=Тренировка, которая подстраивается под тело");
@@ -77,6 +82,18 @@ await page.reload();
 await expectText(page, "#history", /готовность/);
 await expectText(page, "#history", /52 мин/);
 await expectText(page, "#achievement", /1 тренировка|тренировок|Маршрут/);
+await page.locator("#sleep").evaluate((input) => {
+  input.value = "3";
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+});
+await expectText(page, "#sleepHint", /мало сна/);
+await expectText(page, "#stateImpact", /Сон: мало сна/);
+
+await page.click("#logoutButton");
+await page.fill("#authName", "Атлет 2");
+await page.fill("#authCode", "2222");
+await page.click("#loginButton");
+await expectText(page, "#history", /Пока нет сохраненных тренировок/);
 
 for (const viewport of [
   { width: 430, height: 932 },

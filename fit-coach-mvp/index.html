@@ -4,9 +4,28 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KAM Fit Coach</title>
-    <link rel="stylesheet" href="./styles.css?v=techfix1" />
+    <link rel="stylesheet" href="./styles.css?v=authscales1" />
   </head>
   <body>
+    <div id="authOverlay" class="auth-overlay">
+      <form id="authForm" class="auth-card">
+        <span class="brand-mark">K</span>
+        <p class="eyebrow">личный журнал</p>
+        <h1>Войти в Fit Coach</h1>
+        <p class="auth-copy">Имя и код создают отдельный локальный профиль: тренировки, состояние и прогресс будут видны только этому пользователю на этом устройстве.</p>
+        <label>
+          Имя
+          <input id="authName" autocomplete="name" placeholder="например: Александр" />
+        </label>
+        <label>
+          Код
+          <input id="authCode" autocomplete="current-password" placeholder="4 цифры или слово" type="password" />
+        </label>
+        <button id="loginButton" type="submit">Войти</button>
+        <button id="demoLoginButton" class="secondary" type="button">Демо-вход</button>
+      </form>
+    </div>
+
     <div class="app-shell">
       <aside class="sidebar">
         <div class="brand">
@@ -15,6 +34,13 @@
             <strong>KAM Fit Coach</strong>
             <small>адаптивный тренер</small>
           </div>
+        </div>
+
+        <div class="account-card">
+          <span>Пользователь</span>
+          <strong id="currentUserLabel">Гость</strong>
+          <small id="userHistoryCount">0 тренировок</small>
+          <button id="logoutButton" class="secondary" type="button">Сменить</button>
         </div>
 
         <nav class="nav">
@@ -238,11 +264,28 @@
             </div>
 
             <div class="sliders">
-              <label>Сон <input id="sleep" type="range" min="1" max="10" value="7" /></label>
-              <label>Энергия <input id="energy" type="range" min="1" max="10" value="7" /></label>
-              <label>Стресс <input id="stress" type="range" min="1" max="10" value="4" /></label>
-              <label>Боль / дискомфорт <input id="pain" type="range" min="1" max="10" value="2" /></label>
+              <label class="scale-label">
+                <span class="scale-head"><span>Сон</span><strong id="sleepValue">7/10</strong></span>
+                <input id="sleep" type="range" min="1" max="10" value="7" />
+                <small id="sleepHint">7-8 часов: можно тренироваться рабоче.</small>
+              </label>
+              <label class="scale-label">
+                <span class="scale-head"><span>Энергия</span><strong id="energyValue">7/10</strong></span>
+                <input id="energy" type="range" min="1" max="10" value="7" />
+                <small id="energyHint">Есть ресурс на основной блок.</small>
+              </label>
+              <label class="scale-label">
+                <span class="scale-head"><span>Стресс</span><strong id="stressValue">4/10</strong></span>
+                <input id="stress" type="range" min="1" max="10" value="4" />
+                <small id="stressHint">Средний стресс: держим запас.</small>
+              </label>
+              <label class="scale-label">
+                <span class="scale-head"><span>Боль / дискомфорт</span><strong id="painValue">2/10</strong></span>
+                <input id="pain" type="range" min="1" max="10" value="2" />
+                <small id="painHint">Можно тренироваться, если боль не растет.</small>
+              </label>
             </div>
+            <div id="stateImpact" class="state-impact"></div>
 
             <label class="full-label">
               Обратная связь после прошлой тренировки
@@ -307,6 +350,6 @@
       </div>
     </div>
 
-    <script src="./app.js?v=techfix1"></script>
+    <script src="./app.js?v=authscales1"></script>
   </body>
 </html>

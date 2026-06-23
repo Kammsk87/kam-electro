@@ -46,6 +46,64 @@ body::before {
   mask-image: linear-gradient(to bottom, black, transparent 80%);
 }
 
+body.locked {
+  overflow: hidden;
+}
+
+.auth-overlay[hidden] {
+  display: none;
+}
+
+.auth-overlay {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background:
+    linear-gradient(135deg, rgba(7, 9, 8, 0.92), rgba(7, 9, 8, 0.78)),
+    url("https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=1600&q=80") center / cover;
+}
+
+.auth-card {
+  display: grid;
+  gap: 13px;
+  width: min(440px, 100%);
+  border: 1px solid rgba(215, 255, 56, 0.22);
+  border-radius: 8px;
+  padding: 24px;
+  background: rgba(16, 22, 17, 0.94);
+  box-shadow: 0 30px 120px rgba(0, 0, 0, 0.55);
+}
+
+.auth-card h1 {
+  margin-bottom: 0;
+  font-size: 42px;
+}
+
+.auth-copy {
+  margin-bottom: 4px;
+  color: var(--muted);
+}
+
+.auth-card.shake {
+  animation: shake 0.25s linear;
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-7px);
+  }
+  75% {
+    transform: translateX(7px);
+  }
+}
+
 button,
 input,
 select,
@@ -104,6 +162,34 @@ button:hover {
   align-items: center;
   gap: 12px;
   margin-bottom: 34px;
+}
+
+.account-card {
+  display: grid;
+  gap: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  margin-bottom: 18px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.account-card span,
+.account-card small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.account-card strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.account-card button {
+  min-height: 34px;
+  margin-top: 4px;
+  padding: 8px 10px;
+  font-size: 11px;
 }
 
 .brand-mark {
@@ -791,6 +877,86 @@ textarea:focus {
   display: grid;
   gap: 15px;
   margin-bottom: 16px;
+}
+
+.scale-label {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.scale-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.scale-head strong {
+  color: var(--accent);
+}
+
+.scale-label small {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.scale-label small[data-tone="good"] {
+  color: #7bffc9;
+}
+
+.scale-label small[data-tone="warn"] {
+  color: var(--warn);
+}
+
+.scale-label small[data-tone="bad"] {
+  color: #ff9a9d;
+}
+
+.state-impact {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.impact-pill {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 9px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.impact-pill strong {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.impact-pill.good strong {
+  background: rgba(22, 212, 143, 0.18);
+  color: #7bffc9;
+}
+
+.impact-pill.warn strong {
+  background: rgba(255, 178, 56, 0.16);
+  color: var(--warn);
+}
+
+.impact-pill.bad strong {
+  background: rgba(255, 90, 95, 0.16);
+  color: #ff9a9d;
+}
+
+.impact-pill span {
+  color: #d8e1d7;
+  font-size: 13px;
 }
 
 input[type="range"] {
