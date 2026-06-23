@@ -428,6 +428,74 @@ def run_sweep(rows):
             test_exp = (r_te[4] - r_te[5]) if r_te and r_te[4] is not None and r_te[5] is not None else None
             add_result("G", f"{strat} | timeframe={tf} vs others", train_lift, test_lift, test_n, train_exp, test_exp)
 
+    # Group H: META — пул ВСЕХ сигналов (исполненные + отклонённые) БЕЗ привязки к
+    # стратегии-источнику. Цель — найти правило входа, которое работает само по себе,
+    # а не "докрутка" одной из 4 существующих стратегий — кандидат в новую, 5-ю стратегию.
+    # Раз пул разнородный, дополнительно проверяем состав топ-25%/низ-25% корзины по
+    # стратегиям: если 80%+ одной корзины — это одна стратегия, пометка "dominated_by",
+    # чтобы не выдать находку pullback'а за "универсальный" паттерн.
+    def strategy_composition(rows_subset):
+        c = Counter(r["f"].get("strategy", "?") for r in rows_subset)
+        if not c:
+            return None
+        top_strat, top_n = c.most_common(1)[0]
+        share = top_n / len(rows_subset)
+        return top_strat, share
+
+    def dominance_tag(pos, neg):
+        tags = []
+        for label, subset in (("pos", pos), ("neg", neg)):
+            comp = strategy_composition(subset)
+            if comp and comp[1] >= 0.8:
+                tags.append(f"{label}_dominated_by={comp[0]}({comp[1]*100:.0f}%)")
+        return " ".join(tags)
+
+    for feat in NUM_FEATS:
+        if not has_variance(train, feat):
+            continue
+        thr = quartile_thresh(train, feat)
+        if not thr:
+            continue
+        q1, q4 = thr
+        for thresh, direction, tag in [(q4, "high", "topQ"), (q1, "low", "botQ")]:
+            r_tr = eval_rule(train, feat, thresh, direction)
+            if not r_tr:
+                continue
+            train_lift = r_tr[0] - r_tr[1]
+            train_exp = (r_tr[4] - r_tr[5]) if r_tr[4] is not None and r_tr[5] is not None else None
+            r_te = eval_rule(test, feat, thresh, direction)
+            test_lift = (r_te[0] - r_te[1]) if r_te else None
+            test_n = (r_te[2] + r_te[3]) if r_te else 0
+            test_exp = (r_te[4] - r_te[5]) if r_te and r_te[4] is not None and r_te[5] is not None else None
+            if direction == "high":
+                pos_tr = [r for r in train if r["f"].get(feat) is not None and r["f"].get(feat) >= thresh]
+                neg_tr = [r for r in train if r["f"].get(feat) is not None and r["f"].get(feat) < thresh]
+            else:
+                pos_tr = [r for r in train if r["f"].get(feat) is not None and r["f"].get(feat) <= thresh]
+                neg_tr = [r for r in train if r["f"].get(feat) is not None and r["f"].get(feat) > thresh]
+            dom = dominance_tag(pos_tr, neg_tr)
+            label = f"META | {feat} {tag}" + (f" [{dom}]" if dom else "")
+            add_result("H", label, train_lift, test_lift, test_n, train_exp, test_exp)
+
+    for name, cond in COMBOS:
+        pos_tr, neg_tr = combo_eval(train, cond)
+        if len(pos_tr) < MIN_BUCKET or len(neg_tr) < MIN_BUCKET:
+            continue
+        train_lift = statistics.fmean(r["label"] for r in pos_tr) - statistics.fmean(r["label"] for r in neg_tr)
+        exp_pos_tr, exp_neg_tr = expectancy(pos_tr), expectancy(neg_tr)
+        train_exp = (exp_pos_tr - exp_neg_tr) if exp_pos_tr is not None and exp_neg_tr is not None else None
+        pos_te, neg_te = combo_eval(test, cond)
+        if len(pos_te) >= MIN_BUCKET and len(neg_te) >= MIN_BUCKET:
+            test_lift = statistics.fmean(r["label"] for r in pos_te) - statistics.fmean(r["label"] for r in neg_te)
+            test_n = len(pos_te) + len(neg_te)
+            exp_pos_te, exp_neg_te = expectancy(pos_te), expectancy(neg_te)
+            test_exp = (exp_pos_te - exp_neg_te) if exp_pos_te is not None and exp_neg_te is not None else None
+        else:
+            test_lift, test_n, test_exp = None, len(pos_te) + len(neg_te), None
+        dom = dominance_tag(pos_tr, neg_tr)
+        label = f"META | {name}" + (f" [{dom}]" if dom else "")
+        add_result("H", label, train_lift, test_lift, test_n, train_exp, test_exp)
+
     return results
 
 
