@@ -12,6 +12,7 @@ const defaults = {
     energy: 7,
     stress: 4,
     pain: 2,
+    trainingFocus: "auto",
     readinessNote: "",
     feedback: "",
     resultMinutes: 45,
@@ -84,10 +85,11 @@ function bindInputs() {
     });
   });
 
-  ["sleep", "energy", "stress", "pain", "readinessNote", "feedback", "resultMinutes", "resultEffort", "resultPain", "resultCompletion"].forEach((id) => {
+  ["sleep", "energy", "stress", "pain", "trainingFocus", "readinessNote", "feedback", "resultMinutes", "resultEffort", "resultPain", "resultCompletion"].forEach((id) => {
     $(id).value = data.state[id];
     $(id).addEventListener("input", () => {
       data.state[id] = $(id).type === "range" || $(id).type === "number" ? Number($(id).value) : $(id).value;
+      if (id === "trainingFocus") data.activeWorkout = null;
       save();
       render();
     });
@@ -192,7 +194,7 @@ function slugify(value) {
 }
 
 function syncInputs() {
-  ["sleep", "energy", "stress", "pain", "readinessNote", "feedback", "resultMinutes", "resultEffort", "resultPain", "resultCompletion"].forEach((id) => {
+  ["sleep", "energy", "stress", "pain", "trainingFocus", "readinessNote", "feedback", "resultMinutes", "resultEffort", "resultPain", "resultCompletion"].forEach((id) => {
     $(id).value = data.state[id];
   });
 }
@@ -269,7 +271,7 @@ function context(score) {
   const intensity = score >= 78 ? "high" : score >= 58 ? "medium" : "low";
   const experience = { beginner: 2, middle: 3, advanced: 4 }[level];
 
-  return { goal, place, level, needsLowImpact, cycleDeload, luteal, intensity, experience, quickMode: data.quickMode };
+  return { goal, place, level, needsLowImpact, cycleDeload, luteal, intensity, experience, quickMode: data.quickMode, focus: data.state.trainingFocus };
 }
 
 function exerciseLibrary(place) {
@@ -278,6 +280,9 @@ function exerciseLibrary(place) {
       push: ["жим гантелей", "жим в тренажере", "разведения на плечи"],
       pull: ["тяга верхнего блока", "горизонтальная тяга", "face pull"],
       legs: ["жим ногами", "румынская тяга", "сгибание ног"],
+      chest: ["жим гантелей на наклонной", "жим в тренажере на грудь", "сведение рук в кроссовере"],
+      shoulders: ["жим плеч в тренажере", "разведения гантелей в стороны", "face pull"],
+      arms: ["разгибание рук на блоке", "подъем гантелей на бицепс", "молотковые сгибания"],
       cardio: ["дорожка в наклоне", "велотренажер", "эллипс"],
       core: ["dead bug", "планка", "анти-ротация в блоке"],
     },
@@ -285,6 +290,9 @@ function exerciseLibrary(place) {
       push: ["отжимания", "жим резинки", "плечевой жим с рюкзаком"],
       pull: ["тяга резинки", "тяга полотенца", "обратные разведения"],
       legs: ["присед до стула", "ягодичный мост", "выпады назад"],
+      chest: ["отжимания", "жим резинки", "разводка с резинкой"],
+      shoulders: ["плечевой жим с рюкзаком", "разведения с бутылками", "обратные разведения"],
+      arms: ["разгибание резинки", "сгибание резинки", "узкие отжимания"],
       cardio: ["быстрая ходьба", "низкоударный круг", "ступеньки"],
       core: ["планка", "bird dog", "скручивания медленно"],
     },
@@ -292,6 +300,9 @@ function exerciseLibrary(place) {
       push: ["брусья или отжимания", "отжимания на лавке", "стойка у стены"],
       pull: ["подтягивания или негативы", "австралийская тяга", "вис"],
       legs: ["выпады", "приседания", "шаги на тумбу"],
+      chest: ["отжимания на брусьях", "отжимания широкие", "отжимания на лавке"],
+      shoulders: ["стойка у стены", "отжимания углом", "обратные разведения"],
+      arms: ["узкие отжимания", "подтягивания обратным хватом", "вис на турнике"],
       cardio: ["ходьба в темпе", "легкие ускорения", "лестница"],
       core: ["подъем коленей", "планка", "боковая планка"],
     },
@@ -318,21 +329,44 @@ function chooseWorkout(score) {
   if (ctx.needsLowImpact) title = "Низкоударный день";
   if (short) title = "Короткая тренировка";
   if (cardioFirst) title = "Кардио + силовой минимум";
+  if (ctx.focus === "chest") title = "Грудь + плечи + руки";
+  if (ctx.focus === "back") title = "Спина + бицепс";
+  if (ctx.focus === "legs") title = "Ноги + ягодицы";
+  if (ctx.focus === "cardioMobility") title = "Дорожка + растяжка";
 
-  const heavyLine = cardioFirst
+  const focusLine = getFocusLine(ctx, lib, rounds, reps);
+  const heavyLine = focusLine || (cardioFirst
     ? `${lib.cardio[0]} 20-35 минут + 2 круга: ${lib.core[0]}, ${lib.pull[0]}`
     : ctx.goal === "fatloss"
     ? `${rounds} круга без отказа: ${lib.legs[0]}, ${lib.push[0]}, ${lib.pull[0]}, ${lib.core[0]}`
-    : `${rounds} подхода: ${lib.legs[0]}, ${lib.push[0]}, ${lib.pull[0]}`;
+    : `${rounds} подхода: ${lib.legs[0]}, ${lib.push[0]}, ${lib.pull[0]}`);
 
   const blocks = [
-    { title: "Старт", body: `${short ? "5" : "8-12"} минут: ${lib.cardio[0]}, суставы, 2 легких подхода.` },
+    { title: "Старт", body: startProtocol(ctx, lib) },
     { title: "Силовой блок", body: `${heavyLine}. Повторы ${reps}, отдых ${rest}.` },
     { title: "Финиш", body: finishText(ctx, lib) },
     { title: "Замена", body: swapText(ctx, lib) },
   ];
 
   return { title, intensity: ctx.intensity, blocks };
+}
+
+function startProtocol(ctx, lib) {
+  if (ctx.place === "gym") {
+    return "Дорожка 8-12 мин: скорость 4,5-5, наклон 12-15. Затем 4-6 мин динамической растяжки плеч, груди, бедер.";
+  }
+  if (ctx.place === "home") return "5-8 мин ходьбы/суставной разминки. Затем динамическая растяжка грудного отдела, плеч и бедер.";
+  return "8-12 мин ходьбы в темпе. Затем динамическая растяжка плеч, грудного отдела и бедер.";
+}
+
+function getFocusLine(ctx, lib, rounds, reps) {
+  if (ctx.focus === "chest") {
+    return `${rounds} подхода: ${lib.chest[0]}, ${lib.chest[1]}, ${lib.chest[2]}. Добивка: ${lib.shoulders[1]}, ${lib.arms[0]}, ${lib.arms[1]}`;
+  }
+  if (ctx.focus === "back") return `${rounds} подхода: ${lib.pull[0]}, ${lib.pull[1]}, ${lib.pull[2]}. Добивка: ${lib.arms[1]}`;
+  if (ctx.focus === "legs") return `${rounds} подхода: ${lib.legs[0]}, ${lib.legs[1]}, ${lib.legs[2]}. Добивка: кор`;
+  if (ctx.focus === "cardioMobility") return `${lib.cardio[0]} 25-40 минут + растяжка 10-15 минут`;
+  return "";
 }
 
 function finishText(ctx, lib) {
@@ -536,16 +570,14 @@ function buildActiveExercises(score) {
   const baseSets = ctx.quickMode === "short" ? 2 : ctx.intensity === "high" ? 4 : ctx.intensity === "medium" ? 3 : 2;
   const reps = ctx.intensity === "high" ? 8 : ctx.intensity === "medium" ? 10 : 12;
   const weight = ctx.place === "gym" ? 20 : 0;
-  const names = ctx.quickMode === "cardio"
-    ? [lib.cardio[0], lib.pull[0], lib.core[0]]
-    : [lib.legs[0], lib.push[0], lib.pull[0], lib.core[0]];
+  const names = activeExerciseNames(ctx, lib);
 
   return names.map((name, index) => ({
     name,
-    target: index === 0 && ctx.quickMode === "cardio" ? "20-35 мин" : `${baseSets} x ${reps}`,
+    target: targetForExercise(name, index, ctx, baseSets, reps),
     alternatives: alternativesFor(name, lib),
     accepted: false,
-    sets: Array.from({ length: index === 0 && ctx.quickMode === "cardio" ? 1 : baseSets }, () => ({
+    sets: Array.from({ length: isWarmupExercise(name) || (index === 0 && ctx.quickMode === "cardio") ? 1 : baseSets }, () => ({
       reps,
       weight,
       done: false,
@@ -553,8 +585,29 @@ function buildActiveExercises(score) {
   }));
 }
 
+function activeExerciseNames(ctx, lib) {
+  const warmup = ctx.place === "gym" ? "дорожка 4,5-5 / наклон 15 + растяжка" : `${lib.cardio[0]} + растяжка`;
+  if (ctx.focus === "chest") return [warmup, ...lib.chest, lib.shoulders[1], lib.arms[0], lib.arms[1]];
+  if (ctx.focus === "back") return [warmup, ...lib.pull, lib.arms[1]];
+  if (ctx.focus === "legs") return [warmup, ...lib.legs, lib.core[0]];
+  if (ctx.focus === "cardioMobility") return [warmup, lib.cardio[0], "растяжка 10-15 минут"];
+  if (ctx.quickMode === "cardio") return [warmup, lib.cardio[0], lib.pull[0], lib.core[0]];
+  return [warmup, lib.legs[0], lib.push[0], lib.pull[0], lib.core[0]];
+}
+
+function isWarmupExercise(name) {
+  return /дорож|растяж|размин|ходь/.test(name.toLowerCase());
+}
+
+function targetForExercise(name, index, ctx, baseSets, reps) {
+  if (isWarmupExercise(name)) return index === 0 ? "8-12 мин + растяжка" : "10-15 мин";
+  if (ctx.quickMode === "cardio" && index === 1) return "20-35 мин";
+  return `${baseSets} x ${reps}`;
+}
+
 function alternativesFor(name, lib) {
-  const all = [...lib.legs, ...lib.push, ...lib.pull, ...lib.core, ...lib.cardio];
+  if (isWarmupExercise(name)) return [lib.cardio[1], lib.cardio[2], "суставная разминка"];
+  const all = [...lib.legs, ...lib.push, ...lib.pull, ...lib.chest, ...lib.shoulders, ...lib.arms, ...lib.core, ...lib.cardio];
   return all.filter((item) => item !== name).slice(0, 3);
 }
 
@@ -619,7 +672,7 @@ function exerciseTechnique(name) {
   if (/тяга верх|горизонт|резин|полотен|подтяг|австрал|face pull|вис/.test(lower)) return techniqueLibrary.pull;
   if (/жим|отжим|брусь|плеч|развед/.test(lower)) return techniqueLibrary.push;
   if (/планк|планк|dead bug|bird|скручив|анти|подъем колен|кор|боковая/.test(lower)) return techniqueLibrary.core;
-  if (/дорож|вело|эллипс|ходь|кардио|лестниц|ускор|ступень/.test(lower)) return techniqueLibrary.cardio;
+  if (/дорож|вело|эллипс|ходь|кардио|лестниц|ускор|ступень|растяж|размин/.test(lower)) return techniqueLibrary.cardio;
   return techniqueLibrary.general;
 }
 
@@ -925,6 +978,7 @@ function render() {
 }
 
 function renderStateScales() {
+  $("focusValue").textContent = focusLabel(data.state.trainingFocus);
   ["sleep", "energy", "stress", "pain"].forEach((id) => {
     const value = data.state[id];
     const [, text, tone] = scaleMeta(id, value);
@@ -935,6 +989,16 @@ function renderStateScales() {
   $("stateImpact").innerHTML = stateImpactItems()
     .map((item) => `<div class="impact-pill ${item.tone}"><strong>${item.effect}</strong><span>${item.label}: ${item.text}</span></div>`)
     .join("");
+}
+
+function focusLabel(value) {
+  return {
+    auto: "авто",
+    chest: "грудь",
+    back: "спина",
+    legs: "ноги",
+    cardioMobility: "кардио",
+  }[value] || "авто";
 }
 
 function plural(count, one, few, many) {

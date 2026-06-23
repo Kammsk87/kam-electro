@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KAM Fit Coach</title>
-    <link rel="stylesheet" href="./styles.css?v=gymmode1" />
+    <link rel="stylesheet" href="./styles.css?v=focuswarmup1" />
   </head>
   <body>
     <div id="authOverlay" class="auth-overlay">
@@ -265,6 +265,17 @@
 
             <div class="sliders">
               <label class="scale-label">
+                <span class="scale-head"><span>Фокус дня</span><strong id="focusValue">авто</strong></span>
+                <select id="trainingFocus">
+                  <option value="auto">авто по программе</option>
+                  <option value="chest">грудь + плечи + руки</option>
+                  <option value="back">спина + бицепс</option>
+                  <option value="legs">ноги + ягодицы</option>
+                  <option value="cardioMobility">дорожка + растяжка</option>
+                </select>
+                <small>Если пришел с конкретным планом, выбери группу мышц.</small>
+              </label>
+              <label class="scale-label">
                 <span class="scale-head"><span>Сон</span><strong id="sleepValue">7/10</strong></span>
                 <input id="sleep" type="range" min="1" max="10" value="7" />
                 <small id="sleepHint">7-8 часов: можно тренироваться рабоче.</small>
@@ -357,6 +368,6 @@
       </div>
     </div>
 
-    <script src="./app.js?v=gymmode1"></script>
+    <script src="./app.js?v=focuswarmup1"></script>
   </body>
 </html>

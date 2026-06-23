@@ -49,6 +49,11 @@ await expectText(page, "#planOptions", /4 недели|месяц/i);
 
 await page.selectOption("#place", "home");
 await expectText(page, "#workoutBlocks", /резинки|рюкзак|быстрая ходьба|присед/);
+await page.selectOption("#place", "gym");
+await page.selectOption("#trainingFocus", "chest");
+await expectText(page, "#workoutName", /Грудь/);
+await expectText(page, "#workoutBlocks", /Дорожка|наклон 12-15|груд/);
+await expectText(page, "#exerciseList", /дорожка 4,5-5|жим|кроссовер|разгибание/i);
 await expectVisible(page, "#exerciseList .exercise-card");
 await page.click("[data-swap='0']");
 await page.click("[data-info='0']");
