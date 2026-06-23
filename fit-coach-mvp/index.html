@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KAM Fit Coach</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark">K</span>
+          <div>
+            <strong>KAM Fit Coach</strong>
+            <small>адаптивный тренер</small>
+          </div>
+        </div>
+
+        <nav class="nav">
+          <a href="#today" class="active">Тренировка</a>
+          <a href="#plans">Планы</a>
+          <a href="#profile">Атлет</a>
+          <a href="#nutrition">Питание</a>
+          <a href="#progress">Прогресс</a>
+        </nav>
+      </aside>
+
+      <main>
+        <section id="today" class="hero">
+          <div class="hero-copy">
+            <p class="eyebrow">адаптивный тренер</p>
+            <h1>Тренировка, которая подстраивается под тело</h1>
+            <p id="readinessText" class="hero-text"></p>
+            <div class="quick-checkin" aria-label="Быстрый чек-ин">
+              <button class="quick-chip active" data-mode="normal">Готов</button>
+              <button class="quick-chip" data-mode="tired">Устал</button>
+              <button class="quick-chip" data-mode="short">25 мин</button>
+              <button class="quick-chip" data-mode="pain">Болит</button>
+              <button class="quick-chip" data-mode="cardio">Кардио</button>
+            </div>
+            <div class="hero-actions">
+              <button id="logDone">Сохранить тренировку</button>
+              <button id="resetDemo" class="ghost-button">Сбросить демо</button>
+            </div>
+          </div>
+
+          <div class="athlete-card">
+            <div>
+              <span class="label">готовность</span>
+              <strong id="readinessTitle">Расчет...</strong>
+            </div>
+            <div class="score-ring" id="readinessScore">0</div>
+            <div id="signals" class="signal-list"></div>
+          </div>
+        </section>
+
+        <section class="journey">
+          <div class="journey-step active">
+            <span>1</span>
+            <strong>Открыл</strong>
+            <small>чек-ин 5 сек</small>
+          </div>
+          <div class="journey-step">
+            <span>2</span>
+            <strong>Сделал</strong>
+            <small>план дня</small>
+          </div>
+          <div class="journey-step">
+            <span>3</span>
+            <strong>Отметил</strong>
+            <small>легко / тяжело</small>
+          </div>
+          <div class="journey-step">
+            <span>4</span>
+            <strong>Увидел</strong>
+            <small>прогресс</small>
+          </div>
+        </section>
+
+        <section class="grid today-grid">
+          <article class="panel workout-panel primary-panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">сегодня</p>
+                <h2 id="workoutName">Тренировка</h2>
+              </div>
+              <span id="workoutBadge" class="badge">адаптивно</span>
+            </div>
+            <div id="workoutBlocks" class="workout-blocks"></div>
+            <div class="active-workout">
+              <div class="panel-header compact">
+                <div>
+                  <p class="eyebrow">выполнение</p>
+                  <h2>Подходы сегодня</h2>
+                </div>
+                <span id="activeProgress" class="badge subtle">0%</span>
+              </div>
+              <div id="exerciseList" class="exercise-list"></div>
+            </div>
+          </article>
+
+          <article class="panel coach-panel">
+            <div class="panel-header compact">
+              <div>
+                <p class="eyebrow">тренер</p>
+                <h2>Почему так</h2>
+              </div>
+            </div>
+            <div id="coachWhy" class="coach-why"></div>
+            <div id="nextAction" class="next-action"></div>
+            <hr />
+            <p class="eyebrow">после тренировки</p>
+            <div class="workout-result">
+              <label>
+                Минуты
+                <input id="resultMinutes" type="number" min="5" max="180" value="45" />
+              </label>
+              <label>
+                Сложность
+                <select id="resultEffort">
+                  <option value="easy">легко</option>
+                  <option value="done" selected>нормально</option>
+                  <option value="hard">тяжело</option>
+                </select>
+              </label>
+              <label>
+                Боль после
+                <select id="resultPain">
+                  <option value="0">нет</option>
+                  <option value="2">легкая</option>
+                  <option value="5">заметная</option>
+                  <option value="8">сильная</option>
+                </select>
+              </label>
+              <label>
+                Сделано
+                <select id="resultCompletion">
+                  <option value="full">весь план</option>
+                  <option value="partial">часть плана</option>
+                  <option value="extra">с запасом</option>
+                </select>
+              </label>
+            </div>
+            <div class="log-actions">
+              <button id="logEasy" class="secondary">Было легко</button>
+              <button id="logHard" class="secondary">Было тяжело</button>
+            </div>
+            <label class="full-label">
+              Что почувствовал
+              <textarea id="feedback" rows="5" placeholder="мышцы, дыхание, боль, настроение, что не зашло"></textarea>
+            </label>
+          </article>
+        </section>
+
+        <section id="plans" class="panel plan-studio">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">варианты программы</p>
+              <h2>День, неделя, месяц</h2>
+            </div>
+            <div class="segmented">
+              <button class="plan-tab active" data-plan="day">День</button>
+              <button class="plan-tab" data-plan="week">Неделя</button>
+              <button class="plan-tab" data-plan="month">Месяц</button>
+            </div>
+          </div>
+          <div id="planOptions" class="plan-options"></div>
+        </section>
+
+        <section class="grid form-grid">
+          <article id="profile" class="panel">
+            <div class="panel-header compact">
+              <div>
+                <p class="eyebrow">профиль</p>
+              <h2>Атлет и ограничения</h2>
+              </div>
+              <span class="badge subtle">сохраняется</span>
+            </div>
+
+            <div class="form-grid-inner">
+              <label>
+                Пол
+                <select id="sex">
+                  <option value="female">женский</option>
+                  <option value="male">мужской</option>
+                  <option value="other">другое / не указывать</option>
+                </select>
+              </label>
+              <label>
+                Цель
+                <select id="goal">
+                  <option value="strength">сила</option>
+                  <option value="muscle">мышцы</option>
+                  <option value="fatloss">снижение веса</option>
+                  <option value="health">здоровье и тонус</option>
+                </select>
+              </label>
+              <label>
+                Где тренируемся
+                <select id="place">
+                  <option value="gym">тренажерный зал</option>
+                  <option value="home">дом</option>
+                  <option value="outdoor">воркаут площадка</option>
+                </select>
+              </label>
+              <label>
+                Уровень
+                <select id="level">
+                  <option value="beginner">начинающий</option>
+                  <option value="middle">средний</option>
+                  <option value="advanced">опытный</option>
+                </select>
+              </label>
+              <label id="cycleField">
+                Фаза цикла
+                <select id="cyclePhase">
+                  <option value="none">не учитывать</option>
+                  <option value="menstruation">менструация</option>
+                  <option value="follicular">фолликулярная</option>
+                  <option value="ovulation">овуляция</option>
+                  <option value="luteal">лютеиновая</option>
+                </select>
+              </label>
+              <label>
+                Ограничения / травмы
+                <input id="limitations" placeholder="например: колени, спина" />
+              </label>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header compact">
+              <div>
+                <p class="eyebrow">состояние</p>
+                <h2>Как ты сегодня?</h2>
+              </div>
+            </div>
+
+            <div class="sliders">
+              <label>Сон <input id="sleep" type="range" min="1" max="10" value="7" /></label>
+              <label>Энергия <input id="energy" type="range" min="1" max="10" value="7" /></label>
+              <label>Стресс <input id="stress" type="range" min="1" max="10" value="4" /></label>
+              <label>Боль / дискомфорт <input id="pain" type="range" min="1" max="10" value="2" /></label>
+            </div>
+
+            <label class="full-label">
+              Обратная связь после прошлой тренировки
+              <textarea id="readinessNote" rows="4" placeholder="например: мало спал, болит поясница, хочется кардио"></textarea>
+            </label>
+          </article>
+        </section>
+
+        <section class="grid lower-grid">
+          <article class="panel">
+            <div class="panel-header compact">
+              <div>
+                <p class="eyebrow">журнал</p>
+                <h2>История</h2>
+              </div>
+            </div>
+            <ul id="history" class="history"></ul>
+          </article>
+
+          <article id="nutrition" class="panel">
+            <div class="panel-header compact">
+              <div>
+                <p class="eyebrow">питание</p>
+                <h2>Фокус дня</h2>
+              </div>
+            </div>
+            <div id="nutritionAdvice" class="nutrition"></div>
+          </article>
+
+          <article id="progress" class="panel">
+            <div class="panel-header compact">
+              <div>
+                <p class="eyebrow">прогресс</p>
+                <h2>Нагрузка и баланс</h2>
+              </div>
+            </div>
+            <div class="progress-bars">
+              <div><span>Силовые</span><strong id="strengthCount">0</strong></div>
+              <div><span>Кардио</span><strong id="cardioCount">0</strong></div>
+              <div><span>Восстановление</span><strong id="mobilityCount">0</strong></div>
+            </div>
+            <div id="achievement" class="achievement"></div>
+            <p id="reminder" class="reminder"></p>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <div id="techniqueModal" class="technique-modal" hidden>
+      <div class="technique-card" role="dialog" aria-modal="true" aria-labelledby="techniqueTitle">
+        <button id="closeTechnique" class="close-technique" aria-label="Закрыть">×</button>
+        <div class="technique-media">
+          <img id="techniqueImage" alt="" />
+        </div>
+        <div class="technique-body">
+          <p class="eyebrow">техника</p>
+          <h2 id="techniqueTitle"></h2>
+          <p id="techniquePurpose" class="technique-purpose"></p>
+          <ol id="techniqueSteps"></ol>
+          <a id="techniqueSource" href="#" target="_blank" rel="noreferrer">Источник изображения</a>
+        </div>
+      </div>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

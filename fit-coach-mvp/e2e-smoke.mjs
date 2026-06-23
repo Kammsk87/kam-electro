@@ -1,0 +1,103 @@
+import { createRequire } from "node:module";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+const require = createRequire(import.meta.url);
+const { chromium } = require("playwright");
+const pageUrl = pathToFileURL(fileURLToPath(new URL("./index.html", import.meta.url))).href;
+
+const browser = await chromium.launch({
+  executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  headless: true,
+});
+const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } });
+
+const errors = [];
+page.on("pageerror", (error) => errors.push(error.message));
+page.on("console", (message) => {
+  if (message.type() === "error") errors.push(message.text());
+});
+
+await page.goto(pageUrl);
+await page.waitForSelector("#workoutName");
+
+await expectVisible(page, "text=Тренировка, которая подстраивается под тело");
+await expectVisible(page, "#readinessScore");
+await expectVisible(page, "#workoutBlocks .workout-step");
+await expectVisible(page, "#coachWhy .reason-pill");
+await expectVisible(page, "#nextAction");
+
+const initialWorkout = await text(page, "#workoutName");
+await page.click('[data-mode="short"]');
+await page.waitForTimeout(50);
+await expectText(page, "#workoutName", /Короткая тренировка/);
+await expectText(page, "#nextAction", /25 минут/);
+
+await page.click('[data-mode="pain"]');
+await page.waitForTimeout(50);
+await expectText(page, "#workoutName", /Низкоударный день/);
+await expectText(page, "#coachWhy", /есть боль|бережем суставы/);
+
+await page.click('[data-plan="week"]');
+await expectText(page, "#planOptions", /Неделя/);
+await page.click('[data-plan="month"]');
+await expectText(page, "#planOptions", /4 недели|месяц/i);
+
+await page.selectOption("#place", "home");
+await expectText(page, "#workoutBlocks", /резинки|рюкзак|быстрая ходьба|присед/);
+await expectVisible(page, "#exerciseList .exercise-card");
+await page.click("[data-swap='0']");
+await page.click("[data-info='0']");
+await expectVisible(page, "#techniqueModal");
+await expectText(page, "#techniqueSteps", /контрол|стоп|корпус|дых/i);
+await page.click("#closeTechnique");
+await page.click("[data-exercise='0'][data-set='0']");
+await page.click("[data-exercise='1'][data-set='0']");
+await expectText(page, "#activeProgress", /[1-9][0-9]?%/);
+await page.click("[data-accept='0']");
+await expectText(page, "#exerciseList .exercise-card", /подходов/);
+await expectVisible(page, "[data-expand='0']");
+await page.click("[data-expand='0']");
+await expectVisible(page, "[data-accept='0']");
+
+await page.fill("#resultMinutes", "52");
+await page.selectOption("#resultEffort", "hard");
+await page.selectOption("#resultPain", "5");
+await page.selectOption("#resultCompletion", "partial");
+await page.fill("#feedback", "прошло нормально, но колено устало");
+await page.click("#logDone");
+await expectText(page, "#history", /готовность/);
+await expectText(page, "#history", /52 мин/);
+await expectText(page, "#history", /часть/);
+await expectText(page, "#history", /подход/);
+await expectText(page, "#history", /боль после/);
+await expectText(page, "#achievement", /1 тренировка|тренировок|Маршрут/);
+
+await page.reload();
+await expectText(page, "#history", /готовность/);
+await expectText(page, "#history", /52 мин/);
+await expectText(page, "#achievement", /1 тренировка|тренировок|Маршрут/);
+
+if (errors.length) {
+  throw new Error(`Browser errors:\n${errors.join("\n")}`);
+}
+
+await browser.close();
+console.log(`E2E smoke passed. Initial workout: ${initialWorkout}`);
+
+async function text(page, selector) {
+  return (await page.locator(selector).first().innerText()).trim();
+}
+
+async function expectVisible(page, selector) {
+  const locator = page.locator(selector).first();
+  await locator.waitFor({ state: "visible", timeout: 3000 });
+}
+
+async function expectText(page, selector, pattern) {
+  const locator = page.locator(selector).first();
+  await locator.waitFor({ state: "visible", timeout: 3000 });
+  const value = await locator.innerText();
+  if (!pattern.test(value)) {
+    throw new Error(`Expected ${selector} to match ${pattern}, got: ${value}`);
+  }
+}
