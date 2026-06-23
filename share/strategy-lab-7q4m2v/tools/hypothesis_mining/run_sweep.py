@@ -25,7 +25,7 @@ import time
 import urllib.request
 import urllib.parse
 from collections import defaultdict, Counter
-from datetime import datetime
+from datetime import datetime, timezone
 import statistics
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
@@ -39,7 +39,8 @@ STRONG_TRAIN = 0.15
 STRONG_TEST = STRONG_TRAIN * 0.5
 
 NUM_FEATS = ["rsi", "adx", "volumeRatio", "atrPct", "mtfScoreDelta", "altBtcRelStrength",
-             "fundingRatePct", "oiChangePct", "historyWinRate", "historyAvgPnlPct", "score"]
+             "fundingRatePct", "oiChangePct", "historyWinRate", "historyAvgPnlPct", "score",
+             "bidAskSpreadPct"]
 
 
 def http_get(url, headers=None):
@@ -166,6 +167,12 @@ COMBOS = [
     ("funding>0 & SHORT", lambda f: f.get("side") == "SHORT" and f.get("fundingRatePct") is not None and f["fundingRatePct"] > 0),
     ("oiChangePct>0.3 & volumeRatio>1.5", lambda f: (f.get("oiChangePct") or -99) > 0.3 and (f.get("volumeRatio") or 0) > 1.5),
     ("macd==supertrend agree", lambda f: f.get("macdBullish") is not None and f.get("supertrendBullish") is not None and f["macdBullish"] == f["supertrendBullish"]),
+    ("macdBullish aligned with side", lambda f: f.get("macdBullish") is not None and
+        ((f.get("side") == "LONG" and f["macdBullish"] is True) or (f.get("side") == "SHORT" and f["macdBullish"] is False))),
+    ("supertrendBullish aligned with side", lambda f: f.get("supertrendBullish") is not None and
+        ((f.get("side") == "LONG" and f["supertrendBullish"] is True) or (f.get("side") == "SHORT" and f["supertrendBullish"] is False))),
+    ("low spread (<0.02%, liquid)", lambda f: f.get("bidAskSpreadPct") is not None and f["bidAskSpreadPct"] < 0.02),
+    ("high spread (>0.05%, illiquid)", lambda f: f.get("bidAskSpreadPct") is not None and f["bidAskSpreadPct"] > 0.05),
     ("ADX>=28 & |altBtcRel|>1.5 aligned", lambda f: (f.get("adx") or 0) >= 28 and f.get("altBtcRelStrength") is not None and
         ((f.get("side") == "LONG" and f["altBtcRelStrength"] > 1.5) or (f.get("side") == "SHORT" and f["altBtcRelStrength"] < -1.5))),
     ("RSI extreme & ADX<18", lambda f: f.get("rsi") is not None and (f["rsi"] >= 65 or f["rsi"] <= 35) and (f.get("adx") or 99) < 18),
@@ -361,6 +368,65 @@ def run_sweep(rows):
                     test_n = rej_n_te + exec_n_te
                     test_exp = (rej_exp_te - exec_exp_te) if rej_exp_te is not None and exec_exp_te is not None else None
             add_result("E", f"{strat} | rejected({bucket}) vs executed", train_lift, test_lift, test_n, train_exp, test_exp)
+
+    # Group F: hour-of-day / trading session, per strategy — пользователь заметил ночью
+    # просадку у pullback (2026-06-22/23), проверяем это систематически, а не на глаз.
+    SESSIONS = {"asia": (0, 8), "europe": (8, 16), "us": (16, 24)}
+
+    def in_session(dt, lo, hi):
+        utc_hour = dt.astimezone(timezone.utc).hour
+        return lo <= utc_hour < hi
+
+    def session_stats(data, strat, lo, hi):
+        sub = [r for r in data if r["f"].get("strategy") == strat and in_session(r["dt"], lo, hi)]
+        rest = [r for r in data if r["f"].get("strategy") == strat and not in_session(r["dt"], lo, hi)]
+        if len(sub) < MIN_BUCKET or len(rest) < MIN_BUCKET:
+            return None
+        return (statistics.fmean(r["label"] for r in sub), statistics.fmean(r["label"] for r in rest),
+                len(sub), len(rest), expectancy(sub), expectancy(rest))
+
+    for strat in train_by_strat:
+        if len(train_by_strat[strat]) < MIN_GROUP:
+            continue
+        for session_name, (lo, hi) in SESSIONS.items():
+            r_tr = session_stats(train, strat, lo, hi)
+            if not r_tr:
+                continue
+            train_lift = r_tr[0] - r_tr[1]
+            train_exp = (r_tr[4] - r_tr[5]) if r_tr[4] is not None and r_tr[5] is not None else None
+            r_te = session_stats(test, strat, lo, hi)
+            test_lift = (r_te[0] - r_te[1]) if r_te else None
+            test_n = (r_te[2] + r_te[3]) if r_te else 0
+            test_exp = (r_te[4] - r_te[5]) if r_te and r_te[4] is not None and r_te[5] is not None else None
+            add_result("F", f"{strat} | session={session_name} ({lo}-{hi} UTC)", train_lift, test_lift, test_n, train_exp, test_exp)
+
+    # Group G: систематический таймфрейм per strategy — нашли вручную (vwap-reversion 15m
+    # вдвое лучше 5m, 2026-06-23), проверяем для ВСЕХ стратегий с >1 таймфреймом, не только той.
+    def timeframe_stats(data, strat, tf):
+        sub = [r for r in data if r["f"].get("strategy") == strat and r["f"].get("timeframe") == tf]
+        rest = [r for r in data if r["f"].get("strategy") == strat and r["f"].get("timeframe") not in (None, tf)]
+        if len(sub) < MIN_BUCKET or len(rest) < MIN_BUCKET:
+            return None
+        return (statistics.fmean(r["label"] for r in sub), statistics.fmean(r["label"] for r in rest),
+                len(sub), len(rest), expectancy(sub), expectancy(rest))
+
+    for strat, tr in train_by_strat.items():
+        if len(tr) < MIN_GROUP:
+            continue
+        timeframes = set(r["f"].get("timeframe") for r in tr if r["f"].get("timeframe"))
+        if len(timeframes) < 2:
+            continue
+        for tf in timeframes:
+            r_tr = timeframe_stats(train, strat, tf)
+            if not r_tr:
+                continue
+            train_lift = r_tr[0] - r_tr[1]
+            train_exp = (r_tr[4] - r_tr[5]) if r_tr[4] is not None and r_tr[5] is not None else None
+            r_te = timeframe_stats(test, strat, tf)
+            test_lift = (r_te[0] - r_te[1]) if r_te else None
+            test_n = (r_te[2] + r_te[3]) if r_te else 0
+            test_exp = (r_te[4] - r_te[5]) if r_te and r_te[4] is not None and r_te[5] is not None else None
+            add_result("G", f"{strat} | timeframe={tf} vs others", train_lift, test_lift, test_n, train_exp, test_exp)
 
     return results
 
