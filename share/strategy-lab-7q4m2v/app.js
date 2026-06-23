@@ -1795,6 +1795,7 @@ function getTradeTimestamp(trade) {
 
 const tradeStatsPeriodKey = "crypto-strategy-bot-stats-period-v1";
 let tradeStatsPeriod = localStorage.getItem(tradeStatsPeriodKey) || "today";
+const periodTradeStatsCache = { period: null, closed: null, loadedAt: 0, inFlight: null };
 
 function getTradeStatsPeriodSinceMs(period) {
   if (period === "today") { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); }
@@ -1803,16 +1804,55 @@ function getTradeStatsPeriodSinceMs(period) {
   return 0; // all time
 }
 
+function matchesBotFilter(trade, bot) {
+  if (bot.strategy === "vps") return getTradeUserLogin(trade) === "server-vps";
+  if (!isServerTrade(trade)) return false;
+  if (bot.strategy === "all") return getTradeUserLogin(trade) !== "server-vps";
+  return getServerStrategyId(trade) === bot.strategy;
+}
+
+// state.paperTrades только хранит последние ~350-600 сделок (см. fetchSupabaseJournalTrades),
+// поэтому при высокой частоте торговли "7 дней/30 дней/всё время" может физически не из чего считать —
+// тут запрашиваем закрытые сделки за период отдельно, напрямую из БД.
+async function fetchClosedTradesForPeriod(period) {
+  if (!isRemoteJournalConfigured() || state.remoteJournal.config.provider !== "supabase") {
+    return state.paperTrades.filter((t) => !isPaperTradeActive(t) && t.status !== "cancelled");
+  }
+  const sinceMs = getTradeStatsPeriodSinceMs(period);
+  const { table } = supabaseJournalBase();
+  const filter = sinceMs > 0 ? `&closed_at=gte.${encodeURIComponent(new Date(sinceMs).toISOString())}` : "";
+  const path = `/${encodeURIComponent(table)}?select=trade&closed_at=not.is.null${filter}&order=closed_at.desc&limit=5000`;
+  const rows = await remoteJournalFetch(path, { timeoutMs: 15_000 });
+  return (Array.isArray(rows) ? rows : [])
+    .map((row) => row?.trade)
+    .filter((t) => t && t.status !== "cancelled");
+}
+
+async function refreshPeriodTradeStats(period) {
+  if (periodTradeStatsCache.period === period && Date.now() - periodTradeStatsCache.loadedAt < 45_000) return;
+  if (periodTradeStatsCache.inFlight) return periodTradeStatsCache.inFlight;
+  const task = fetchClosedTradesForPeriod(period)
+    .then((closed) => {
+      periodTradeStatsCache.period = period;
+      periodTradeStatsCache.closed = closed;
+      periodTradeStatsCache.loadedAt = Date.now();
+      periodTradeStatsCache.inFlight = null;
+      if (tradeStatsPeriod === period) renderTradeStats();
+    })
+    .catch((error) => {
+      periodTradeStatsCache.inFlight = null;
+      console.warn("Period trade stats fetch failed", error);
+    });
+  periodTradeStatsCache.inFlight = task;
+  return task;
+}
+
 function getBotStatsForPeriod(bot, sinceMs) {
-  const trades = state.paperTrades.filter((trade) => {
-    if (bot.strategy === "vps") return getTradeUserLogin(trade) === "server-vps";
-    if (!isServerTrade(trade)) return false;
-    if (bot.strategy === "all") return getTradeUserLogin(trade) !== "server-vps";
-    return getServerStrategyId(trade) === bot.strategy;
-  });
-  const active = trades.filter(isPaperTradeActive);
-  const closedAll = trades.filter((t) => !isPaperTradeActive(t) && t.status !== "cancelled");
-  const closed = sinceMs > 0 ? closedAll.filter((t) => getTradeTimestamp(t) >= sinceMs) : closedAll;
+  const active = state.paperTrades.filter((t) => matchesBotFilter(t, bot) && isPaperTradeActive(t));
+  const cacheReady = periodTradeStatsCache.period === tradeStatsPeriod && Array.isArray(periodTradeStatsCache.closed);
+  const closed = cacheReady
+    ? periodTradeStatsCache.closed.filter((t) => matchesBotFilter(t, bot))
+    : state.paperTrades.filter((t) => matchesBotFilter(t, bot) && !isPaperTradeActive(t) && t.status !== "cancelled" && (sinceMs <= 0 || getTradeTimestamp(t) >= sinceMs));
   const wins = closed.filter((t) => (Number(t.pnl) || 0) > 0);
   const pnl = closed.reduce((s, t) => s + (Number(t.pnl) || 0), 0);
   const wr = closed.length ? (wins.length / closed.length) * 100 : null;
@@ -1835,6 +1875,7 @@ function setTradeStatsPeriod(period) {
   tradeStatsPeriod = period;
   localStorage.setItem(tradeStatsPeriodKey, period);
   renderTradeStats();
+  refreshPeriodTradeStats(period);
 }
 
 function renderTradeStats() {
@@ -1896,6 +1937,7 @@ function renderServerOpenPositions() {
   const rows = open.map((t) => {
     const currentPrice = getPaperTradePrice(t);
     const entry = Number(t.entry) || 0;
+    const orderAmount = Number(t.amount) || Number(t.reservedAmount) || 0;
     const pnlPct = entry > 0 ? ((currentPrice - entry) / entry * 100 * (t.side === "SHORT" ? -1 : 1)) : 0;
     const pnl = Number(t.pnl) || (entry > 0 ? (currentPrice - entry) * (Number(t.size) || 0) * (t.side === "SHORT" ? -1 : 1) : 0);
     const pnlClass = pnl > 0 ? "pos" : pnl < 0 ? "neg" : "";
@@ -1908,6 +1950,7 @@ function renderServerOpenPositions() {
       <td>${escapeHtml(strategy)}</td>
       <td>${entry > 0 ? formatPrice(entry) : "—"}</td>
       <td>${currentPrice > 0 ? formatPrice(currentPrice) : "—"}</td>
+      <td>${orderAmount > 0 ? `${orderAmount.toFixed(2)} USDT` : "—"}</td>
       <td class="${pnlClass}">${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USDT (${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(2)}%)</td>
       <td style="color:#888">${age}</td>
     </tr>`;
@@ -1920,7 +1963,7 @@ function renderServerOpenPositions() {
       <table class="journal-table">
         <thead><tr>
           <th>Актив</th><th>Направление</th><th>ТФ</th><th>Стратегия</th>
-          <th>Вход</th><th>Цена</th><th>P&amp;L</th><th>Открыта</th>
+          <th>Вход</th><th>Цена</th><th>Сумма ордера</th><th>P&amp;L</th><th>Открыта</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
@@ -7524,6 +7567,7 @@ generateStrategy();
 refreshStrategyIntelligence(false);
 refreshOpenPaperTradePrices(true);
 syncRemoteJournal(true);
+refreshPeriodTradeStats(tradeStatsPeriod);
 refreshCmcRadar(false);
 refreshNewsAnalytics(false);
 runDailyLearningReview(false);
@@ -7535,6 +7579,7 @@ window.setInterval(() => runAutopilotScan(), autopilotScanMs);
 window.setInterval(() => runDailyLearningReview(false), learningReviewMs);
 window.setInterval(() => syncRemoteJournal(false), 30000);
 window.setInterval(() => renderTradeStats(), 120000);
+window.setInterval(() => refreshPeriodTradeStats(tradeStatsPeriod), 60000);
 window.setInterval(() => refreshCmcRadar(false), 10 * 60 * 1000);
 window.setInterval(() => refreshNewsAnalytics(false), 15 * 60 * 1000);
 
