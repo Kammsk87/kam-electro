@@ -77,6 +77,21 @@ await expectText(page, "#history", /готовность/);
 await expectText(page, "#history", /52 мин/);
 await expectText(page, "#achievement", /1 тренировка|тренировок|Маршрут/);
 
+for (const viewport of [
+  { width: 430, height: 932 },
+  { width: 390, height: 844 },
+  { width: 375, height: 812 },
+  { width: 360, height: 740 },
+]) {
+  await page.setViewportSize(viewport);
+  await page.goto(pageUrl);
+  await page.waitForSelector("#exerciseList .exercise-card");
+  await expectVisible(page, "[data-exercise='0'][data-set='0']");
+  await expectVisible(page, "[data-field='weight'][data-exercise='0'][data-set='0']");
+  await expectVisible(page, "[data-field='reps'][data-exercise='0'][data-set='0']");
+  await assertNoHorizontalOverflow(page, viewport.width);
+}
+
 if (errors.length) {
   throw new Error(`Browser errors:\n${errors.join("\n")}`);
 }
@@ -99,5 +114,12 @@ async function expectText(page, selector, pattern) {
   const value = await locator.innerText();
   if (!pattern.test(value)) {
     throw new Error(`Expected ${selector} to match ${pattern}, got: ${value}`);
+  }
+}
+
+async function assertNoHorizontalOverflow(page, width) {
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  if (overflow > 2) {
+    throw new Error(`Horizontal overflow ${overflow}px at ${width}px viewport`);
   }
 }
