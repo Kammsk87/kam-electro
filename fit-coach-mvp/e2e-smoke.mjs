@@ -29,6 +29,10 @@ await expectText(page, "#tourTitle", /Старт/);
 await page.click("#tourNext");
 await expectText(page, "#tourTitle", /Что тренируешь/);
 await page.click("#tourSkip");
+await expectVisible(page, "#accountTourButton");
+await page.click("#accountTourButton");
+await expectVisible(page, "#tourOverlay");
+await page.click("#tourSkip");
 
 await expectVisible(page, "text=Тренировка, которая подстраивается под тело");
 await expectVisible(page, "#readinessScore");

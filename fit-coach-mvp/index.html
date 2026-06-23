@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KAM Fit Coach</title>
-    <link rel="stylesheet" href="./styles.css?v=tour1" />
+    <link rel="stylesheet" href="./styles.css?v=tourbutton1" />
   </head>
   <body>
     <div id="authOverlay" class="auth-overlay">
@@ -40,6 +40,7 @@
           <span>Пользователь</span>
           <strong id="currentUserLabel">Гость</strong>
           <small id="userHistoryCount">0 тренировок</small>
+          <button id="accountTourButton" class="secondary" type="button">Как пользоваться</button>
           <button id="logoutButton" class="secondary" type="button">Сменить</button>
         </div>
 
@@ -378,7 +379,7 @@
           <button id="mobileSaveWorkout" type="button">Сохранить</button>
     </nav>
 
-    <button id="tourLauncher" class="tour-launcher" type="button">Тур</button>
+    <button id="tourLauncher" class="tour-launcher" type="button">Помощь</button>
 
     <div id="tourOverlay" class="tour-overlay" hidden>
       <div class="tour-spotlight"></div>
@@ -410,6 +411,6 @@
       </div>
     </div>
 
-    <script src="./app.js?v=tour1"></script>
+    <script src="./app.js?v=tourbutton1"></script>
   </body>
 </html>

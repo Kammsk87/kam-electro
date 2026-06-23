@@ -79,6 +79,7 @@ function bindInputs() {
   $("demoLoginButton").addEventListener("click", () => login("Демо атлет", "0000"));
   $("logoutButton").addEventListener("click", logout);
   $("tourLauncher").addEventListener("click", () => startTour(false));
+  $("accountTourButton").addEventListener("click", () => startTour(false));
   $("tourNext").addEventListener("click", nextTourStep);
   $("tourBack").addEventListener("click", prevTourStep);
   $("tourSkip").addEventListener("click", finishTour);
