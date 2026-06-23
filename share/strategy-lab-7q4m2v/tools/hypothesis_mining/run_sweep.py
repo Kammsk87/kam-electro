@@ -83,7 +83,7 @@ def fetch_combined_dataset():
     print(f"  {len(trades)} сделок")
 
     print("Загружаю отклонённые сигналы с гипотетическим исходом...")
-    url = (f"{SUPABASE_URL}/rest/v1/rejected_signals?select=recorded_at,features"
+    url = (f"{SUPABASE_URL}/rest/v1/rejected_signals?select=recorded_at,reject_reason,features"
            f"&features-%3EhypotheticalOutcome=not.is.null")
     rejected = http_get(url, headers)
     print(f"  {len(rejected)} отклонённых сигналов")
@@ -97,7 +97,8 @@ def fetch_combined_dataset():
         dt = parse_dt(r.get("opened_at"))
         if not dt:
             continue
-        rows.append({"dt": dt, "label": 1 if r["status"] == "target" else 0, "f": feats})
+        rows.append({"dt": dt, "label": 1 if r["status"] == "target" else 0, "f": feats,
+                     "src": "trade", "reject_reason": None})
 
     for r in rejected:
         feats = r.get("features") or {}
@@ -108,7 +109,8 @@ def fetch_combined_dataset():
         if not dt:
             continue
         label = 1 if ho["outcome"] in ("target1", "target2") else 0
-        rows.append({"dt": dt, "label": label, "f": feats})
+        rows.append({"dt": dt, "label": label, "f": feats,
+                     "src": "rejected", "reject_reason": r.get("reject_reason")})
 
     rows.sort(key=lambda r: r["dt"])
     print(f"Итого размеченных сэмплов: {len(rows)}")
@@ -280,6 +282,54 @@ def run_sweep(rows):
                 test_lift = (r_te[0] - r_te[1]) if r_te else None
                 test_n = (r_te[2] + r_te[3]) if r_te else 0
                 add_result("D", f"{strat}/{asset} | {feat} topQ", train_lift, test_lift, test_n)
+
+    # Group E: gap between rejected-signal hypothetical winrate and the strategy's own
+    # executed winrate, by reject_reason bucket — нашли вручную 2026-06-23 (score_low и
+    # gate:pullback стабильно показывали гипотетический winrate выше исполненных сделок).
+    # "lift" здесь = hypothetical_wr - executed_wr (а не разница квартилей, как в A-D), но
+    # та же логика подтверждения 2 раза подряд применяется без изменений.
+    def reason_bucket(reason):
+        if not reason:
+            return None
+        if reason.startswith("gate:") or reason.startswith("early:"):
+            return reason
+        if reason.startswith("score_low"):
+            return "score_low"
+        if reason.startswith("limit_or_cooldown"):
+            return "limit_or_cooldown"
+        return reason
+
+    def executed_wr(data, strat):
+        sub = [r["label"] for r in data if r["src"] == "trade" and r["f"].get("strategy") == strat]
+        return (statistics.fmean(sub), len(sub)) if len(sub) >= MIN_BUCKET else (None, 0)
+
+    def rejected_wr(data, strat, bucket):
+        sub = [r["label"] for r in data if r["src"] == "rejected" and r["f"].get("strategy") == strat
+               and reason_bucket(r["reject_reason"]) == bucket]
+        return (statistics.fmean(sub), len(sub)) if len(sub) >= MIN_BUCKET else (None, 0)
+
+    all_strats = set(r["f"].get("strategy") for r in rows if r["f"].get("strategy"))
+    all_buckets = set(reason_bucket(r["reject_reason"]) for r in rows if r["reject_reason"]) - {None}
+    for strat in all_strats:
+        exec_wr_tr, exec_n_tr = executed_wr(train, strat)
+        if exec_wr_tr is None:
+            continue
+        exec_wr_te, exec_n_te = executed_wr(test, strat)
+        for bucket in all_buckets:
+            rej_wr_tr, rej_n_tr = rejected_wr(train, strat, bucket)
+            if rej_wr_tr is None:
+                continue
+            train_lift = rej_wr_tr - exec_wr_tr
+            if exec_wr_te is None:
+                test_lift, test_n = None, 0
+            else:
+                rej_wr_te, rej_n_te = rejected_wr(test, strat, bucket)
+                if rej_wr_te is None:
+                    test_lift, test_n = None, 0
+                else:
+                    test_lift = rej_wr_te - exec_wr_te
+                    test_n = rej_n_te + exec_n_te
+            add_result("E", f"{strat} | rejected({bucket}) vs executed", train_lift, test_lift, test_n)
 
     return results
 
