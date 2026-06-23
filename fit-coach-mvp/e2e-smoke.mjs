@@ -41,6 +41,15 @@ await page.click('[data-mode="pain"]');
 await page.waitForTimeout(50);
 await expectText(page, "#workoutName", /Низкоударный день/);
 await expectText(page, "#coachWhy", /есть боль|бережем суставы/);
+await page.click('[data-focus="back"]');
+await expectText(page, "#workoutName", /Спина/);
+await expectText(page, "#exerciseList", /тяга|бицепс/i);
+await page.click('[data-focus="legs"]');
+await expectText(page, "#workoutName", /Ноги/);
+await expectText(page, "#exerciseList", /жим ногами|румынская|сгибание/i);
+await page.click('[data-focus="circuit"]');
+await expectText(page, "#workoutName", /Круговая/);
+await expectText(page, "#coachWhy", /круговых/);
 
 await page.click('[data-plan="week"]');
 await expectText(page, "#planOptions", /Неделя/);

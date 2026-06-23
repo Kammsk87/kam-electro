@@ -342,6 +342,38 @@ h2 {
   color: var(--ink);
 }
 
+.today-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.today-switcher span {
+  flex: 1 0 100%;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.focus-chip {
+  min-height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 9px 11px;
+  background: rgba(0, 0, 0, 0.34);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.focus-chip.active {
+  border-color: rgba(22, 212, 143, 0.62);
+  background: rgba(22, 212, 143, 0.18);
+  color: #7bffc9;
+}
+
 .hero-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1298,6 +1330,22 @@ body.device-tablet .workout-blocks {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
+  }
+
+  .today-switcher {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .today-switcher span {
+    grid-column: 1 / -1;
+  }
+
+  .focus-chip {
+    min-height: 46px;
+    padding: 10px 8px;
+    font-size: 11px;
   }
 
   .quick-chip {

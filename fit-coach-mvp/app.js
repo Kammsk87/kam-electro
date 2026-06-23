@@ -120,6 +120,23 @@ function bindInputs() {
     });
   });
 
+  document.querySelectorAll(".focus-chip").forEach((button) => {
+    button.addEventListener("click", () => {
+      const focus = button.dataset.focus;
+      if (focus === "circuit") {
+        data.profile.trainingStyle = "circuit";
+        data.state.trainingFocus = "auto";
+      } else {
+        data.profile.trainingStyle = data.profile.trainingStyle === "circuit" ? "mixed" : data.profile.trainingStyle;
+        data.state.trainingFocus = focus;
+      }
+      data.activeWorkout = null;
+      save();
+      syncInputs();
+      render();
+    });
+  });
+
   $("exerciseList").addEventListener("click", (event) => {
     const setButton = event.target.closest("[data-set]");
     const swapButton = event.target.closest("[data-swap]");
@@ -959,6 +976,12 @@ function render() {
   document.querySelectorAll(".quick-chip").forEach((button) => {
     button.classList.toggle("active", button.dataset.mode === data.quickMode);
   });
+  document.querySelectorAll(".focus-chip").forEach((button) => {
+    const active = button.dataset.focus === "circuit"
+      ? data.profile.trainingStyle === "circuit" && data.state.trainingFocus === "auto"
+      : data.state.trainingFocus === button.dataset.focus && data.profile.trainingStyle !== "circuit";
+    button.classList.toggle("active", active);
+  });
 
   $("cycleField").style.display = data.profile.sex === "female" ? "grid" : "none";
   $("readinessScore").textContent = score;
@@ -1039,6 +1062,7 @@ function focusLabel(value) {
     back: "спина",
     legs: "ноги",
     cardioMobility: "кардио",
+    circuit: "круговая",
   }[value] || "авто";
 }
 
