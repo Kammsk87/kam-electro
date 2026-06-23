@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-const supabaseUrl = "https://dcpenxsthdhvhhqgvgjq.supabase.co";
-const supabaseKey = "sb_publishable_BYYOhjwhgjZBP27Yw7YkVg_CEhF6ugc";
+const supabaseUrl = (process.env.SUPABASE_URL || "https://db.kamtok.ru:8443").replace(/\/$/, "");
+const supabaseKey = process.env.SUPABASE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoid2ViX2Fub24ifQ.zBalbJrifZlJxT09-x8-i3rdNDTyo3jgOm4t2uQw1Ek";
 const tableName = "crypto_strategy_trades";
 const activeStatuses = new Set(["pending", "open", "partial"]);
 
