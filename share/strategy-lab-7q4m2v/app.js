@@ -1797,11 +1797,14 @@ const tradeStatsPeriodKey = "crypto-strategy-bot-stats-period-v1";
 let tradeStatsPeriod = localStorage.getItem(tradeStatsPeriodKey) || "today";
 const periodTradeStatsCache = { period: null, closed: null, loadedAt: 0, inFlight: null };
 
+// Дата начала достоверных данных: стратегии стабилизированы с 21 июня 2026
+const RELIABLE_STATS_FROM = new Date("2026-06-21T00:00:00+03:00").getTime();
+
 function getTradeStatsPeriodSinceMs(period) {
   if (period === "today") { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); }
   if (period === "week") return Date.now() - 7 * 24 * 60 * 60 * 1000;
   if (period === "month") return Date.now() - 30 * 24 * 60 * 60 * 1000;
-  return 0; // all time
+  return RELIABLE_STATS_FROM; // "всё время" = с даты стабилизации стратегий
 }
 
 function matchesBotFilter(trade, bot) {
