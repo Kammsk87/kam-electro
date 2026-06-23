@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KAM Fit Coach</title>
-    <link rel="stylesheet" href="./styles.css?v=switchtoday1" />
+    <link rel="stylesheet" href="./styles.css?v=tour1" />
   </head>
   <body>
     <div id="authOverlay" class="auth-overlay">
@@ -375,8 +375,24 @@
       <a href="#today">Чек-ин</a>
       <a href="#activeWorkout">Подходы</a>
       <a href="#progress">Прогресс</a>
-      <button id="mobileSaveWorkout" type="button">Сохранить</button>
+          <button id="mobileSaveWorkout" type="button">Сохранить</button>
     </nav>
+
+    <button id="tourLauncher" class="tour-launcher" type="button">Тур</button>
+
+    <div id="tourOverlay" class="tour-overlay" hidden>
+      <div class="tour-spotlight"></div>
+      <article class="tour-card">
+        <p class="eyebrow" id="tourStepCounter">Шаг 1</p>
+        <h2 id="tourTitle">Как пользоваться</h2>
+        <p id="tourText"></p>
+        <div class="tour-actions">
+          <button id="tourBack" class="secondary" type="button">Назад</button>
+          <button id="tourSkip" class="secondary" type="button">Пропустить</button>
+          <button id="tourNext" type="button">Дальше</button>
+        </div>
+      </article>
+    </div>
 
     <div id="techniqueModal" class="technique-modal" hidden>
       <div class="technique-card" role="dialog" aria-modal="true" aria-labelledby="techniqueTitle">
@@ -394,6 +410,6 @@
       </div>
     </div>
 
-    <script src="./app.js?v=switchtoday1"></script>
+    <script src="./app.js?v=tour1"></script>
   </body>
 </html>

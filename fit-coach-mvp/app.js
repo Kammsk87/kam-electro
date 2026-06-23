@@ -25,6 +25,7 @@ const defaults = {
   activePlan: "day",
   quickMode: "normal",
   activeWorkout: null,
+  tourDone: false,
   history: [],
 };
 
@@ -34,6 +35,7 @@ const $ = (id) => document.getElementById(id);
 
 let currentUser = loadCurrentUser();
 let data = currentUser ? load() : structuredClone(defaults);
+let tourIndex = 0;
 
 function loadCurrentUser() {
   try {
@@ -76,6 +78,10 @@ function bindInputs() {
   });
   $("demoLoginButton").addEventListener("click", () => login("Демо атлет", "0000"));
   $("logoutButton").addEventListener("click", logout);
+  $("tourLauncher").addEventListener("click", () => startTour(false));
+  $("tourNext").addEventListener("click", nextTourStep);
+  $("tourBack").addEventListener("click", prevTourStep);
+  $("tourSkip").addEventListener("click", finishTour);
 
   ["sex", "goal", "place", "level", "trainingDays", "trainingStyle", "cyclePhase", "limitations"].forEach((id) => {
     $(id).value = data.profile[id];
@@ -198,6 +204,7 @@ function login(name, code) {
   data = load();
   syncInputs();
   render();
+  window.setTimeout(() => startTour(true), 250);
 }
 
 function logout() {
@@ -210,6 +217,92 @@ function logout() {
 
 function slugify(value) {
   return value.toLowerCase().replace(/[^a-zа-я0-9]+/gi, "-").replace(/^-|-$/g, "") || "user";
+}
+
+const tourSteps = [
+  {
+    target: "#today",
+    title: "Старт тренировки",
+    text: "Открыл приложение в зале: сначала выбери состояние — готов, устал, 25 минут, болит или кардио.",
+  },
+  {
+    target: ".today-switcher",
+    title: "Что тренируешь сегодня",
+    text: "Если у тебя уже свой режим, выбери день: грудь, спина, ноги, кардио или круговая. План перестроится сразу.",
+  },
+  {
+    target: "#profile",
+    title: "База программы",
+    text: "Здесь задаются цель, место, уровень, дней в неделю и стиль: сплит, круговые или смешанный формат.",
+  },
+  {
+    target: ".sliders",
+    title: "Состояние сегодня",
+    text: "Сон, энергия, стресс и боль меняют нагрузку. Под шкалами видно, что именно влияет на тренировку.",
+  },
+  {
+    target: "#activeWorkout",
+    title: "Работа в зале",
+    text: "Отмечай подходы, вес и повторы. После упражнения нажми «Принять данные», карточка свернется.",
+  },
+  {
+    target: "[data-info='0']",
+    title: "Техника",
+    text: "Кнопка «Техника» открывает схему выполнения и короткие шаги: раз, два, что контролировать.",
+  },
+  {
+    target: ".coach-panel",
+    title: "Итог тренировки",
+    text: "После занятия укажи минуты, сложность, боль после и что удалось выполнить. Это влияет на следующий план.",
+  },
+  {
+    target: "#progress",
+    title: "Прогресс",
+    text: "Здесь видны история, баланс силовых/кардио/восстановления и достижения пользователя.",
+  },
+];
+
+function startTour(auto = false) {
+  if (auto && data.tourDone) return;
+  tourIndex = 0;
+  $("tourOverlay").hidden = false;
+  renderTourStep();
+}
+
+function renderTourStep() {
+  const step = tourSteps[tourIndex];
+  const target = document.querySelector(step.target);
+  $("tourStepCounter").textContent = `Шаг ${tourIndex + 1} из ${tourSteps.length}`;
+  $("tourTitle").textContent = step.title;
+  $("tourText").textContent = step.text;
+  $("tourBack").disabled = tourIndex === 0;
+  $("tourNext").textContent = tourIndex === tourSteps.length - 1 ? "Готово" : "Дальше";
+  document.querySelectorAll(".tour-target").forEach((item) => item.classList.remove("tour-target"));
+  if (target) {
+    target.classList.add("tour-target");
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+}
+
+function nextTourStep() {
+  if (tourIndex >= tourSteps.length - 1) {
+    finishTour();
+    return;
+  }
+  tourIndex += 1;
+  renderTourStep();
+}
+
+function prevTourStep() {
+  tourIndex = Math.max(0, tourIndex - 1);
+  renderTourStep();
+}
+
+function finishTour() {
+  $("tourOverlay").hidden = true;
+  document.querySelectorAll(".tour-target").forEach((item) => item.classList.remove("tour-target"));
+  data.tourDone = true;
+  save();
 }
 
 function syncInputs() {

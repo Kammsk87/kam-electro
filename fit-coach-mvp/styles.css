@@ -1074,6 +1074,68 @@ input[type="range"] {
   display: none;
 }
 
+.tour-launcher {
+  position: fixed;
+  z-index: 17;
+  right: 18px;
+  bottom: 18px;
+  min-height: 44px;
+  border: 1px solid rgba(215, 255, 56, 0.3);
+  background: rgba(7, 9, 8, 0.86);
+  color: var(--accent);
+}
+
+.tour-overlay[hidden] {
+  display: none;
+}
+
+.tour-overlay {
+  position: fixed;
+  z-index: 28;
+  inset: 0;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.tour-card {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  display: grid;
+  gap: 10px;
+  width: min(390px, calc(100vw - 28px));
+  border: 1px solid rgba(215, 255, 56, 0.28);
+  border-radius: 8px;
+  padding: 18px;
+  background: #101611;
+  box-shadow: 0 26px 90px rgba(0, 0, 0, 0.55);
+  pointer-events: auto;
+}
+
+.tour-card p {
+  margin-bottom: 0;
+  color: #d9e4db;
+}
+
+.tour-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.2fr;
+  gap: 8px;
+}
+
+.tour-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.tour-target {
+  position: relative;
+  z-index: 29;
+  outline: 3px solid var(--accent);
+  outline-offset: 6px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.42);
+}
+
 body.device-touch button,
 body.device-touch a,
 body.device-touch input,
@@ -1196,6 +1258,25 @@ body.device-tablet .workout-blocks {
     background: rgba(7, 9, 8, 0.92);
     box-shadow: 0 16px 60px rgba(0, 0, 0, 0.46);
     backdrop-filter: blur(14px);
+  }
+
+  .tour-launcher {
+    right: 12px;
+    bottom: calc(86px + env(safe-area-inset-bottom));
+    min-height: 42px;
+    padding: 10px 12px;
+  }
+
+  .tour-card {
+    right: 8px;
+    bottom: calc(88px + env(safe-area-inset-bottom));
+    left: 8px;
+    width: auto;
+    padding: 14px;
+  }
+
+  .tour-actions {
+    grid-template-columns: 1fr;
   }
 
   .mobile-gym-bar a,

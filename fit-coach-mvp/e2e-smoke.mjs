@@ -24,6 +24,11 @@ await page.fill("#authName", "Атлет 1");
 await page.fill("#authCode", "1111");
 await page.click("#loginButton");
 await page.waitForSelector("#workoutName");
+await expectVisible(page, "#tourOverlay");
+await expectText(page, "#tourTitle", /Старт/);
+await page.click("#tourNext");
+await expectText(page, "#tourTitle", /Что тренируешь/);
+await page.click("#tourSkip");
 
 await expectVisible(page, "text=Тренировка, которая подстраивается под тело");
 await expectVisible(page, "#readinessScore");
