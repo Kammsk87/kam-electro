@@ -136,6 +136,7 @@ function bindInputs() {
   });
 
   $("logDone").addEventListener("click", () => logWorkout("done"));
+  $("mobileSaveWorkout").addEventListener("click", () => logWorkout("done"));
   $("logEasy").addEventListener("click", () => logWorkout("easy"));
   $("logHard").addEventListener("click", () => logWorkout("hard"));
   $("resetDemo").addEventListener("click", () => {
@@ -147,6 +148,17 @@ function bindInputs() {
   $("techniqueModal").addEventListener("click", (event) => {
     if (event.target.id === "techniqueModal") closeTechnique();
   });
+  window.addEventListener("resize", applyDeviceMode);
+  applyDeviceMode();
+}
+
+function applyDeviceMode() {
+  const width = window.innerWidth;
+  const touch = window.matchMedia("(hover: none), (pointer: coarse)").matches;
+  document.body.classList.toggle("device-mobile", width <= 640);
+  document.body.classList.toggle("device-tablet", width > 640 && width <= 1060);
+  document.body.classList.toggle("device-desktop", width > 1060);
+  document.body.classList.toggle("device-touch", touch);
 }
 
 function login(name, code) {

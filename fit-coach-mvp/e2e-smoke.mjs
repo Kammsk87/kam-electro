@@ -103,6 +103,8 @@ for (const viewport of [
 ]) {
   await page.setViewportSize(viewport);
   await page.goto(pageUrl);
+  await expectVisible(page, ".mobile-gym-bar");
+  await expectBodyClass(page, "device-mobile");
   await page.waitForSelector("#exerciseList .exercise-card");
   await expectVisible(page, "[data-exercise='0'][data-set='0']");
   await expectVisible(page, "[data-field='weight'][data-exercise='0'][data-set='0']");
@@ -145,4 +147,9 @@ async function assertNoHorizontalOverflow(page, width) {
 async function expectImageLoaded(page, selector) {
   const loaded = await page.locator(selector).first().evaluate((image) => image.naturalWidth > 0 && image.naturalHeight > 0);
   if (!loaded) throw new Error(`${selector} did not load`);
+}
+
+async function expectBodyClass(page, className) {
+  const hasClass = await page.evaluate((name) => document.body.classList.contains(name), className);
+  if (!hasClass) throw new Error(`body missing ${className}`);
 }

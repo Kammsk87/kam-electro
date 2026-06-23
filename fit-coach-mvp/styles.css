@@ -1038,6 +1038,29 @@ input[type="range"] {
   color: #d3d9cf;
 }
 
+.mobile-gym-bar {
+  display: none;
+}
+
+body.device-touch button,
+body.device-touch a,
+body.device-touch input,
+body.device-touch select {
+  touch-action: manipulation;
+}
+
+body.device-tablet .sidebar {
+  height: auto;
+}
+
+body.device-tablet .today-grid {
+  grid-template-columns: 1fr;
+}
+
+body.device-tablet .workout-blocks {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 @media (max-width: 1060px) {
   .app-shell {
     display: block;
@@ -1120,6 +1143,75 @@ input[type="range"] {
   }
 }
 
+@media (max-width: 640px) {
+  body {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+
+  .mobile-gym-bar {
+    position: fixed;
+    z-index: 18;
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr) 1.25fr;
+    gap: 6px;
+    border: 1px solid rgba(215, 255, 56, 0.24);
+    border-radius: 8px;
+    padding: 7px;
+    padding-bottom: calc(7px + env(safe-area-inset-bottom));
+    background: rgba(7, 9, 8, 0.92);
+    box-shadow: 0 16px 60px rgba(0, 0, 0, 0.46);
+    backdrop-filter: blur(14px);
+  }
+
+  .mobile-gym-bar a,
+  .mobile-gym-bar button {
+    display: grid;
+    place-items: center;
+    min-height: 48px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 8px 6px;
+    background: rgba(255, 255, 255, 0.07);
+    color: var(--text);
+    font-size: 11px;
+    font-weight: 950;
+    text-align: center;
+    text-decoration: none;
+    text-transform: uppercase;
+  }
+
+  .mobile-gym-bar button {
+    background: var(--accent);
+    color: var(--ink);
+  }
+
+  body.device-mobile .hero-copy {
+    justify-content: flex-start;
+  }
+
+  body.device-mobile .today-grid {
+    gap: 12px;
+  }
+
+  body.device-mobile .primary-panel {
+    border-color: rgba(215, 255, 56, 0.26);
+  }
+
+  body.device-mobile .active-workout {
+    scroll-margin-top: 10px;
+  }
+
+  body.device-mobile #plans,
+  body.device-mobile #profile,
+  body.device-mobile #nutrition,
+  body.device-mobile #progress {
+    scroll-margin-top: 10px;
+  }
+}
+
 @media (max-width: 430px) {
   body {
     -webkit-text-size-adjust: 100%;
@@ -1179,6 +1271,14 @@ input[type="range"] {
     margin-bottom: 12px;
     padding: 16px;
     background-position: center;
+  }
+
+  .today-grid {
+    gap: 10px;
+  }
+
+  .workout-panel {
+    order: -1;
   }
 
   h1 {
@@ -1251,6 +1351,7 @@ input[type="range"] {
 
   .exercise-card {
     padding: 12px;
+    scroll-margin-bottom: 90px;
   }
 
   .exercise-head {
@@ -1310,6 +1411,9 @@ input[type="range"] {
   .accept-button {
     min-height: 50px;
     margin-top: 12px;
+    position: sticky;
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    z-index: 2;
   }
 
   .workout-result {

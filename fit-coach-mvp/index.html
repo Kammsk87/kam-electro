@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KAM Fit Coach</title>
-    <link rel="stylesheet" href="./styles.css?v=authscales1" />
+    <link rel="stylesheet" href="./styles.css?v=gymmode1" />
   </head>
   <body>
     <div id="authOverlay" class="auth-overlay">
@@ -114,7 +114,7 @@
               <span id="workoutBadge" class="badge">адаптивно</span>
             </div>
             <div id="workoutBlocks" class="workout-blocks"></div>
-            <div class="active-workout">
+            <div id="activeWorkout" class="active-workout">
               <div class="panel-header compact">
                 <div>
                   <p class="eyebrow">выполнение</p>
@@ -334,6 +334,13 @@
       </main>
     </div>
 
+    <nav class="mobile-gym-bar" aria-label="Быстрые действия тренировки">
+      <a href="#today">Чек-ин</a>
+      <a href="#activeWorkout">Подходы</a>
+      <a href="#progress">Прогресс</a>
+      <button id="mobileSaveWorkout" type="button">Сохранить</button>
+    </nav>
+
     <div id="techniqueModal" class="technique-modal" hidden>
       <div class="technique-card" role="dialog" aria-modal="true" aria-labelledby="techniqueTitle">
         <button id="closeTechnique" class="close-technique" aria-label="Закрыть">×</button>
@@ -350,6 +357,6 @@
       </div>
     </div>
 
-    <script src="./app.js?v=authscales1"></script>
+    <script src="./app.js?v=gymmode1"></script>
   </body>
 </html>
