@@ -106,10 +106,18 @@ await expectText(page, "#history", /часть/);
 await expectText(page, "#history", /подход/);
 await expectText(page, "#history", /боль после/);
 await expectText(page, "#achievement", /1 тренировка|тренировок|Маршрут/);
+await expectText(page, "#archiveStats", /Всего|Минуты|Последняя/);
+await expectText(page, "#archiveList", /52 мин|Грудь|Сложность|Подходы/);
+await expectVisible(page, "#archiveList details[open]");
+await page.click('[data-archive-filter="cardio"]');
+await expectText(page, "#archiveList", /В этом фильтре пока нет тренировок/);
+await page.click('[data-archive-filter="strength"]');
+await expectText(page, "#archiveList", /Грудь|52 мин/);
 
 await page.reload();
 await expectText(page, "#history", /готовность/);
 await expectText(page, "#history", /52 мин/);
+await expectText(page, "#archiveList", /Грудь|52 мин/);
 await expectText(page, "#achievement", /1 тренировка|тренировок|Маршрут/);
 await page.locator("#sleep").evaluate((input) => {
   input.value = "3";
@@ -123,6 +131,7 @@ await page.fill("#authName", "Атлет 2");
 await page.fill("#authCode", "2222");
 await page.click("#loginButton");
 await expectText(page, "#history", /Пока нет сохраненных тренировок/);
+await expectText(page, "#archiveList", /В этом фильтре пока нет тренировок/);
 
 for (const viewport of [
   { width: 430, height: 932 },

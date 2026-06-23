@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KAM Fit Coach</title>
-    <link rel="stylesheet" href="./styles.css?v=plaincopy1" />
+    <link rel="stylesheet" href="./styles.css?v=archive1" />
   </head>
   <body>
     <div id="authOverlay" class="auth-overlay">
@@ -353,7 +353,7 @@
             <div id="nutritionAdvice" class="nutrition"></div>
           </article>
 
-          <article id="progress" class="panel">
+          <article class="panel progress-summary">
             <div class="panel-header compact">
               <div>
                 <p class="eyebrow">прогресс</p>
@@ -367,7 +367,25 @@
             </div>
             <div id="achievement" class="achievement"></div>
             <p id="reminder" class="reminder"></p>
+            <a class="archive-link" href="#progress">Открыть архив тренировок</a>
           </article>
+        </section>
+
+        <section id="progress" class="panel archive-panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">архив пользователя</p>
+              <h2>История тренировок</h2>
+            </div>
+            <div class="archive-filters" aria-label="Фильтр архива">
+              <button class="archive-filter active" data-archive-filter="all" type="button">Все</button>
+              <button class="archive-filter" data-archive-filter="strength" type="button">Силовые</button>
+              <button class="archive-filter" data-archive-filter="cardio" type="button">Кардио</button>
+              <button class="archive-filter" data-archive-filter="mobility" type="button">Восстановление</button>
+            </div>
+          </div>
+          <div id="archiveStats" class="archive-stats"></div>
+          <div id="archiveList" class="archive-list"></div>
         </section>
       </main>
     </div>
@@ -411,6 +429,6 @@
       </div>
     </div>
 
-    <script src="./app.js?v=plaincopy1"></script>
+    <script src="./app.js?v=archive1"></script>
   </body>
 </html>

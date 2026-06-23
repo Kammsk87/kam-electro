@@ -551,6 +551,7 @@ h2 {
 .workout-step,
 .meal-tip,
 .history li,
+.archive-card,
 .plan-card {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
@@ -1077,6 +1078,166 @@ input[type="range"] {
   color: #d3d9cf;
 }
 
+.archive-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  border: 1px solid rgba(215, 255, 56, 0.34);
+  border-radius: 8px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  background: rgba(215, 255, 56, 0.1);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 950;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.archive-panel {
+  margin-top: 18px;
+  scroll-margin-top: 18px;
+}
+
+.archive-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.archive-filter {
+  min-height: 36px;
+  padding: 8px 11px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.archive-filter.active {
+  background: var(--accent);
+  color: var(--ink);
+}
+
+.archive-stats {
+  display: grid;
+  grid-template-columns: 0.7fr 0.7fr 1.6fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.archive-stats div,
+.archive-detail-grid div {
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.archive-stats span,
+.archive-detail-grid span,
+.archive-card small,
+.archive-exercises span {
+  color: var(--muted);
+}
+
+.archive-stats strong {
+  color: var(--accent);
+  font-size: 24px;
+}
+
+.archive-list {
+  display: grid;
+  gap: 10px;
+}
+
+.archive-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.archive-card summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 72px;
+  padding: 14px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.archive-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.archive-card summary span {
+  display: grid;
+  gap: 5px;
+}
+
+.archive-card summary em {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgba(215, 255, 56, 0.36);
+  border-radius: 999px;
+  color: var(--accent);
+  font-style: normal;
+  font-weight: 950;
+}
+
+.archive-card[open] summary {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(215, 255, 56, 0.06);
+}
+
+.archive-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 14px 14px 0;
+}
+
+.archive-exercises {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 14px;
+  list-style: none;
+}
+
+.archive-exercises li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.archive-note,
+.archive-empty {
+  margin: 0 14px 14px;
+  border-left: 4px solid var(--accent-2);
+  padding: 10px 0 10px 12px;
+  color: #d3d9cf;
+}
+
+.archive-empty {
+  margin: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 4px solid var(--warn);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
 .mobile-gym-bar {
   display: none;
 }
@@ -1320,6 +1481,11 @@ body.device-tablet .workout-blocks {
   .plan-options {
     grid-template-columns: 1fr;
   }
+
+  .archive-stats,
+  .archive-detail-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 620px) {
@@ -1345,9 +1511,28 @@ body.device-tablet .workout-blocks {
   .form-grid-inner,
   .workout-blocks,
   .workout-result,
+  .archive-stats,
+  .archive-detail-grid,
   .technique-card {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .archive-filters {
+    justify-content: flex-start;
+  }
+
+  .archive-filter {
+    flex: 1 1 calc(50% - 8px);
+  }
+
+  .archive-card summary,
+  .archive-exercises li {
+    align-items: flex-start;
+  }
+
+  .archive-exercises li {
+    display: grid;
   }
 
   .segmented {
@@ -1444,6 +1629,10 @@ body.device-tablet .workout-blocks {
   body.device-mobile #nutrition,
   body.device-mobile #progress {
     scroll-margin-top: 10px;
+  }
+
+  body.device-mobile .archive-panel {
+    margin-bottom: 10px;
   }
 }
 

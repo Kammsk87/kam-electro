@@ -23,6 +23,7 @@ const defaults = {
     resultCompletion: "full",
   },
   activePlan: "day",
+  archiveFilter: "all",
   quickMode: "normal",
   activeWorkout: null,
   tourDone: false,
@@ -107,6 +108,14 @@ function bindInputs() {
   document.querySelectorAll(".plan-tab").forEach((button) => {
     button.addEventListener("click", () => {
       data.activePlan = button.dataset.plan;
+      save();
+      render();
+    });
+  });
+
+  document.querySelectorAll(".archive-filter").forEach((button) => {
+    button.addEventListener("click", () => {
+      data.archiveFilter = button.dataset.archiveFilter;
       save();
       render();
     });
@@ -1133,6 +1142,29 @@ function render() {
 
   $("achievement").innerHTML = getAchievement(counts);
   $("reminder").textContent = getReminder(counts);
+  renderArchive();
+}
+
+function renderArchive() {
+  document.querySelectorAll(".archive-filter").forEach((button) => {
+    button.classList.toggle("active", button.dataset.archiveFilter === data.archiveFilter);
+  });
+
+  const totalMinutes = data.history.reduce((sum, item) => sum + (item.result?.minutes || 0), 0);
+  const lastTitle = data.history[0]?.title || "пока нет";
+  $("archiveStats").innerHTML = `
+    <div><span>Всего</span><strong>${data.history.length}</strong></div>
+    <div><span>Минуты</span><strong>${totalMinutes}</strong></div>
+    <div><span>Последняя</span><strong>${escapeHtml(lastTitle)}</strong></div>
+  `;
+
+  const filtered = data.archiveFilter === "all"
+    ? data.history
+    : data.history.filter((item) => item.kind === data.archiveFilter);
+
+  $("archiveList").innerHTML = filtered.length
+    ? filtered.map((item, index) => archiveCard(item, index)).join("")
+    : `<div class="archive-empty">В этом фильтре пока нет тренировок.</div>`;
 }
 
 function renderStateScales() {
@@ -1183,11 +1215,68 @@ function historyLine(item) {
     if (result.painAfter >= 5) parts.push("боль после");
   }
   if (item.note) parts.push(`заметка: ${item.note}`);
-  return parts.join(", ");
+  return escapeHtml(parts.join(", "));
+}
+
+function archiveCard(item, index) {
+  const result = item.result || {};
+  const exercises = result.exercises || [];
+  const doneSets = exercises.reduce((sum, exercise) => sum + exercise.doneSets, 0);
+  const totalSets = exercises.reduce((sum, exercise) => sum + exercise.totalSets, 0);
+  const totalWeight = exercises.reduce((sum, exercise) => sum + (exercise.volume || 0), 0);
+  const exerciseRows = exercises.length
+    ? exercises.map((exercise) => `
+        <li>
+          <strong>${escapeHtml(exercise.name)}</strong>
+          <span>${exercise.doneSets}/${exercise.totalSets} подходов${exercise.volume ? ` · всего кг ${exercise.volume}` : ""}</span>
+        </li>
+      `).join("")
+    : "<li><span>Упражнения не были отмечены.</span></li>";
+
+  return `
+    <details class="archive-card" ${index === 0 ? "open" : ""}>
+      <summary>
+        <span>
+          <strong>${escapeHtml(item.date)} · ${escapeHtml(item.title)}</strong>
+          <small>${archiveKindLabel(item.kind)} · ${result.minutes || 0} мин · ${labelCompletion(result.completion)}</small>
+        </span>
+        <em>${item.score}</em>
+      </summary>
+      <div class="archive-detail-grid">
+        <div><span>Сложность</span><strong>${labelFeedback(result.effort) || labelFeedback(item.feedback)}</strong></div>
+        <div><span>Боль после</span><strong>${painLabel(result.painAfter)}</strong></div>
+        <div><span>Подходы</span><strong>${doneSets}/${totalSets}</strong></div>
+        <div><span>Всего кг</span><strong>${totalWeight}</strong></div>
+      </div>
+      <ul class="archive-exercises">${exerciseRows}</ul>
+      ${item.note ? `<p class="archive-note">Заметка: ${escapeHtml(item.note)}</p>` : ""}
+    </details>
+  `;
 }
 
 function labelCompletion(value) {
   return { full: "весь план", partial: "часть", extra: "с запасом" }[value] || value;
+}
+
+function archiveKindLabel(value) {
+  return { strength: "силовая", cardio: "кардио", mobility: "восстановление" }[value] || "тренировка";
+}
+
+function painLabel(value) {
+  const pain = Number(value) || 0;
+  if (pain >= 8) return "сильная";
+  if (pain >= 5) return "заметная";
+  if (pain >= 2) return "легкая";
+  return "нет";
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 function getReminder(counts) {
