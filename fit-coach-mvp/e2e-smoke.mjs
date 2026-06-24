@@ -154,12 +154,20 @@ await expectText(page, "#history", /готовность/);
 await expectText(page, "#history", /52 мин/);
 await expectText(page, "#archiveList", /Грудь|52 мин/);
 await expectText(page, "#achievement", /1 тренировка|тренировок|Маршрут/);
+await page.selectOption("#trainingFocus", "auto");
+await expectText(page, "#coachWhy", /авто выбрал|за неделю/);
+await expectText(page, "#workoutName", /по истории|Кардио/);
 await page.locator("#sleep").evaluate((input) => {
   input.value = "3";
   input.dispatchEvent(new Event("input", { bubbles: true }));
 });
 await expectText(page, "#sleepHint", /мало сна/);
 await expectText(page, "#stateImpact", /Сон: мало сна/);
+await page.fill("#readinessNote", "боль в груди и головокружение");
+await expectText(page, "#workoutName", /Стоп/);
+await expectText(page, "#nextAction", /остановиться/);
+await expectText(page, "#exerciseList", /пауза и проверка самочувствия/i);
+await page.fill("#readinessNote", "");
 
 await page.click("#logoutButton");
 await page.fill("#authName", "Атлет 2");

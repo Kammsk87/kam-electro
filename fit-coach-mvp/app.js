@@ -387,13 +387,88 @@ function stateImpactItems() {
 function context(score) {
   const { goal, place, level, trainingDays, trainingStyle, limitations, cyclePhase, sex } = data.profile;
   const injuryText = limitations.toLowerCase();
+  const weekly = weeklyTrainingMap();
+  const redFlag = redFlagText();
+  const requestedFocus = data.state.trainingFocus;
+  const resolvedFocus = requestedFocus === "auto" ? autoFocus(goal, trainingStyle, weekly) : requestedFocus;
   const needsLowImpact = /колен|спин|плеч|таз|голен|поясн/i.test(injuryText) || score < 55 || data.quickMode === "pain";
   const cycleDeload = sex === "female" && cyclePhase === "menstruation";
   const luteal = sex === "female" && cyclePhase === "luteal";
   const intensity = score >= 78 ? "high" : score >= 58 ? "medium" : "low";
   const experience = { beginner: 2, middle: 3, advanced: 4 }[level];
 
-  return { goal, place, level, trainingDays: Number(trainingDays), trainingStyle, limitations, sex, cyclePhase, needsLowImpact, cycleDeload, luteal, intensity, experience, quickMode: data.quickMode, focus: data.state.trainingFocus };
+  return { goal, place, level, trainingDays: Number(trainingDays), trainingStyle, limitations, sex, cyclePhase, weekly, redFlag, requestedFocus, needsLowImpact, cycleDeload, luteal, intensity, experience, quickMode: data.quickMode, focus: resolvedFocus };
+}
+
+function weeklyTrainingMap() {
+  const empty = { chest: 0, back: 0, legs: 0, shoulders: 0, arms: 0, core: 0, cardio: 0, mobility: 0 };
+  const recent = data.history.slice(0, 8);
+  return recent.reduce((acc, item) => {
+    const groups = groupsForHistoryItem(item);
+    const doneSets = (item.result?.exercises || []).reduce((sum, exercise) => sum + (exercise.doneSets || 0), 0) || 1;
+    groups.forEach((group) => {
+      acc[group] = (acc[group] || 0) + doneSets;
+    });
+    return acc;
+  }, { ...empty });
+}
+
+function groupsForHistoryItem(item) {
+  if (item.groups?.length) return item.groups;
+  const text = `${item.title || ""} ${(item.result?.exercises || []).map((exercise) => exercise.name).join(" ")}`.toLowerCase();
+  const groups = new Set();
+  if (/груд|жим|отжим|кроссовер|брусь/.test(text)) groups.add("chest");
+  if (/спин|тяга|подтяг|вис/.test(text)) groups.add("back");
+  if (/ног|ягод|присед|выпад|румын|сгибание ног|жим ног/.test(text)) groups.add("legs");
+  if (/плеч|развед|канат к лицу|стойка/.test(text)) groups.add("shoulders");
+  if (/бицепс|трицепс|рук|молот|разгибание/.test(text)) groups.add("arms");
+  if (/пресс|планк|корпус|скручив|подъем колен/.test(text)) groups.add("core");
+  if (/кардио|дорож|вело|эллипс|ходь|лестниц|ступень/.test(text) || item.kind === "cardio") groups.add("cardio");
+  if (/растяж|восстанов|мобил|дых/.test(text) || item.kind === "mobility") groups.add("mobility");
+  if (!groups.size) groups.add(item.kind === "cardio" ? "cardio" : item.kind === "mobility" ? "mobility" : "legs");
+  return [...groups];
+}
+
+function groupsForExerciseName(name) {
+  const text = name.toLowerCase();
+  const groups = new Set();
+  if (/груд|жим гант|жим в тренажере на груд|отжим|кроссовер|брусь/.test(text)) groups.add("chest");
+  if (/спин|тяга|подтяг|вис/.test(text)) groups.add("back");
+  if (/ног|ягод|присед|выпад|румын|сгибание ног|жим ног/.test(text)) groups.add("legs");
+  if (/плеч|развед|канат к лицу|стойка/.test(text)) groups.add("shoulders");
+  if (/бицепс|рук|молот|разгибание/.test(text)) groups.add("arms");
+  if (/пресс|планк|корпус|скручив|подъем колен/.test(text)) groups.add("core");
+  if (/дорож|вело|эллипс|ходь|кардио|лестниц|ступень/.test(text)) groups.add("cardio");
+  if (/растяж|дых|пауза|самочувств/.test(text)) groups.add("mobility");
+  return [...groups];
+}
+
+function groupsForWorkoutTitle(title, exercises) {
+  const groups = new Set(groupsForHistoryItem({ title, result: { exercises } }));
+  exercises.forEach((exercise) => (exercise.groups || []).forEach((group) => groups.add(group)));
+  return [...groups];
+}
+
+function autoFocus(goal, trainingStyle, weekly) {
+  if (trainingStyle === "circuit") return "auto";
+  if (!data.history.length) return "auto";
+  if (goal === "fatloss" && weekly.cardio < 2) return "cardioMobility";
+  const recentGroups = data.history.slice(0, 2).flatMap(groupsForHistoryItem);
+  const candidates = [
+    ["legs", weekly.legs],
+    ["back", weekly.back],
+    ["chest", weekly.chest],
+  ].filter(([group]) => !recentGroups.includes(group));
+  const pool = candidates.length ? candidates : [["legs", weekly.legs], ["back", weekly.back], ["chest", weekly.chest]];
+  return pool.sort((a, b) => a[1] - b[1])[0][0];
+}
+
+function redFlagText() {
+  const text = `${data.profile.limitations} ${data.state.readinessNote} ${data.state.feedback}`.toLowerCase();
+  if (/боль в груди|давит в груди|сердц|обмор|потер(я|ял).*созн|головокруж|не хватает воздуха|одышк.*покой|онем|отек|резкая боль|острая боль/.test(text)) {
+    return "Есть тревожный симптом. Тренировку лучше остановить и обратиться к врачу.";
+  }
+  return "";
 }
 
 function exerciseLibrary(place) {
@@ -438,6 +513,19 @@ function chooseWorkout(score) {
   const short = ctx.quickMode === "short";
   const cardioFirst = ctx.quickMode === "cardio";
 
+  if (ctx.redFlag) {
+    return {
+      title: "Стоп: сначала безопасность",
+      intensity: "low",
+      blocks: [
+        { title: "Что делать", body: ctx.redFlag },
+        { title: "Сегодня без тренировки", body: "Не делай силовые подходы, интервалы, прыжки и попытки через боль." },
+        { title: "Можно только мягко", body: "Если симптом прошел и врач не запрещал движение: спокойная ходьба 5-10 минут и дыхание." },
+        { title: "Почему", body: "База знаний ставит безопасность выше цели, прогресса и расписания." },
+      ],
+    };
+  }
+
   let title = {
     strength: "Сила: все тело",
     muscle: "Мышцы: верх + ноги",
@@ -454,6 +542,7 @@ function chooseWorkout(score) {
   if (ctx.focus === "legs") title = "Ноги + ягодицы";
   if (ctx.focus === "cardioMobility") title = "Дорожка + растяжка";
   if (ctx.trainingStyle === "circuit" && ctx.focus === "auto") title = "Круговая тренировка";
+  if (ctx.requestedFocus === "auto" && ctx.focus !== "auto") title = `${focusTitle(ctx.focus)} по истории`;
 
   const focusLine = getFocusLine(ctx, lib, dose);
   const heavyLine = focusLine || (cardioFirst
@@ -545,6 +634,16 @@ function trainingDose(ctx) {
     rounds = Math.max(2, rounds - 1);
     reasons.push("5 дней в неделю: один день не перегружаем");
   }
+  const focusGroup = focusToGroup(ctx.focus);
+  if (focusGroup && ctx.weekly[focusGroup] >= weeklyVolumeCap(ctx.level, focusGroup)) {
+    sets = Math.max(1, sets - 1);
+    rounds = Math.max(1, rounds - 1);
+    reasons.push("группа уже нагружалась: меньше объем");
+  }
+  if (repeatedHeavyGroup(ctx)) {
+    sets = Math.max(1, sets - 1);
+    reasons.push("недавно была похожая тяжелая тренировка");
+  }
   if (ctx.needsLowImpact) {
     sets = Math.min(sets, 2);
     rounds = Math.min(rounds, 2);
@@ -597,6 +696,33 @@ function getFocusLine(ctx, lib, dose) {
   return "";
 }
 
+function focusTitle(focus) {
+  return {
+    chest: "Грудь",
+    back: "Спина",
+    legs: "Ноги",
+    cardioMobility: "Кардио",
+    auto: "Все тело",
+  }[focus] || "Тренировка";
+}
+
+function focusToGroup(focus) {
+  return { chest: "chest", back: "back", legs: "legs", cardioMobility: "cardio" }[focus] || "";
+}
+
+function weeklyVolumeCap(level, group) {
+  const base = { beginner: 8, middle: 12, advanced: 16 }[level] || 8;
+  return group === "cardio" ? 3 : base;
+}
+
+function repeatedHeavyGroup(ctx) {
+  const group = focusToGroup(ctx.focus);
+  if (!group || !data.history.length) return false;
+  const last = data.history[0];
+  const lastGroups = groupsForHistoryItem(last);
+  return lastGroups.includes(group) && last.feedback === "hard";
+}
+
 function accessoryText(ctx, lib) {
   if (ctx.quickMode === "short" || ctx.needsLowImpact) return `${lib.shoulders[1]} или ${lib.arms[0]}`;
   if (ctx.trainingDays >= 5) return `${lib.shoulders[1]}, ${lib.arms[0]}`;
@@ -627,9 +753,13 @@ function correctionText(ctx) {
 function coachWhy(score) {
   const ctx = context(score);
   const reasons = [];
+  if (ctx.redFlag) return ["тревожный симптом", "безопасность важнее тренировки", "нужна пауза"];
   reasons.push(sexReason(ctx));
   reasons.push(goalReason(ctx.goal));
   reasons.push(`уровень: ${levelLabel(ctx.level)}`);
+  if (ctx.requestedFocus === "auto" && ctx.focus !== "auto") reasons.push(`авто выбрал: ${focusTitle(ctx.focus).toLowerCase()}`);
+  const focusGroup = focusToGroup(ctx.focus);
+  if (focusGroup) reasons.push(`за неделю: ${ctx.weekly[focusGroup] || 0} подходов`);
   if (ctx.trainingStyle === "circuit") reasons.push(`${ctx.trainingDays} круговых в неделю`);
   if (ctx.trainingDays <= 2) reasons.push("меньше дней: тренировка плотнее");
   if (ctx.trainingDays >= 5) reasons.push("много дней: объем дня ниже");
@@ -671,6 +801,8 @@ function modeLabel(mode) {
 }
 
 function getNextAction(score) {
+  const ctx = context(score);
+  if (ctx.redFlag) return "Цель: остановиться и разобраться с симптомом.";
   const workout = chooseWorkout(score);
   if (data.quickMode === "short") return "Цель: 25 минут и отметка результата.";
   if (data.quickMode === "pain") return "Цель: закончить без усиления боли.";
@@ -683,6 +815,15 @@ function buildDayPlans(score) {
   const ctx = context(score);
   const lib = exerciseLibrary(ctx.place);
   const main = chooseWorkout(score);
+  if (ctx.redFlag) {
+    return [
+      {
+        title: "Безопасный день",
+        meta: ["стоп-сигнал", "без силовой", "проверить самочувствие"],
+        body: ctx.redFlag,
+      },
+    ];
+  }
   return [
     {
       title: main.title,
@@ -847,6 +988,7 @@ function ensureActiveWorkout(score) {
     intensity: ctx.intensity,
     needsLowImpact: ctx.needsLowImpact,
     cycleDeload: ctx.cycleDeload,
+    redFlag: Boolean(ctx.redFlag),
   });
 
   if (data.activeWorkout?.signature === signature && data.activeWorkout.exercises?.length) {
@@ -864,6 +1006,17 @@ function ensureActiveWorkout(score) {
 
 function buildActiveExercises(score) {
   const ctx = context(score);
+  if (ctx.redFlag) {
+    return [
+      {
+        name: "пауза и проверка самочувствия",
+        target: "без силовой нагрузки",
+        alternatives: ["спокойная ходьба 5-10 минут", "дыхание 3-5 минут", "закончить тренировку"],
+        accepted: false,
+        sets: [{ reps: 0, weight: 0, done: false }],
+      },
+    ];
+  }
   const lib = exerciseLibrary(ctx.place);
   const dose = trainingDose(ctx);
   const baseSets = dose.sets;
@@ -1099,6 +1252,7 @@ function applyActiveWorkoutResult() {
 function activeSummary() {
   return (data.activeWorkout?.exercises || []).map((exercise) => ({
     name: exercise.name,
+    groups: groupsForExerciseName(exercise.name),
     doneSets: exercise.sets.filter((set) => set.done).length,
     totalSets: exercise.sets.length,
     volume: exercise.sets
@@ -1110,8 +1264,12 @@ function activeSummary() {
 function logWorkout(feedback) {
   const score = getReadiness();
   const workout = chooseWorkout(score);
+  const ctx = context(score);
   applyActiveWorkoutResult();
-  const kind = workout.blocks[2].body.includes("20 минут") || data.profile.goal === "fatloss"
+  const summary = activeSummary();
+  const kind = ctx.redFlag
+    ? "mobility"
+    : ctx.focus === "cardioMobility" || ctx.quickMode === "cardio" || data.profile.goal === "fatloss"
     ? "cardio"
     : workout.intensity === "low"
       ? "mobility"
@@ -1123,13 +1281,14 @@ function logWorkout(feedback) {
     score,
     feedback,
     kind,
+    groups: groupsForWorkoutTitle(workout.title, summary),
     note: data.state.feedback.trim(),
     result: {
       minutes: Number(data.state.resultMinutes) || 0,
       effort: data.state.resultEffort,
       painAfter: Number(data.state.resultPain) || 0,
       completion: data.state.resultCompletion,
-      exercises: activeSummary(),
+      exercises: summary,
     },
   });
   data.history = data.history.slice(0, 20);
