@@ -39,6 +39,30 @@ await expectVisible(page, "#readinessScore");
 await expectVisible(page, "#workoutBlocks .workout-step");
 await expectVisible(page, "#coachWhy .reason-pill");
 await expectVisible(page, "#nextAction");
+await page.evaluate(() => {
+  const session = JSON.parse(localStorage.getItem("kam-fit-coach-mvp:current-user"));
+  const key = `kam-fit-coach-mvp:user:${session.id}`;
+  const saved = JSON.parse(localStorage.getItem(key));
+  saved.activeWorkout = {
+    signature: JSON.stringify({
+      place: saved.profile.place,
+      goal: saved.profile.goal,
+      level: saved.profile.level,
+      focus: saved.state.trainingFocus,
+      trainingDays: Number(saved.profile.trainingDays),
+      trainingStyle: saved.profile.trainingStyle,
+      mode: saved.quickMode,
+      intensity: "high",
+      needsLowImpact: false,
+      cycleDeload: false,
+    }),
+    startedAt: new Date().toISOString(),
+    exercises: [],
+  };
+  localStorage.setItem(key, JSON.stringify(saved));
+});
+await page.reload();
+await expectVisible(page, "#exerciseList .exercise-card");
 
 const initialWorkout = await text(page, "#workoutName");
 await page.click('[data-mode="short"]');

@@ -704,15 +704,23 @@ function getNutrition(score) {
 }
 
 function ensureActiveWorkout(score) {
+  const ctx = context(score);
   const signature = JSON.stringify({
-    place: data.profile.place,
-    goal: data.profile.goal,
-    level: data.profile.level,
+    place: ctx.place,
+    goal: ctx.goal,
+    level: ctx.level,
+    focus: ctx.focus,
+    trainingDays: ctx.trainingDays,
+    trainingStyle: ctx.trainingStyle,
     mode: data.quickMode,
-    intensity: context(score).intensity,
+    intensity: ctx.intensity,
+    needsLowImpact: ctx.needsLowImpact,
+    cycleDeload: ctx.cycleDeload,
   });
 
-  if (data.activeWorkout?.signature === signature) return data.activeWorkout;
+  if (data.activeWorkout?.signature === signature && data.activeWorkout.exercises?.length) {
+    return data.activeWorkout;
+  }
 
   data.activeWorkout = {
     signature,
