@@ -1738,14 +1738,13 @@ function renderServerWalletReadout() {
 
 const SERVER_BOTS = [
   { login: "server",          strategy: "all",            label: "Все стратегии", color: "accent"  },
-  { login: "server-trend",    strategy: "trend",          label: "Тренд EMA",     color: "blue"    },
   { login: "server-pullback", strategy: "pullback",       label: "Откат",         color: "purple"  },
-  { login: "server-scalping", strategy: "scalping",       label: "Скальпинг",     color: "yellow"  },
-  { login: "server-rsi",      strategy: "rsi-reversal",   label: "RSI Разворот",  color: "teal"    },
   { login: "server-breakout", strategy: "breakout",       label: "Пробой",        color: "orange"  },
+  { login: "server-rsi",      strategy: "rsi-reversal",   label: "RSI Разворот",  color: "teal"    },
   { login: "server-vwap",     strategy: "vwap-reversion", label: "VWAP Возврат",  color: "rose"    },
+  { login: "server-trend",    strategy: "trend",          label: "Тренд EMA",     color: "blue"    },
+  { login: "server-scalping", strategy: "scalping",       label: "Скальпинг",     color: "yellow"  },
   { login: "server-momentum", strategy: "momentum",       label: "Импульс (риск)", color: "red"     },
-  { login: "server-vps",      strategy: "vps",            label: "VPS (все)",     color: "accent"  },
 ];
 
 function isServerTrade(trade) {
@@ -1808,9 +1807,8 @@ function getTradeStatsPeriodSinceMs(period) {
 }
 
 function matchesBotFilter(trade, bot) {
-  if (bot.strategy === "vps") return getTradeUserLogin(trade) === "server-vps";
   if (!isServerTrade(trade)) return false;
-  if (bot.strategy === "all") return getTradeUserLogin(trade) !== "server-vps";
+  if (bot.strategy === "all") return true;
   return getServerStrategyId(trade) === bot.strategy;
 }
 
@@ -1896,7 +1894,7 @@ function renderTradeStats() {
       <div><span>PNL</span><strong class="${pnlClass}">${s.pnl >= 0 ? "+" : ""}${s.pnl.toFixed(2)} USDT</strong></div>
     `;
   }
-  statsRows.innerHTML = rows.map(({ bot, s }) => {
+  statsRows.innerHTML = rows.filter(({ bot, s }) => bot.strategy === "all" || s.active + s.closed > 0).map(({ bot, s }) => {
     const pnlClass = s.pnl > 0 ? "pos" : s.pnl < 0 ? "neg" : "";
     const wrStr = s.wr !== null ? `${s.wr.toFixed(0)}%` : "—";
     return `<tr>
@@ -4015,10 +4013,11 @@ function getDailyRiskState() {
   dayStart.setHours(0, 0, 0, 0);
   const trades = state.paperTrades.filter((trade) => isPaperTradeClosedForStats(trade) && (Number(trade.closedAt) || Number(trade.openedAt) || 0) >= dayStart.getTime());
   const pnl = trades.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0);
+  const depositIsSet = getDepositValue() > 0;
   const budgetBase = Math.max(1, getDepositValue() + getReservedPaperBudget());
-  const lossPct = pnl < 0 ? Math.abs(pnl) / budgetBase * 100 : 0;
+  const lossPct = depositIsSet && pnl < 0 ? Math.abs(pnl) / budgetBase * 100 : 0;
   const stops = trades.filter((trade) => trade.status === "stop" || Number(trade.pnl) < 0).length;
-  return { trades: trades.length, pnl, lossPct, stops, blocked: lossPct >= dailyMaxLossPct || stops >= dailyMaxStops };
+  return { trades: trades.length, pnl, lossPct, stops, blocked: depositIsSet && (lossPct >= dailyMaxLossPct || stops >= dailyMaxStops) };
 }
 
 function getAutopilotScenario(tradePlan, side) {

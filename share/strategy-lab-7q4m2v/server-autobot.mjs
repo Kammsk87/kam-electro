@@ -86,18 +86,16 @@ const serverProfiles = {
     duplicateCooldownMs: 4 * 60 * 1000,
     minVolumeRatio: 0.35,
     minScalpingVolumeRatio: 0.6,
-    minExpectedNetPct: 0.03,
-    minScalpingExpectedNetPct: 0.02,
+    minExpectedNetPct: 0.12,
+    minScalpingExpectedNetPct: 0.08,
     blockedAssetMode: "soft",
     softBlockPenalty: 12,
     minTradesBeforeBlock: 20,
     dailyStopLimit: 100,
     dailyLossPctLimit: 50,
-    // RSI extremes loosened from the default 28/72 — at 28/72 this strategy produced
-    // ~1 trade/day (24h log), ~100 days to reach the 100-closed-trades checkpoint.
     rsiReversalLow: 35,
     rsiReversalHigh: 65,
-    strategyMaxEntriesPerRun: { trend: 5, pullback: 5, scalping: 6, "rsi-reversal": 5, breakout: 5, "vwap-reversion": 5, momentum: 5 }
+    strategyMaxEntriesPerRun: { trend: 2, pullback: 2, scalping: 3, "rsi-reversal": 2, breakout: 2, "vwap-reversion": 2, momentum: 2 }
   },
   real: {
     label: "Реальная торговля",
@@ -1464,7 +1462,10 @@ function evaluateCandidate(symbol, interval, candles, strategy, trades, learning
   // выборки. Майнинг 374 гипотез (2026-06-22) показал, что высокий historyWinRate сейчас
   // СТАБИЛЬНО предсказывает ХУДШИЙ следующий результат (regression to the mean на короткой
   // "удачной полосе") — а текущий код её, наоборот, поощряет +10. Поднимаем порог доверия.
-  if (history.trades >= 8) score += history.winRate >= 60 && history.avgPnlPct > 0 ? 10 : -25;
+  if (history.trades >= 8) {
+    if (history.avgPnlPct < 0) { recordGateRejection("pattern-negative-ev"); return null; }
+    score += history.winRate >= 60 && history.avgPnlPct > 0 ? 10 : -25;
+  }
 
   const wideStop = strategy.kind === "momentum";
   const atrStop = calculateAtrStopModel(last.close, atrPct, scalping, wideStop);

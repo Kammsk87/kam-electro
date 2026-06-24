@@ -51,8 +51,19 @@ process.on("SIGINT", () => {
   console.log("[runner] SIGINT received, stopping after current child process");
 });
 
+// Align runs to 5m candle close boundaries (+2s buffer for REST propagation).
+// 15m and 1h closes are multiples of 5m, so all timeframes are covered.
+// Falls back to intervalSec if candle boundary is too soon (< 30s away).
+function msUntilNextCandleRun() {
+  const periodMs = 5 * 60 * 1000;
+  const bufferMs = 2_000;
+  let ms = periodMs - (Date.now() % periodMs) + bufferMs;
+  if (ms < 30_000) ms += periodMs; // skip to next boundary if too close
+  return ms;
+}
+
 let cycle = 0;
-console.log(`[runner] started: profile=${profile}, dryRun=${dryRun}, interval=${intervalSec}s, stagger=${staggerSec}s, strategies=${strategies.map((s) => s.strategy).join("/")}`);
+console.log(`[runner] started: profile=${profile}, dryRun=${dryRun}, mode=candle-aligned(5m), stagger=${staggerSec}s, strategies=${strategies.map((s) => s.strategy).join("/")}`);
 
 do {
   cycle += 1;
@@ -70,8 +81,9 @@ do {
   }
 
   const elapsedMs = Date.now() - startedAt;
-  const waitMs = Math.max(0, intervalSec * 1000 - elapsedMs);
-  console.log(`[runner] cycle ${cycle} done in ${Math.round(elapsedMs / 1000)}s${runOnce ? "" : `, next in ${Math.round(waitMs / 1000)}s`}`);
+  const waitMs = runOnce ? 0 : msUntilNextCandleRun();
+  const nextAt = runOnce ? "" : ` next in ${Math.round(waitMs / 1000)}s (${new Date(Date.now() + waitMs).toISOString().slice(11, 19)} UTC)`;
+  console.log(`[runner] cycle ${cycle} done in ${Math.round(elapsedMs / 1000)}s${nextAt}`);
 
   if (!runOnce && !shuttingDown && waitMs > 0) await sleep(waitMs);
 } while (!runOnce && !shuttingDown);
