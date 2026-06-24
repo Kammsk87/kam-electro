@@ -393,7 +393,7 @@ function context(score) {
   const intensity = score >= 78 ? "high" : score >= 58 ? "medium" : "low";
   const experience = { beginner: 2, middle: 3, advanced: 4 }[level];
 
-  return { goal, place, level, trainingDays: Number(trainingDays), trainingStyle, needsLowImpact, cycleDeload, luteal, intensity, experience, quickMode: data.quickMode, focus: data.state.trainingFocus };
+  return { goal, place, level, trainingDays: Number(trainingDays), trainingStyle, limitations, sex, cyclePhase, needsLowImpact, cycleDeload, luteal, intensity, experience, quickMode: data.quickMode, focus: data.state.trainingFocus };
 }
 
 function exerciseLibrary(place) {
@@ -434,11 +434,9 @@ function exerciseLibrary(place) {
 function chooseWorkout(score) {
   const ctx = context(score);
   const lib = exerciseLibrary(ctx.place);
+  const dose = trainingDose(ctx);
   const short = ctx.quickMode === "short";
   const cardioFirst = ctx.quickMode === "cardio";
-  const rounds = short ? 2 : ctx.intensity === "high" ? ctx.experience + 1 : ctx.intensity === "medium" ? ctx.experience : 2;
-  const reps = ctx.intensity === "high" ? "6-10" : ctx.intensity === "medium" ? "8-12" : "10-15 спокойно";
-  const rest = ctx.intensity === "high" ? "90-120 сек" : ctx.intensity === "medium" ? "60-90 сек" : "45-60 сек";
 
   let title = {
     strength: "Сила: все тело",
@@ -457,21 +455,125 @@ function chooseWorkout(score) {
   if (ctx.focus === "cardioMobility") title = "Дорожка + растяжка";
   if (ctx.trainingStyle === "circuit" && ctx.focus === "auto") title = "Круговая тренировка";
 
-  const focusLine = getFocusLine(ctx, lib, rounds, reps);
+  const focusLine = getFocusLine(ctx, lib, dose);
   const heavyLine = focusLine || (cardioFirst
     ? `${lib.cardio[0]} 20-35 минут + 2 круга: ${lib.core[0]}, ${lib.pull[0]}`
     : ctx.goal === "fatloss"
-    ? `${rounds} круга без подходов до предела: ${lib.legs[0]}, ${lib.push[0]}, ${lib.pull[0]}, ${lib.core[0]}`
-    : `${rounds} подхода: ${lib.legs[0]}, ${lib.push[0]}, ${lib.pull[0]}`);
+    ? `${dose.rounds} круга без подходов до предела: ${lib.legs[0]}, ${lib.push[0]}, ${lib.pull[0]}, ${lib.core[0]}`
+    : `${dose.sets} подхода: ${lib.legs[0]}, ${lib.push[0]}, ${lib.pull[0]}`);
 
   const blocks = [
     { title: "Старт", body: startProtocol(ctx, lib) },
-    { title: "Силовой блок", body: `${heavyLine}. Повторы ${reps}, отдых ${rest}.` },
+    { title: "Силовой блок", body: `${heavyLine}. Повторы ${dose.reps}, отдых ${dose.rest}.` },
+    { title: "Почему такой объем", body: dose.reason },
     { title: "Финиш", body: finishText(ctx, lib) },
     { title: "Замена", body: swapText(ctx, lib) },
   ];
 
   return { title, intensity: ctx.intensity, blocks };
+}
+
+function trainingDose(ctx) {
+  let sets = { beginner: 2, middle: 3, advanced: 4 }[ctx.level];
+  let reps = ctx.goal === "strength" ? [6, 8] : ctx.goal === "muscle" ? [8, 12] : [10, 15];
+  let rest = ctx.goal === "strength" ? [90, 120] : ctx.goal === "fatloss" ? [45, 60] : [60, 90];
+  let rounds = sets;
+  const reasons = [];
+
+  reasons.push(`уровень: ${levelLabel(ctx.level)}`);
+
+  if (ctx.intensity === "high") {
+    sets += 1;
+    rounds += 1;
+    reasons.push("готовность высокая: можно добавить объем");
+  }
+  if (ctx.intensity === "low") {
+    sets -= 1;
+    rounds -= 1;
+    rest[0] = Math.max(45, rest[0] - 15);
+    reasons.push("готовность низкая: меньше подходов");
+  }
+
+  if (ctx.goal === "strength") reasons.push("цель сила: меньше повторов, больше отдых");
+  if (ctx.goal === "muscle") reasons.push("цель мышцы: средние повторы и рабочие подходы");
+  if (ctx.goal === "fatloss") {
+    rounds += 1;
+    rest = [30, 60];
+    reasons.push("цель снижение веса: больше движения и короче отдых");
+  }
+  if (ctx.goal === "health") {
+    sets = Math.min(sets, 3);
+    reps = [10, 15];
+    reasons.push("цель здоровье: без перегруза");
+  }
+
+  if (ctx.sex === "male" && (ctx.goal === "strength" || ctx.goal === "muscle") && ctx.intensity !== "low") {
+    sets += 1;
+    rest[1] += 30;
+    reasons.push("мужской профиль: стартово больше силового объема");
+  }
+  if (ctx.sex === "female") {
+    reps = [Math.max(reps[0], 10), Math.max(reps[1], 12)];
+    reasons.push("женский профиль: больше контроля техники и самочувствия");
+  }
+  if (ctx.cycleDeload) {
+    sets = Math.min(sets, 2);
+    rounds = Math.min(rounds, 2);
+    rest[1] += 30;
+    reasons.push("менструация: тренировка легче");
+  } else if (ctx.luteal) {
+    sets = Math.min(sets, 3);
+    rounds = Math.min(rounds, 3);
+    reasons.push("перед менструацией: оставляем запас сил");
+  } else if (ctx.sex === "female" && ctx.cyclePhase === "follicular" && ctx.intensity !== "low") {
+    sets += 1;
+    reasons.push("после менструации: можно добавить нагрузку");
+  }
+
+  if (ctx.trainingStyle === "circuit") {
+    rounds = Math.max(2, Math.min(rounds + (ctx.trainingDays >= 4 ? 1 : 0), 5));
+    sets = rounds;
+    rest = [20, 45];
+    reasons.push("круговая: считаем круги, отдых короче");
+  }
+  if (ctx.trainingDays <= 2) {
+    sets += 1;
+    reasons.push("2 дня в неделю: тренировка плотнее");
+  }
+  if (ctx.trainingDays >= 5) {
+    sets = Math.max(2, sets - 1);
+    rounds = Math.max(2, rounds - 1);
+    reasons.push("5 дней в неделю: один день не перегружаем");
+  }
+  if (ctx.needsLowImpact) {
+    sets = Math.min(sets, 2);
+    rounds = Math.min(rounds, 2);
+    reps = [10, 15];
+    rest[1] += 15;
+    reasons.push("есть боль или ограничения: меньше объем");
+  }
+  if (ctx.quickMode === "short") {
+    sets = Math.min(sets, 2);
+    rounds = Math.min(rounds, 2);
+    reasons.push("25 минут: только главное");
+  }
+  if (ctx.cycleDeload || ctx.needsLowImpact || ctx.quickMode === "short") {
+    sets = Math.min(sets, 2);
+    rounds = Math.min(rounds, 2);
+  } else if (ctx.luteal) {
+    sets = Math.min(sets, 3);
+    rounds = Math.min(rounds, 3);
+  }
+
+  sets = clamp(sets, 1, 5);
+  rounds = clamp(rounds, 1, 5);
+  return {
+    sets,
+    rounds,
+    reps: `${reps[0]}-${reps[1]}`,
+    rest: `${rest[0]}-${rest[1]} сек`,
+    reason: reasons.slice(0, 4).join(". ") + ".",
+  };
 }
 
 function startProtocol(ctx, lib) {
@@ -482,17 +584,23 @@ function startProtocol(ctx, lib) {
   return "8-12 мин быстрой ходьбы. Затем растяжка в движении: плечи, верх спины, бедра.";
 }
 
-function getFocusLine(ctx, lib, rounds, reps) {
+function getFocusLine(ctx, lib, dose) {
   if (ctx.trainingStyle === "circuit" && ctx.focus === "auto") {
-    return `${rounds} круга: ${lib.legs[0]}, ${lib.push[0]}, ${lib.pull[0]}, ${lib.core[0]}, ${lib.cardio[1]}. Работа 40 сек, отдых 20-40 сек`;
+    return `${dose.rounds} круга: ${lib.legs[0]}, ${lib.push[0]}, ${lib.pull[0]}, ${lib.core[0]}, ${lib.cardio[1]}. Работа 30-45 сек, отдых ${dose.rest}`;
   }
   if (ctx.focus === "chest") {
-    return `${rounds} подхода: ${lib.chest[0]}, ${lib.chest[1]}, ${lib.chest[2]}. Добивка: ${lib.shoulders[1]}, ${lib.arms[0]}, ${lib.arms[1]}`;
+    return `${dose.sets} подхода: ${lib.chest[0]}, ${lib.chest[1]}, ${lib.chest[2]}. Добивка: ${accessoryText(ctx, lib)}`;
   }
-  if (ctx.focus === "back") return `${rounds} подхода: ${lib.pull[0]}, ${lib.pull[1]}, ${lib.pull[2]}. Добивка: ${lib.arms[1]}`;
-  if (ctx.focus === "legs") return `${rounds} подхода: ${lib.legs[0]}, ${lib.legs[1]}, ${lib.legs[2]}. В конце: пресс и корпус`;
+  if (ctx.focus === "back") return `${dose.sets} подхода: ${lib.pull[0]}, ${lib.pull[1]}, ${lib.pull[2]}. Добивка: ${lib.arms[1]}`;
+  if (ctx.focus === "legs") return `${dose.sets} подхода: ${lib.legs[0]}, ${lib.legs[1]}, ${lib.legs[2]}. В конце: пресс и корпус`;
   if (ctx.focus === "cardioMobility") return `${lib.cardio[0]} 25-40 минут + растяжка 10-15 минут`;
   return "";
+}
+
+function accessoryText(ctx, lib) {
+  if (ctx.quickMode === "short" || ctx.needsLowImpact) return `${lib.shoulders[1]} или ${lib.arms[0]}`;
+  if (ctx.trainingDays >= 5) return `${lib.shoulders[1]}, ${lib.arms[0]}`;
+  return `${lib.shoulders[1]}, ${lib.arms[0]}, ${lib.arms[1]}`;
 }
 
 function finishText(ctx, lib) {
@@ -519,7 +627,12 @@ function correctionText(ctx) {
 function coachWhy(score) {
   const ctx = context(score);
   const reasons = [];
+  reasons.push(sexReason(ctx));
+  reasons.push(goalReason(ctx.goal));
+  reasons.push(`уровень: ${levelLabel(ctx.level)}`);
   if (ctx.trainingStyle === "circuit") reasons.push(`${ctx.trainingDays} круговых в неделю`);
+  if (ctx.trainingDays <= 2) reasons.push("меньше дней: тренировка плотнее");
+  if (ctx.trainingDays >= 5) reasons.push("много дней: объем дня ниже");
   if (ctx.quickMode !== "normal") reasons.push(modeLabel(ctx.quickMode));
   if (score < 58) reasons.push("готовность низкая");
   if (score >= 78) reasons.push("можно прогрессировать");
@@ -529,7 +642,22 @@ function coachWhy(score) {
   if (data.history[0]?.result?.painAfter >= 5) reasons.push("после прошлой была боль");
   if (data.history[0]?.result?.completion === "partial") reasons.push("прошлый план не закрыт");
   if (!reasons.length) reasons.push("баланс нормальный");
-  return reasons.slice(0, 3);
+  return reasons.slice(0, 5);
+}
+
+function sexReason(ctx) {
+  if (ctx.sex === "male") return "мужской профиль";
+  if (ctx.sex === "female") return ctx.cyclePhase === "none" ? "женский профиль" : "женский профиль + цикл";
+  return "профиль без пола";
+}
+
+function goalReason(goal) {
+  return {
+    strength: "цель: сила",
+    muscle: "цель: мышцы",
+    fatloss: "цель: снижение веса",
+    health: "цель: здоровье",
+  }[goal];
 }
 
 function modeLabel(mode) {
@@ -709,6 +837,9 @@ function ensureActiveWorkout(score) {
     place: ctx.place,
     goal: ctx.goal,
     level: ctx.level,
+    sex: ctx.sex,
+    cyclePhase: ctx.cyclePhase,
+    limitations: ctx.limitations,
     focus: ctx.focus,
     trainingDays: ctx.trainingDays,
     trainingStyle: ctx.trainingStyle,
@@ -734,8 +865,9 @@ function ensureActiveWorkout(score) {
 function buildActiveExercises(score) {
   const ctx = context(score);
   const lib = exerciseLibrary(ctx.place);
-  const baseSets = ctx.quickMode === "short" ? 2 : ctx.intensity === "high" ? 4 : ctx.intensity === "medium" ? 3 : 2;
-  const reps = ctx.intensity === "high" ? 8 : ctx.intensity === "medium" ? 10 : 12;
+  const dose = trainingDose(ctx);
+  const baseSets = dose.sets;
+  const reps = Number(dose.reps.split("-")[0]) || 10;
   const weight = ctx.place === "gym" ? 20 : 0;
   const names = activeExerciseNames(ctx, lib);
 
@@ -754,13 +886,14 @@ function buildActiveExercises(score) {
 
 function activeExerciseNames(ctx, lib) {
   const warmup = ctx.place === "gym" ? "дорожка 4,5-5 / наклон 15 + растяжка" : `${lib.cardio[0]} + растяжка`;
-  if (ctx.trainingStyle === "circuit" && ctx.focus === "auto") return [warmup, lib.legs[0], lib.push[0], lib.pull[0], lib.core[0], lib.cardio[1]];
-  if (ctx.focus === "chest") return [warmup, ...lib.chest, lib.shoulders[1], lib.arms[0], lib.arms[1]];
-  if (ctx.focus === "back") return [warmup, ...lib.pull, lib.arms[1]];
-  if (ctx.focus === "legs") return [warmup, ...lib.legs, lib.core[0]];
+  const maxMain = ctx.quickMode === "short" || ctx.needsLowImpact || ctx.trainingDays >= 5 ? 3 : 6;
+  if (ctx.trainingStyle === "circuit" && ctx.focus === "auto") return [warmup, lib.legs[0], lib.push[0], lib.pull[0], lib.core[0], lib.cardio[1]].slice(0, maxMain + 2);
+  if (ctx.focus === "chest") return [warmup, ...lib.chest, lib.shoulders[1], lib.arms[0], lib.arms[1]].slice(0, maxMain + 1);
+  if (ctx.focus === "back") return [warmup, ...lib.pull, lib.arms[1]].slice(0, maxMain + 1);
+  if (ctx.focus === "legs") return [warmup, ...lib.legs, lib.core[0]].slice(0, maxMain + 1);
   if (ctx.focus === "cardioMobility") return [warmup, lib.cardio[0], "растяжка 10-15 минут"];
   if (ctx.quickMode === "cardio") return [warmup, lib.cardio[0], lib.pull[0], lib.core[0]];
-  return [warmup, lib.legs[0], lib.push[0], lib.pull[0], lib.core[0]];
+  return [warmup, lib.legs[0], lib.push[0], lib.pull[0], lib.core[0]].slice(0, maxMain + 1);
 }
 
 function isWarmupExercise(name) {
@@ -772,6 +905,14 @@ function targetForExercise(name, index, ctx, baseSets, reps) {
   if (ctx.trainingStyle === "circuit" && ctx.focus === "auto") return `${baseSets} круга · 40 сек`;
   if (ctx.quickMode === "cardio" && index === 1) return "20-35 мин";
   return `${baseSets} x ${reps}`;
+}
+
+function levelLabel(value) {
+  return { beginner: "начинающий", middle: "средний", advanced: "опытный" }[value] || "начинающий";
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
 }
 
 function alternativesFor(name, lib) {
