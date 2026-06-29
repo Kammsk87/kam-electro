@@ -44,8 +44,14 @@
   </url>
   <url>
     <loc>https://kamtok.ru/stati.html</loc>
-    <lastmod>2026-06-20</lastmod>
+    <lastmod>2026-06-29</lastmod>
     <changefreq>weekly</changefreq>
+    <priority>0.75</priority>
+  </url>
+  <url>
+    <loc>https://kamtok.ru/stati/elektromontazh-kommercheskogo-pomeshcheniya.html</loc>
+    <lastmod>2026-06-29</lastmod>
+    <changefreq>monthly</changefreq>
     <priority>0.75</priority>
   </url>
   <url>
