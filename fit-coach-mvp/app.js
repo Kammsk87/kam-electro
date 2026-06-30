@@ -1013,6 +1013,7 @@ function ensureActiveWorkout(score) {
   });
 
   if (data.activeWorkout?.signature === signature && data.activeWorkout.exercises?.length) {
+    normalizeActiveWorkout(data.activeWorkout, score);
     return data.activeWorkout;
   }
 
@@ -1024,6 +1025,21 @@ function ensureActiveWorkout(score) {
   data.state.missionExerciseIndex = 0;
   save();
   return data.activeWorkout;
+}
+
+function normalizeActiveWorkout(workout, score) {
+  const ctx = context(score);
+  workout.exercises = (workout.exercises || []).map((exercise, index) => {
+    const type = exerciseType(exercise.name || "", index, ctx);
+    const sets = (exercise.sets || []).map((set) => ({
+      reps: Number(set.reps) || 0,
+      weight: Number(set.weight) || 0,
+      minutes: Number(set.minutes) || defaultMinutesForExercise(exercise.name || "", index, ctx),
+      comfort: set.comfort || "normal",
+      done: Boolean(set.done),
+    }));
+    return { ...exercise, type, sets };
+  });
 }
 
 function buildActiveExercises(score) {
@@ -1089,7 +1105,7 @@ function isMobilityExercise(name) {
 
 function exerciseType(name, index, ctx) {
   if (ctx.redFlag || isMobilityExercise(name)) return ctx.redFlag ? "safety" : "mobility";
-  if (isCardioExercise(name) || (ctx.quickMode === "cardio" && index === 1)) return "cardio";
+  if (isCardioExercise(name)) return "cardio";
   return "strength";
 }
 

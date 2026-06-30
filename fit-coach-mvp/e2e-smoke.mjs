@@ -50,6 +50,17 @@ await page.evaluate(() => {
   const session = JSON.parse(localStorage.getItem("kam-fit-coach-mvp:current-user"));
   const key = `kam-fit-coach-mvp:user:${session.id}`;
   const saved = JSON.parse(localStorage.getItem(key));
+  saved.activeWorkout.exercises[1].type = "cardio";
+  saved.state.missionExerciseIndex = 1;
+  localStorage.setItem(key, JSON.stringify(saved));
+});
+await page.reload();
+await expectText(page, "#missionTitle", /Шаг 2/);
+await expectText(page, "#missionBody", /кг|повт|Текущий подход/);
+await page.evaluate(() => {
+  const session = JSON.parse(localStorage.getItem("kam-fit-coach-mvp:current-user"));
+  const key = `kam-fit-coach-mvp:user:${session.id}`;
+  const saved = JSON.parse(localStorage.getItem(key));
   saved.activeWorkout = {
     signature: JSON.stringify({
       place: saved.profile.place,
