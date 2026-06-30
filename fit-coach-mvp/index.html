@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KAM Fit Coach</title>
-    <link rel="stylesheet" href="./styles.css?v=knowledge1" />
+    <link rel="stylesheet" href="./styles.css?v=mission1" />
   </head>
   <body>
     <div id="authOverlay" class="auth-overlay">
@@ -76,7 +76,8 @@
               <button class="focus-chip" data-focus="circuit">Круговая</button>
             </div>
             <div class="hero-actions">
-              <button id="logDone">Сохранить тренировку</button>
+              <button id="startMissionHero" type="button">Начать миссию</button>
+              <button id="logDone" class="secondary">Сохранить тренировку</button>
               <button id="resetDemo" class="ghost-button">Сбросить демо</button>
             </div>
           </div>
@@ -124,6 +125,24 @@
               <span id="workoutBadge" class="badge">адаптивно</span>
             </div>
             <div id="workoutBlocks" class="workout-blocks"></div>
+            <section id="missionPanel" class="mission-panel">
+              <div class="mission-top">
+                <div>
+                  <p class="eyebrow">миссия дня</p>
+                  <h2 id="missionTitle">Начни тренировку</h2>
+                </div>
+                <span id="missionProgress" class="badge subtle">0%</span>
+              </div>
+              <div class="mission-meter"><span id="missionMeter"></span></div>
+              <div id="missionBody" class="mission-body"></div>
+              <div class="mission-actions">
+                <button id="missionStart" type="button">Начать миссию</button>
+                <button id="missionPrev" class="secondary" type="button">Назад</button>
+                <button id="missionSetDone" type="button">Сохранить подход</button>
+                <button id="missionExerciseDone" class="secondary" type="button">Упражнение готово</button>
+                <button id="missionNext" class="secondary" type="button">Дальше</button>
+              </div>
+            </section>
             <div id="activeWorkout" class="active-workout">
               <div class="panel-header compact">
                 <div>
@@ -181,6 +200,16 @@
             <div class="log-actions">
               <button id="logEasy" class="secondary">Было легко</button>
               <button id="logHard" class="secondary">Было тяжело</button>
+            </div>
+            <div class="quick-result" aria-label="Быстрый дневник после тренировки">
+              <span>Сложность</span>
+              <button class="result-chip" data-result-field="resultEffort" data-result-value="easy" type="button">Легко</button>
+              <button class="result-chip active" data-result-field="resultEffort" data-result-value="done" type="button">Нормально</button>
+              <button class="result-chip" data-result-field="resultEffort" data-result-value="hard" type="button">Тяжело</button>
+              <span>Боль</span>
+              <button class="result-chip active" data-result-field="resultPain" data-result-value="0" type="button">Нет</button>
+              <button class="result-chip" data-result-field="resultPain" data-result-value="2" type="button">Легкая</button>
+              <button class="result-chip" data-result-field="resultPain" data-result-value="5" type="button">Заметная</button>
             </div>
             <label class="full-label">
               Что почувствовал
@@ -429,6 +458,6 @@
       </div>
     </div>
 
-    <script src="./app.js?v=knowledge1"></script>
+    <script src="./app.js?v=mission1"></script>
   </body>
 </html>

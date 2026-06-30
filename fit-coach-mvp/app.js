@@ -21,6 +21,8 @@ const defaults = {
     resultEffort: "done",
     resultPain: "0",
     resultCompletion: "full",
+    missionStarted: false,
+    missionExerciseIndex: 0,
   },
   activePlan: "day",
   archiveFilter: "all",
@@ -171,11 +173,30 @@ function bindInputs() {
     if (!input) return;
     updateSetValue(Number(input.dataset.exercise), Number(input.dataset.set), input.dataset.field, input.value);
   });
+  $("missionBody").addEventListener("click", (event) => {
+    const infoButton = event.target.closest("[data-info]");
+    if (infoButton) openTechnique(Number(infoButton.dataset.info));
+  });
 
   $("logDone").addEventListener("click", () => logWorkout("done"));
   $("mobileSaveWorkout").addEventListener("click", () => logWorkout("done"));
   $("logEasy").addEventListener("click", () => logWorkout("easy"));
   $("logHard").addEventListener("click", () => logWorkout("hard"));
+  $("startMissionHero").addEventListener("click", startMission);
+  $("missionStart").addEventListener("click", startMission);
+  $("missionPrev").addEventListener("click", () => moveMission(-1));
+  $("missionNext").addEventListener("click", () => moveMission(1));
+  $("missionSetDone").addEventListener("click", completeCurrentMissionSet);
+  $("missionExerciseDone").addEventListener("click", completeCurrentMissionExercise);
+  document.querySelectorAll(".result-chip").forEach((button) => {
+    button.addEventListener("click", () => {
+      const field = button.dataset.resultField;
+      data.state[field] = button.dataset.resultValue;
+      save();
+      syncInputs();
+      render();
+    });
+  });
   $("resetDemo").addEventListener("click", () => {
     data = structuredClone(defaults);
     save();
@@ -1000,6 +1021,7 @@ function ensureActiveWorkout(score) {
     startedAt: new Date().toISOString(),
     exercises: buildActiveExercises(score),
   };
+  data.state.missionExerciseIndex = 0;
   save();
   return data.activeWorkout;
 }
@@ -1058,6 +1080,67 @@ function targetForExercise(name, index, ctx, baseSets, reps) {
   if (ctx.trainingStyle === "circuit" && ctx.focus === "auto") return `${baseSets} круга · 40 сек`;
   if (ctx.quickMode === "cardio" && index === 1) return "20-35 мин";
   return `${baseSets} x ${reps}`;
+}
+
+function currentMissionExercise() {
+  const exercises = data.activeWorkout?.exercises || [];
+  const index = clamp(data.state.missionExerciseIndex || 0, 0, Math.max(0, exercises.length - 1));
+  data.state.missionExerciseIndex = index;
+  return { exercise: exercises[index], index, total: exercises.length };
+}
+
+function firstOpenSetIndex(exercise) {
+  return Math.max(0, exercise.sets.findIndex((set) => !set.done));
+}
+
+function startMission() {
+  data.state.missionStarted = true;
+  data.state.missionExerciseIndex = data.state.missionExerciseIndex || 0;
+  save();
+  render();
+  $("missionPanel").scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function moveMission(direction) {
+  const total = data.activeWorkout?.exercises.length || 0;
+  if (!total) return;
+  data.state.missionStarted = true;
+  data.state.missionExerciseIndex = clamp((data.state.missionExerciseIndex || 0) + direction, 0, total - 1);
+  save();
+  render();
+}
+
+function completeCurrentMissionSet() {
+  const { exercise, index } = currentMissionExercise();
+  if (!exercise) return;
+  const setIndex = firstOpenSetIndex(exercise);
+  if (setIndex >= 0 && exercise.sets[setIndex]) {
+    exercise.sets[setIndex].done = true;
+  }
+  exercise.accepted = exercise.sets.every((set) => set.done);
+  applyActiveWorkoutResult();
+  if (exercise.accepted && index < (data.activeWorkout?.exercises.length || 1) - 1) {
+    data.state.missionExerciseIndex = index + 1;
+  }
+  data.state.missionStarted = true;
+  save();
+  render();
+}
+
+function completeCurrentMissionExercise() {
+  const { exercise, index } = currentMissionExercise();
+  if (!exercise) return;
+  exercise.sets.forEach((set) => {
+    set.done = true;
+  });
+  exercise.accepted = true;
+  applyActiveWorkoutResult();
+  if (index < (data.activeWorkout?.exercises.length || 1) - 1) {
+    data.state.missionExerciseIndex = index + 1;
+  }
+  data.state.missionStarted = true;
+  save();
+  render();
 }
 
 function levelLabel(value) {
@@ -1293,6 +1376,8 @@ function logWorkout(feedback) {
   });
   data.history = data.history.slice(0, 20);
   data.activeWorkout = null;
+  data.state.missionStarted = false;
+  data.state.missionExerciseIndex = 0;
   save();
   render();
 }
@@ -1416,6 +1501,7 @@ function render() {
     .map((block) => `<div class="workout-step"><strong>${block.title}</strong><span>${block.body}</span></div>`)
     .join("");
   renderActiveWorkout(score);
+  renderMission(score);
 
   $("coachWhy").innerHTML = coachWhy(score)
     .map((reason) => `<span class="reason-pill">${reason}</span>`)
@@ -1451,6 +1537,87 @@ function render() {
   $("achievement").innerHTML = getAchievement(counts);
   $("reminder").textContent = getReminder(counts);
   renderArchive();
+}
+
+function renderMission(score) {
+  const workout = ensureActiveWorkout(score);
+  const progress = workoutProgress();
+  const { exercise, index, total } = currentMissionExercise();
+  const setIndex = exercise ? firstOpenSetIndex(exercise) : 0;
+  const openSet = exercise?.sets[setIndex] || exercise?.sets[exercise.sets.length - 1];
+  const doneSets = exercise?.sets.filter((set) => set.done).length || 0;
+  const started = data.state.missionStarted;
+
+  $("missionProgress").textContent = `${progress.percent}%`;
+  $("missionMeter").style.width = `${progress.percent}%`;
+
+  if (!exercise) {
+    $("missionTitle").textContent = "Миссия готовится";
+    $("missionBody").innerHTML = `<p class="mission-copy">План собирается по профилю, состоянию и истории.</p>`;
+    return;
+  }
+
+  $("missionTitle").textContent = started
+    ? `Шаг ${index + 1} из ${total}: ${exercise.name}`
+    : `Миссия дня: ${workout.title}`;
+
+  $("missionBody").innerHTML = started
+    ? `
+      <div class="mission-focus-card">
+        <span class="mission-step-label">${exercise.target}</span>
+        <strong>${exercise.name}</strong>
+        <p>${exerciseTechnique(exercise.name).purpose}</p>
+      </div>
+      <div class="mission-set-card">
+        <span>Текущий подход</span>
+        <strong>${Math.min(doneSets + 1, exercise.sets.length)} / ${exercise.sets.length}</strong>
+        <div class="mission-inputs">
+          <label>кг<input id="missionWeight" type="number" min="0" value="${openSet?.weight ?? 0}" /></label>
+          <label>повт.<input id="missionReps" type="number" min="0" value="${openSet?.reps ?? 0}" /></label>
+        </div>
+      </div>
+      <p class="mission-copy">${missionHint(exercise, doneSets)}</p>
+      <button class="secondary mini-button" data-info="${index}" type="button">Техника</button>
+    `
+    : `
+      <div class="mission-focus-card">
+        <span class="mission-step-label">${total} шагов · ${workout.intensity === "high" ? "можно добавить" : labelIntensity(workout.intensity)}</span>
+        <strong>${workout.title}</strong>
+        <p>${getNextAction(score)} Сначала пройди старт, затем приложение будет вести по одному упражнению.</p>
+      </div>
+      <p class="mission-copy">Ниже останется полный список подходов, но главный маршрут будет здесь.</p>
+    `;
+
+  const weightInput = $("missionWeight");
+  const repsInput = $("missionReps");
+  if (weightInput && repsInput && openSet) {
+    weightInput.addEventListener("input", () => {
+      openSet.weight = Number(weightInput.value) || 0;
+      save();
+    });
+    repsInput.addEventListener("input", () => {
+      openSet.reps = Number(repsInput.value) || 0;
+      save();
+    });
+  }
+
+  $("missionStart").hidden = started;
+  $("missionPrev").hidden = !started;
+  $("missionSetDone").hidden = !started || exercise.accepted;
+  $("missionExerciseDone").hidden = !started || exercise.accepted;
+  $("missionNext").hidden = !started;
+  $("missionPrev").disabled = index === 0;
+  $("missionNext").disabled = index >= total - 1;
+
+  document.querySelectorAll(".result-chip").forEach((button) => {
+    button.classList.toggle("active", String(data.state[button.dataset.resultField]) === button.dataset.resultValue);
+  });
+}
+
+function missionHint(exercise, doneSets) {
+  if (exercise.accepted) return "Шаг закрыт. Можно идти дальше или развернуть упражнение в подробном списке ниже.";
+  if (doneSets === 0) return "Запиши фактический вес и повторы после подхода. Это нужно для прогресса и следующей рекомендации.";
+  return `Уже сохранено: ${doneSets}. Если техника ровная и без боли, продолжай по плану.`;
 }
 
 function renderArchive() {

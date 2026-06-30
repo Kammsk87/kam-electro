@@ -39,6 +39,12 @@ await expectVisible(page, "#readinessScore");
 await expectVisible(page, "#workoutBlocks .workout-step");
 await expectVisible(page, "#coachWhy .reason-pill");
 await expectVisible(page, "#nextAction");
+await expectText(page, "#missionTitle", /Миссия дня|Начни тренировку/);
+await page.click("#startMissionHero");
+await expectText(page, "#missionTitle", /Шаг 1/);
+await expectText(page, "#missionBody", /Текущий подход|Запиши фактический вес/);
+await page.click("#missionNext");
+await expectText(page, "#missionTitle", /Шаг 2/);
 await page.evaluate(() => {
   const session = JSON.parse(localStorage.getItem("kam-fit-coach-mvp:current-user"));
   const key = `kam-fit-coach-mvp:user:${session.id}`;
