@@ -42,9 +42,10 @@ await expectVisible(page, "#nextAction");
 await expectText(page, "#missionTitle", /Миссия дня|Начни тренировку/);
 await page.click("#startMissionHero");
 await expectText(page, "#missionTitle", /Шаг 1/);
-await expectText(page, "#missionBody", /Текущий подход|Запиши фактический вес/);
+await expectText(page, "#missionBody", /минуты|дыхание|Вес и повторы для кардио не нужны/);
 await page.click("#missionNext");
 await expectText(page, "#missionTitle", /Шаг 2/);
+await expectText(page, "#missionBody", /кг|повт|Текущий подход/);
 await page.evaluate(() => {
   const session = JSON.parse(localStorage.getItem("kam-fit-coach-mvp:current-user"));
   const key = `kam-fit-coach-mvp:user:${session.id}`;
@@ -119,6 +120,7 @@ await page.selectOption("#trainingFocus", "chest");
 await expectText(page, "#workoutName", /Грудь/);
 await expectText(page, "#workoutBlocks", /Дорожка|наклон 12-15|груд/);
 await expectText(page, "#exerciseList", /дорожка 4,5-5|жим|кроссовер|разгибание/i);
+await expectText(page, "#exerciseList", /минуты|дыхание/);
 await expectVisible(page, "#exerciseList .exercise-card");
 await page.click("[data-swap='0']");
 await page.click("[data-info='0']");
@@ -130,7 +132,7 @@ await page.click("[data-exercise='0'][data-set='0']");
 await page.click("[data-exercise='1'][data-set='0']");
 await expectText(page, "#activeProgress", /[1-9][0-9]?%/);
 await page.click("[data-accept='0']");
-await expectText(page, "#exerciseList .exercise-card", /подходов/);
+await expectText(page, "#exerciseList .exercise-card", /мин/);
 await expectVisible(page, "[data-expand='0']");
 await page.click("[data-expand='0']");
 await expectVisible(page, "[data-accept='0']");
@@ -194,8 +196,10 @@ for (const viewport of [
   await expectBodyClass(page, "device-mobile");
   await page.waitForSelector("#exerciseList .exercise-card");
   await expectVisible(page, "[data-exercise='0'][data-set='0']");
-  await expectVisible(page, "[data-field='weight'][data-exercise='0'][data-set='0']");
-  await expectVisible(page, "[data-field='reps'][data-exercise='0'][data-set='0']");
+  await expectVisible(page, "[data-field='minutes'][data-exercise='0'][data-set='0']");
+  await expectVisible(page, "[data-field='comfort'][data-exercise='0'][data-set='0']");
+  await expectVisible(page, "[data-field='weight'][data-exercise='1'][data-set='0']");
+  await expectVisible(page, "[data-field='reps'][data-exercise='1'][data-set='0']");
   await assertNoHorizontalOverflow(page, viewport.width);
 }
 

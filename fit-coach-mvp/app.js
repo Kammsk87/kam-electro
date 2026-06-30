@@ -1033,9 +1033,10 @@ function buildActiveExercises(score) {
       {
         name: "пауза и проверка самочувствия",
         target: "без силовой нагрузки",
+        type: "safety",
         alternatives: ["спокойная ходьба 5-10 минут", "дыхание 3-5 минут", "закончить тренировку"],
         accepted: false,
-        sets: [{ reps: 0, weight: 0, done: false }],
+        sets: [{ reps: 0, weight: 0, minutes: 0, done: false }],
       },
     ];
   }
@@ -1049,11 +1050,14 @@ function buildActiveExercises(score) {
   return names.map((name, index) => ({
     name,
     target: targetForExercise(name, index, ctx, baseSets, reps),
+    type: exerciseType(name, index, ctx),
     alternatives: alternativesFor(name, lib),
     accepted: false,
     sets: Array.from({ length: isWarmupExercise(name) || (index === 0 && ctx.quickMode === "cardio") ? 1 : baseSets }, () => ({
       reps,
       weight,
+      minutes: defaultMinutesForExercise(name, index, ctx),
+      comfort: "normal",
       done: false,
     })),
   }));
@@ -1073,6 +1077,27 @@ function activeExerciseNames(ctx, lib) {
 
 function isWarmupExercise(name) {
   return /дорож|растяж|размин|ходь/.test(name.toLowerCase());
+}
+
+function isCardioExercise(name) {
+  return /дорож|вело|эллипс|ходь|кардио|лестниц|ступень|ускор/.test(name.toLowerCase());
+}
+
+function isMobilityExercise(name) {
+  return /растяж|размин|дых|самочувств|пауза/.test(name.toLowerCase());
+}
+
+function exerciseType(name, index, ctx) {
+  if (ctx.redFlag || isMobilityExercise(name)) return ctx.redFlag ? "safety" : "mobility";
+  if (isCardioExercise(name) || (ctx.quickMode === "cardio" && index === 1)) return "cardio";
+  return "strength";
+}
+
+function defaultMinutesForExercise(name, index, ctx) {
+  if (ctx.redFlag) return 0;
+  if (isWarmupExercise(name)) return index === 0 ? 10 : 12;
+  if (isCardioExercise(name)) return ctx.quickMode === "cardio" ? 25 : 12;
+  return 0;
 }
 
 function targetForExercise(name, index, ctx, baseSets, reps) {
@@ -1171,7 +1196,7 @@ function toggleSet(exerciseIndex, setIndex) {
 function updateSetValue(exerciseIndex, setIndex, field, value) {
   const set = data.activeWorkout?.exercises[exerciseIndex]?.sets[setIndex];
   if (!set) return;
-  set[field] = Number(value) || 0;
+  set[field] = field === "comfort" ? value : Number(value) || 0;
   data.activeWorkout.exercises[exerciseIndex].accepted = false;
   applyActiveWorkoutResult();
   save();
@@ -1207,6 +1232,11 @@ function expandExercise(exerciseIndex) {
 
 function exerciseSummary(exercise) {
   const doneSets = exercise.sets.filter((set) => set.done);
+  if (exercise.type === "cardio" || exercise.type === "mobility" || exercise.type === "safety") {
+    const minutes = doneSets.reduce((sum, set) => sum + (Number(set.minutes) || 0), 0);
+    const comfort = doneSets.some((set) => set.comfort === "hard") ? "дыхание было тяжелым" : "дыхание комфортно";
+    return doneSets.length ? `${minutes} мин · ${comfort}` : "пока не отмечено";
+  }
   const volume = doneSets.reduce((sum, set) => sum + (Number(set.weight) || 0) * (Number(set.reps) || 0), 0);
   const best = doneSets[0] ? `${doneSets[0].weight} кг x ${doneSets[0].reps}` : "нет отмеченных подходов";
   return `${doneSets.length}/${exercise.sets.length} подходов · ${best}${volume ? ` · всего кг за подходы ${volume}` : ""}`;
@@ -1338,6 +1368,9 @@ function activeSummary() {
     groups: groupsForExerciseName(exercise.name),
     doneSets: exercise.sets.filter((set) => set.done).length,
     totalSets: exercise.sets.length,
+    minutes: exercise.sets
+      .filter((set) => set.done)
+      .reduce((sum, set) => sum + (Number(set.minutes) || 0), 0),
     volume: exercise.sets
       .filter((set) => set.done)
       .reduce((sum, set) => sum + (Number(set.weight) || 0) * (Number(set.reps) || 0), 0),
@@ -1437,16 +1470,9 @@ function renderActiveWorkout(score) {
                   ${exercise.sets
                     .map(
                       (set, setIndex) => `
-                        <div class="set-row ${set.done ? "done" : ""}">
+                        <div class="set-row ${exercise.type !== "strength" ? "cardio-row" : ""} ${set.done ? "done" : ""}">
                           <button class="set-check" data-exercise="${exerciseIndex}" data-set="${setIndex}">${set.done ? "✓" : setIndex + 1}</button>
-                          <label>
-                            кг
-                            <input data-field="weight" data-exercise="${exerciseIndex}" data-set="${setIndex}" type="number" min="0" value="${set.weight}" />
-                          </label>
-                          <label>
-                            повт.
-                            <input data-field="reps" data-exercise="${exerciseIndex}" data-set="${setIndex}" type="number" min="0" value="${set.reps}" />
-                          </label>
+                          ${setFields(exercise, set, exerciseIndex, setIndex)}
                         </div>
                       `,
                     )
@@ -1459,6 +1485,34 @@ function renderActiveWorkout(score) {
       `,
     )
     .join("");
+}
+
+function setFields(exercise, set, exerciseIndex, setIndex) {
+  if (exercise.type === "strength") {
+    return `
+      <label>
+        кг
+        <input data-field="weight" data-exercise="${exerciseIndex}" data-set="${setIndex}" type="number" min="0" value="${set.weight}" />
+      </label>
+      <label>
+        повт.
+        <input data-field="reps" data-exercise="${exerciseIndex}" data-set="${setIndex}" type="number" min="0" value="${set.reps}" />
+      </label>
+    `;
+  }
+  return `
+    <label>
+      минуты
+      <input data-field="minutes" data-exercise="${exerciseIndex}" data-set="${setIndex}" type="number" min="0" value="${set.minutes || 0}" />
+    </label>
+    <label>
+      дыхание
+      <select data-field="comfort" data-exercise="${exerciseIndex}" data-set="${setIndex}">
+        <option value="normal" ${set.comfort !== "hard" ? "selected" : ""}>комфортно</option>
+        <option value="hard" ${set.comfort === "hard" ? "selected" : ""}>тяжело</option>
+      </select>
+    </label>
+  `;
 }
 
 function render() {
@@ -1569,12 +1623,9 @@ function renderMission(score) {
         <p>${exerciseTechnique(exercise.name).purpose}</p>
       </div>
       <div class="mission-set-card">
-        <span>Текущий подход</span>
-        <strong>${Math.min(doneSets + 1, exercise.sets.length)} / ${exercise.sets.length}</strong>
-        <div class="mission-inputs">
-          <label>кг<input id="missionWeight" type="number" min="0" value="${openSet?.weight ?? 0}" /></label>
-          <label>повт.<input id="missionReps" type="number" min="0" value="${openSet?.reps ?? 0}" /></label>
-        </div>
+        <span>${exercise.type === "strength" ? "Текущий подход" : "Текущий шаг"}</span>
+        <strong>${exercise.type === "strength" ? `${Math.min(doneSets + 1, exercise.sets.length)} / ${exercise.sets.length}` : "кардио / движение"}</strong>
+        ${missionInputs(exercise, openSet)}
       </div>
       <p class="mission-copy">${missionHint(exercise, doneSets)}</p>
       <button class="secondary mini-button" data-info="${index}" type="button">Техника</button>
@@ -1590,6 +1641,8 @@ function renderMission(score) {
 
   const weightInput = $("missionWeight");
   const repsInput = $("missionReps");
+  const minutesInput = $("missionMinutes");
+  const comfortInput = $("missionComfort");
   if (weightInput && repsInput && openSet) {
     weightInput.addEventListener("input", () => {
       openSet.weight = Number(weightInput.value) || 0;
@@ -1597,6 +1650,18 @@ function renderMission(score) {
     });
     repsInput.addEventListener("input", () => {
       openSet.reps = Number(repsInput.value) || 0;
+      save();
+    });
+  }
+  if (minutesInput && openSet) {
+    minutesInput.addEventListener("input", () => {
+      openSet.minutes = Number(minutesInput.value) || 0;
+      save();
+    });
+  }
+  if (comfortInput && openSet) {
+    comfortInput.addEventListener("input", () => {
+      openSet.comfort = comfortInput.value;
       save();
     });
   }
@@ -1614,8 +1679,29 @@ function renderMission(score) {
   });
 }
 
+function missionInputs(exercise, set) {
+  if (exercise.type === "strength") {
+    return `
+      <div class="mission-inputs">
+        <label>кг<input id="missionWeight" type="number" min="0" value="${set?.weight ?? 0}" /></label>
+        <label>повт.<input id="missionReps" type="number" min="0" value="${set?.reps ?? 0}" /></label>
+      </div>
+    `;
+  }
+  return `
+    <div class="mission-inputs">
+      <label>минуты<input id="missionMinutes" type="number" min="0" value="${set?.minutes ?? 0}" /></label>
+      <label>дыхание<select id="missionComfort">
+        <option value="normal" ${set?.comfort !== "hard" ? "selected" : ""}>комфортно</option>
+        <option value="hard" ${set?.comfort === "hard" ? "selected" : ""}>тяжело</option>
+      </select></label>
+    </div>
+  `;
+}
+
 function missionHint(exercise, doneSets) {
   if (exercise.accepted) return "Шаг закрыт. Можно идти дальше или развернуть упражнение в подробном списке ниже.";
+  if (exercise.type !== "strength") return "Отметь минуты и дыхание. Вес и повторы для кардио не нужны.";
   if (doneSets === 0) return "Запиши фактический вес и повторы после подхода. Это нужно для прогресса и следующей рекомендации.";
   return `Уже сохранено: ${doneSets}. Если техника ровная и без боли, продолжай по плану.`;
 }
