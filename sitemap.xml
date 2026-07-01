@@ -44,8 +44,32 @@
   </url>
   <url>
     <loc>https://kamtok.ru/stati.html</loc>
-    <lastmod>2026-06-29</lastmod>
+    <lastmod>2026-07-01</lastmod>
     <changefreq>weekly</changefreq>
+    <priority>0.75</priority>
+  </url>
+  <url>
+    <loc>https://kamtok.ru/voprosy-po-elektromontazhu.html</loc>
+    <lastmod>2026-07-01</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://kamtok.ru/stati/skolko-stoit-elektromontazh-kvartiry.html</loc>
+    <lastmod>2026-07-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+  </url>
+  <url>
+    <loc>https://kamtok.ru/stati/elektromontazh-kottedzha-pod-klyuch-chto-vhodit.html</loc>
+    <lastmod>2026-07-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+  </url>
+  <url>
+    <loc>https://kamtok.ru/stati/chto-nuzhno-dlya-rascheta-elektromontazha.html</loc>
+    <lastmod>2026-07-01</lastmod>
+    <changefreq>monthly</changefreq>
     <priority>0.75</priority>
   </url>
   <url>
