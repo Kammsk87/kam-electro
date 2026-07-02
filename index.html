@@ -178,6 +178,7 @@
           <div class="hero-actions" aria-label="Основные действия">
             <a class="button primary" href="#contact" data-goal="click_calculate_hero">Обсудить объект</a>
             <a class="button messenger" href="https://wa.me/79120507100" target="_blank" rel="noopener" data-goal="click_whatsapp_hero">WhatsApp</a>
+            <a class="button messenger" href="https://t.me/kam_ekb" target="_blank" rel="noopener" data-goal="click_telegram_hero">Telegram</a>
             <a class="button ghost" href="tel:+79120507100" data-goal="click_phone_hero">Позвонить</a>
           </div>
           <dl class="hero-stats" aria-label="Ключевые преимущества">
@@ -713,9 +714,20 @@
             <a href="https://max.ru/u/f9LHodD0cOLynfdRttKoIF_j0KKoL1yJP9YbU3gEaWBa7ZW_3o2vPkf8S3E" target="_blank" rel="noopener" data-goal="click_max_contact">MAX</a>
             <a href="mailto:kammsk87@gmail.com" data-goal="click_email_contact">kammsk87@gmail.com</a>
           </div>
+          <div class="lead-checklist" aria-label="Что желательно указать в заявке">
+            <strong>Чтобы быстрее получить расчет, напишите:</strong>
+            <ul>
+              <li>тип объекта: квартира, дом, коммерция или производство;</li>
+              <li>адрес или район в Екатеринбурге / Свердловской области;</li>
+              <li>есть ли проект, план, фото объекта или список нагрузок;</li>
+              <li>когда нужно начать работы и какой объем нужен под ключ.</li>
+            </ul>
+          </div>
         </div>
         <form class="lead-form" id="lead-form" name="lead" method="POST" data-netlify="true" netlify-honeypot="bot-field">
           <input type="hidden" name="form-name" value="lead">
+          <input type="hidden" name="page_url" value="">
+          <input type="hidden" name="page_title" value="">
           <p class="visually-hidden">
             <label>
               Не заполняйте это поле
@@ -746,6 +758,10 @@
             Коротко о задаче
             <textarea name="message" rows="5" placeholder="Например: коттедж 180 м2, нужен электромонтаж под ключ, есть план и фото объекта..."></textarea>
           </label>
+          <div class="form-help">
+            <strong>Можно отправить даже без проекта.</strong>
+            <span>Если данных не хватит, мы уточним, что нужно прислать для нормальной оценки.</span>
+          </div>
           <button class="button primary" type="submit">Отправить заявку</button>
           <p class="form-note" data-form-note>После отправки мы увидим заявку и свяжемся с вами в ближайшее время.</p>
         </form>
@@ -757,5 +773,11 @@
       <span>Электромонтаж под ключ и сборка электрощитов</span>
       <a href="#top">Наверх</a>
     </footer>
+
+    <div class="mobile-lead-bar" aria-label="Быстрая связь">
+      <a href="tel:+79120507100" data-goal="click_mobile_phone">Позвонить</a>
+      <a href="https://wa.me/79120507100" target="_blank" rel="noopener" data-goal="click_mobile_whatsapp">WhatsApp</a>
+      <a href="#contact" data-goal="click_mobile_request">Заявка</a>
+    </div>
   </body>
 </html>

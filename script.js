@@ -16,6 +16,22 @@ function updateHeader() {
   }
 }
 
+function ensureMobileLeadBar() {
+  if (document.querySelector(".mobile-lead-bar")) {
+    return;
+  }
+
+  const bar = document.createElement("div");
+  bar.className = "mobile-lead-bar";
+  bar.setAttribute("aria-label", "Быстрая связь");
+  bar.innerHTML = `
+    <a href="tel:+79120507100" data-goal="click_mobile_phone">Позвонить</a>
+    <a href="https://wa.me/79120507100" target="_blank" rel="noopener" data-goal="click_mobile_whatsapp">WhatsApp</a>
+    <a href="/#contact" data-goal="click_mobile_request">Заявка</a>
+  `;
+  document.body.append(bar);
+}
+
 function showSubmissionSuccess() {
   reachGoal("lead_form_submit");
   form.reset();
@@ -86,6 +102,7 @@ function submitLeadForm(data) {
 
 window.addEventListener("scroll", updateHeader, { passive: true });
 updateHeader();
+ensureMobileLeadBar();
 
 document.querySelectorAll("[data-goal]").forEach((element) => {
   element.addEventListener("click", () => {
@@ -99,6 +116,8 @@ if (form) {
 
     const data = new FormData(form);
     data.set("form-name", form.getAttribute("name"));
+    data.set("page_url", window.location.href);
+    data.set("page_title", document.title);
 
     if (note) {
       note.classList.remove("success", "error");
