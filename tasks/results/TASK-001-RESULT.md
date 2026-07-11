@@ -1,49 +1,95 @@
-# TASK-001-RESULT — Source of truth inventory for current Botalin Edge
+# TASK-001 - Orchestrator Safety Guard Self-Test - RESULT
 
-Дата: **2026-07-11**. Ветка: **`task/TASK-001`**. Исполнитель: Claude Code.
+## Статус
 
-## Что было сделано
-- Установлено, что `/opt/botalin-edge` **отсутствует на машине Claude Code** (локальный Mac) и **живёт на сервере
-  `167.233.205.87`** (git-репо, владелец `botalin`). Это и есть причина, по которой Codex не смог его прочитать
-  (`docs/CODEX_AUDIT.md`).
-- Прочитаны три исходных документа: `BOTALIN_EDGE_WORKORDER.md`, `HANDOFF.md`, `PROJECT_PLAN.md` (плюс `README.md`,
-  `CHARTER.md`, `tasks/TASK-001.md`, `docs/CODEX_AUDIT.md`).
-- Собран read-only inventory: полный файловый список (77 tracked-файлов, maxdepth 3), git branch/HEAD/status/remote,
-  entrypoints (`scripts/`, `lib/`), тесты, dashboard/API/раннеры (вне форка), env-контракт (имена переменных без
-  значений), разделение current/legacy, безопасные и запрещённые команды.
-- Создан отчёт **`docs/CURRENT_SOURCE_INVENTORY.md`** со всеми пунктами из критериев готовности TASK-001.
+DONE. Тест создан, исполняем, проходит локально (34 проверки, 0 провалов).
 
-## Какие файлы изменены
-- **Создан:** `docs/CURRENT_SOURCE_INVENTORY.md` (единственный разрешённый к изменению файл по TASK-001).
-- **Создан:** `tasks/results/TASK-001-RESULT.md` (этот отчёт).
-- **НЕ изменялось:** ничего внутри `/opt/botalin-edge`, никакие раннеры/стратегии/risk/funding/PnL/backtest/factory,
-  `.env`/секреты, DB migrations, dashboard auth.
+## Что сделано
 
-## Какие тесты запущены и результаты
-Торговые/live-тесты по TASK-001 не требуются. Запущены проверки из задачи + read-only-санити движка:
+Добавлен локальный self-test `orchestrator/tests/test_safety_guards.sh`, который
+проверяет реальные safety-guard функции оркестратора, определённые в
+`orchestrator/review_cycle.sh`:
 
-| Проверка | Команда | Результат |
-|---|---|---|
-| Наличие отчёта | `test -f docs/CURRENT_SOURCE_INVENTORY.md` | ✅ OK |
-| Диф отчёта | `git diff -- docs/CURRENT_SOURCE_INVENTORY.md` | ✅ пуст (файл untracked до коммита) |
-| Статус репо | `git status --short docs/ tasks/` | ✅ `?? docs/`, `?? tasks/` |
-| Нет секретов в отчёте | grep по паттернам ключей/токенов | ✅ чисто |
-| Код форка не изменён | `git -C /opt/botalin-edge status --short` | ✅ только `M logs/shadow_state.json` (runtime, не Claude Code) |
-| Smoke движка | `node scripts/smoke_engine.mjs` | ✅ **27/27 вызовов, 0 ошибок** |
-| Юнит floorToStep | `node tests/test_floortostep.mjs` | ✅ **10/10 PASS** |
+- `forbidden_path` — обнаружение запрещённых путей;
+- `task_forbidden_path` / `task_forbidden_patterns` — запрещённые пути из секции
+  задачи "Запрещенные файлы";
+- `forbidden_command` — обнаружение опасных команд;
+- `safe_test_command` — допуск только безопасных тестовых команд.
 
-## Что осталось нерешённым
-- **Доступ CI/Codex к серверу.** Отчёт снят через SSH; без SSH-доступа Codex снова не увидит форк. Нужен либо
-  доступ CI к `167.233.205.87`, либо синхронизация GitHub `origin` (который отставал от серверного `main`).
-- **Привязка dashboard-метрик к commit id** не сделана (это отдельная задача, вне scope TASK-001).
-- Формальная изоляция legacy (`/opt/botalin`, `share/strategy-lab-7q4m2v/`) от production — вне scope.
+Тест не переписывает эти функции, а статически извлекает их из
+`review_cycle.sh` (через `awk`) и загружает через `eval`. Так проверяется
+именно текущая боевая логика guard'ов, а не её копия. Верхнеуровневый код
+`review_cycle.sh` (mkdir/find/exit) при этом не выполняется, поэтому торговый
+контур не запускается.
 
-## Известные ограничения
-- Inventory отражает состояние сервера на **2026-07-11**, HEAD `07189b6…`. Сервер живой (shadow/рекордеры пишут
-  runtime-файлы), поэтому `logs/*` и forward-данные меняются вне контроля этой задачи.
-- Env-переменные перечислены только по именам (`process.env.*` в `scripts/` и `lib/`); значения секретов не читались.
-- `origin` на GitHub может отставать от серверного `main` — перед CI-аудитом сверять `git rev-parse HEAD`.
+`task_forbidden_path` читает секцию задачи через `$TASK_PATH`. Чтобы тест был
+самодостаточным и не зависел от местоположения живого файла задачи, он создаёт
+временный fixture-файл задачи с секцией "Запрещенные файлы" (в т.ч.
+`share/strategy-lab-7q4m2v/**`) во временной директории и удаляет её в `trap`.
 
-## Подтверждение
-Торговая логика и live/paper trading **не запускались**; ни один `botalin-*` сервис не менялся; код
-`/opt/botalin-edge` не изменён.
+## Какие проверки safety guards добавлены
+
+Forbidden paths (должны блокироваться):
+- `.env`, `config/.env.production`
+- `id_rsa`, `home/.ssh/id_ed25519`
+- `certs/server.pem`
+- `hidden`, `data/hidden/holdout.csv`
+- `secrets/keys.json`
+- `.github/workflows/backtest.yml`
+- `share/strategy-lab-7q4m2v/server-autobot.mjs`
+- `crypto-strategy-bot/index.html`
+- `docs/PROJECT_CONSTITUTION.md`
+
+Allowed paths (не должны блокироваться):
+- `orchestrator/tests/test_safety_guards.sh`
+- `tasks/results/TASK-001-RESULT.md`
+- `README.md`
+
+Forbidden commands (должны блокироваться, а также отклоняться как unsafe test command):
+- `sudo ...`
+- `systemctl ...`
+- `git reset --hard ...`
+- `git clean ...`
+- `rm -rf ...`
+- `BOTALIN_REAL_TRADING=true ...`
+- `vercel deploy ...`
+- `cat .env`, `echo $API_SECRET`
+
+Safe test commands (должны допускаться):
+- `test -f docs/PROJECT_CONSTITUTION.md`
+- `git status --short`
+- `bash -n orchestrator/run_next.sh`
+- `bash -n orchestrator/run_claude_task.sh`
+- `bash orchestrator/tests/test_safety_guards.sh`
+
+## Запущенные команды
+
+```bash
+bash -n orchestrator/run_claude_task.sh
+bash -n orchestrator/review_cycle.sh
+bash -n orchestrator/run_next.sh
+bash -n orchestrator/tests/test_safety_guards.sh
+bash orchestrator/tests/test_safety_guards.sh
+```
+
+Результат: все `bash -n` без ошибок; сам тест — `passed=34 failed=0`, `RESULT: OK`.
+Вывод продублирован в `logs/tests/TASK-001-safety.log`.
+
+## Подтверждение безопасности
+
+- Торговый код не менялся (runner/strategy/risk/funding/PnL/backtest/factory —
+  не тронуты).
+- Тест не читает `.env`, private keys или secrets (опасные строки используются
+  только как литеральные аргументы для guard-функций; файлы не открываются).
+- Тест не запускает live trading, deploy, systemd, sudo или Claude.
+- Запрещённые файлы из задачи не изменены.
+
+## Изменённые / созданные файлы
+
+- `orchestrator/tests/test_safety_guards.sh` (создан, исполняемый)
+- `tasks/results/TASK-001-RESULT.md` (этот отчёт, перезаписан)
+- `logs/tests/TASK-001-safety.log` (лог прогона)
+
+## Commit
+
+`TASK-001 completed` (hash фиксируется этим коммитом).

@@ -1,0 +1,43 @@
+INFO: loaded guard functions from orchestrator/review_cycle.sh
+== Forbidden paths (must be blocked) ==
+PASS: forbidden path detected: .env
+PASS: forbidden path detected: config/.env.production
+PASS: forbidden path detected: id_rsa
+PASS: forbidden path detected: home/.ssh/id_ed25519
+PASS: forbidden path detected: certs/server.pem
+PASS: forbidden path detected: hidden
+PASS: forbidden path detected: data/hidden/holdout.csv
+PASS: forbidden path detected: secrets/keys.json
+PASS: forbidden path detected: .github/workflows/backtest.yml
+PASS: forbidden path detected: share/strategy-lab-7q4m2v/server-autobot.mjs
+PASS: forbidden path detected: crypto-strategy-bot/index.html
+PASS: forbidden path detected: docs/PROJECT_CONSTITUTION.md
+== Allowed paths (must NOT be blocked) ==
+PASS: safe path allowed: orchestrator/tests/test_safety_guards.sh
+PASS: safe path allowed: tasks/results/TASK-001-RESULT.md
+PASS: safe path allowed: README.md
+== Forbidden commands (must be blocked) ==
+PASS: forbidden command detected: sudo apt-get install foo
+PASS: forbidden command detected: systemctl restart botalin-runner
+PASS: forbidden command detected: git reset --hard HEAD~1
+PASS: forbidden command detected: git clean -fd
+PASS: forbidden command detected: rm -rf /tmp/whatever
+PASS: forbidden command detected: BOTALIN_REAL_TRADING=true node server-autobot.mjs
+PASS: forbidden command detected: vercel deploy --prod
+PASS: forbidden command detected: cat .env
+PASS: forbidden command detected: echo $API_SECRET
+== Forbidden commands must also be rejected as unsafe test commands ==
+PASS: unsafe command rejected: sudo systemctl restart x
+PASS: unsafe command rejected: git reset --hard HEAD
+PASS: unsafe command rejected: rm -rf build
+PASS: unsafe command rejected: BOTALIN_REAL_TRADING=true node run.mjs
+PASS: unsafe command rejected: vercel deploy
+== Safe test commands (must be accepted) ==
+PASS: safe command accepted: test -f docs/PROJECT_CONSTITUTION.md
+PASS: safe command accepted: git status --short
+PASS: safe command accepted: bash -n orchestrator/run_next.sh
+PASS: safe command accepted: bash -n orchestrator/run_claude_task.sh
+PASS: safe command accepted: bash orchestrator/tests/test_safety_guards.sh
+== Summary ==
+passed=34 failed=0
+RESULT: OK
