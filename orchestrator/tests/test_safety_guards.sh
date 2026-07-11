@@ -151,6 +151,42 @@ assert_safe_command "bash -n orchestrator/run_next.sh"
 assert_safe_command "bash -n orchestrator/run_claude_task.sh"
 assert_safe_command "bash orchestrator/tests/test_safety_guards.sh"
 
+# --- TASK-002: orchestrator preflight contract (static checks) -------------
+# These checks confirm run_claude_task.sh only ever launches the sanctioned
+# standalone Claude CLI in safe mode with the safe settings file, and never
+# uses a VS Code extension binary or --dangerously-skip-permissions.
+# They inspect the script text statically and never launch Claude.
+RUN_SCRIPT="orchestrator/run_claude_task.sh"
+
+assert_script_contains() {
+  local needle="$1" desc="$2"
+  if grep -qF -- "$needle" "$RUN_SCRIPT"; then
+    pass "$desc"
+  else
+    fail "$desc (missing: $needle)"
+  fi
+}
+assert_script_absent() {
+  local needle="$1" desc="$2"
+  if grep -qF -- "$needle" "$RUN_SCRIPT"; then
+    fail "$desc (unexpectedly present: $needle)"
+  else
+    pass "$desc"
+  fi
+}
+
+record "== Orchestrator preflight (run_claude_task.sh) =="
+if [[ -f "$RUN_SCRIPT" ]]; then
+  assert_script_contains "/Users/aleksandr/.local/bin/claude" "standalone CLI path present"
+  assert_script_contains "--safe-mode" "safe-mode flag present in launch"
+  assert_script_contains ".claude/settings.orchestrator-safe-proposed.json" "safe settings path present"
+  assert_script_contains "--settings" "--settings flag present in launch"
+  assert_script_contains ".vscode/extensions" "VS Code extension source is explicitly guarded"
+  assert_script_absent "--dangerously-skip-permissions" "--dangerously-skip-permissions absent"
+else
+  fail "run script not found: $RUN_SCRIPT"
+fi
+
 record "== Summary =="
 record "passed=$PASS failed=$FAIL"
 
