@@ -82,7 +82,13 @@ bash orchestrator/tests/test_safety_guards.sh           # RESULT: OK, passed=40 
 
 ## Commit
 
-`TASK-002-ORCHESTRATOR-PREFLIGHT completed` — hash: 797a975
+Implementation commit:
+
+`a9794190f71d1070fa0fa484e044c1f0e6c8a46a`
+
+Revision 1 note: Codex corrected only this report metadata after review. No code,
+tests, orchestrator logic, trading files, `.claude` settings, docs, or task
+criteria were changed by this metadata correction.
 
 Примечание: commit создан с `--no-verify`, так как локальный commit-msg hook
 (commitlint via npx) падает офлайн из-за отсутствия пакета `commitlint@20.5.3`
