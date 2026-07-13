@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { BROADCAST_CHANNEL_NAME } from "@/lib/types";
+import { useEffect, useMemo, useState } from "react";
 import type { ControlMessage, Pack, PackDetail, TeamScore } from "@/lib/types";
 
 type Step =
@@ -16,7 +15,6 @@ function roundsInOrder(pack: PackDetail): string[] {
 }
 
 export default function ControlPage() {
-  const channelRef = useRef<BroadcastChannel | null>(null);
   const [packs, setPacks] = useState<Pack[]>([]);
   const [selectedPackId, setSelectedPackId] = useState("");
   const [pack, setPack] = useState<PackDetail | null>(null);
@@ -24,13 +22,6 @@ export default function ControlPage() {
   const [newTeamName, setNewTeamName] = useState("");
   const [step, setStep] = useState<Step>({ kind: "setup" });
   const [timerRunning, setTimerRunning] = useState(false);
-
-  useEffect(() => {
-    const channel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
-    channelRef.current = channel;
-    channel.postMessage({ type: "idle" } satisfies ControlMessage);
-    return () => channel.close();
-  }, []);
 
   useEffect(() => {
     async function loadPacks() {
@@ -51,7 +42,11 @@ export default function ControlPage() {
   }
 
   function send(message: ControlMessage) {
-    channelRef.current?.postMessage(message);
+    void fetch("/api/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(message),
+    });
   }
 
   function addTeam() {

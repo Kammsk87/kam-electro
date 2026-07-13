@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { BROADCAST_CHANNEL_NAME } from "@/lib/types";
 import type { ControlMessage } from "@/lib/types";
 
 const TYPE_LABEL: Record<string, string> = {
@@ -46,9 +45,9 @@ export default function PresenterPage() {
   >(null);
 
   useEffect(() => {
-    const channel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
-    channel.onmessage = (event: MessageEvent<ControlMessage>) => {
-      const message = event.data;
+    const es = new EventSource("/api/events");
+    es.onmessage = (event: MessageEvent<string>) => {
+      const message = JSON.parse(event.data) as ControlMessage;
       if (message.type === "timer-start") {
         setTimer({
           startedAt: message.startedAt,
@@ -66,7 +65,7 @@ export default function PresenterPage() {
       setScreen(message);
       setScreenKey((key) => key + 1);
     };
-    return () => channel.close();
+    return () => es.close();
   }, []);
 
   return (
