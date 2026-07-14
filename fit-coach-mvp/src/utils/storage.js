@@ -3,7 +3,19 @@ const WORKOUTS_KEY = "fitcoach_workouts";
 const CHECKINS_KEY = "fitcoach_checkins";
 
 export function loadProfile() {
-  return read(PROFILE_KEY, null);
+  const profile = read(PROFILE_KEY, null);
+  if (!profile || typeof profile !== "object" || Array.isArray(profile)) return null;
+  if (!profile.name || !profile.level || !profile.goal || !profile.availableTime) return null;
+  return {
+    name: String(profile.name),
+    level: ["beginner", "intermediate", "advanced"].includes(profile.level) ? profile.level : "beginner",
+    goal: ["strength", "weight_loss", "health"].includes(profile.goal) ? profile.goal : "health",
+    availableTime: [30, 45, 60].includes(Number(profile.availableTime)) ? Number(profile.availableTime) : 45,
+    restTimerDefault: [60, 90, 120].includes(Number(profile.restTimerDefault)) ? Number(profile.restTimerDefault) : 90,
+    vibrationEnabled: profile.vibrationEnabled !== false,
+    cyclePhase: ["follicular", "ovulation", "luteal", "menstrual"].includes(profile.cyclePhase) ? profile.cyclePhase : null,
+    createdAt: profile.createdAt || new Date().toISOString(),
+  };
 }
 
 export function saveProfile(profile) {
@@ -11,7 +23,8 @@ export function saveProfile(profile) {
 }
 
 export function loadWorkouts() {
-  return read(WORKOUTS_KEY, []);
+  const workouts = read(WORKOUTS_KEY, []);
+  return Array.isArray(workouts) ? workouts.filter((workout) => workout && typeof workout === "object") : [];
 }
 
 export function saveWorkouts(workouts) {
@@ -19,7 +32,8 @@ export function saveWorkouts(workouts) {
 }
 
 export function loadCheckins() {
-  return read(CHECKINS_KEY, []);
+  const checkins = read(CHECKINS_KEY, []);
+  return Array.isArray(checkins) ? checkins.filter((checkin) => checkin && typeof checkin === "object" && checkin.date) : [];
 }
 
 export function saveCheckins(checkins) {
