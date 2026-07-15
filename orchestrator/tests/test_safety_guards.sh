@@ -187,6 +187,59 @@ else
   fail "run script not found: $RUN_SCRIPT"
 fi
 
+# --- TASK-003: strict ACCEPT preflight (static checks) ---------------------
+# Confirm review_cycle.sh cannot auto-promote a task to tasks/accepted unless
+# the acceptance evidence is complete: guard result honoured, result report
+# present and citing the current HEAD, and no new uncommitted leftovers.
+# These checks inspect the script text statically; they never run `accept`,
+# never move a task, and never launch Claude.
+assert_review_contains() {
+  local needle="$1" desc="$2"
+  if grep -qF -- "$needle" "$REVIEW_CYCLE"; then
+    pass "$desc"
+  else
+    fail "$desc (missing: $needle)"
+  fi
+}
+assert_review_absent() {
+  local needle="$1" desc="$2"
+  if grep -qF -- "$needle" "$REVIEW_CYCLE"; then
+    fail "$desc (unexpectedly present: $needle)"
+  else
+    pass "$desc"
+  fi
+}
+assert_review_regex() {
+  local pattern="$1" desc="$2"
+  if grep -qE -- "$pattern" "$REVIEW_CYCLE"; then
+    pass "$desc"
+  else
+    fail "$desc (pattern not found: $pattern)"
+  fi
+}
+
+record "== Acceptance preflight (review_cycle.sh) =="
+if [[ -f "$REVIEW_CYCLE" ]]; then
+  assert_review_contains "acceptance_gate" "acceptance_gate guard function present"
+  assert_review_contains "ACCEPT_BLOCKED" "accept emits explicit ACCEPT_BLOCKED markers"
+  # accept must be a real gate, not the old bare `prepare_review && mv`.
+  assert_review_absent "prepare_review && mv" "accept is not a bare prepare_review && mv"
+  assert_review_regex 'if[[:space:]]+acceptance_gate' "accept gates the mv on acceptance_gate"
+  # Result report existence + HEAD hash freshness logic.
+  assert_review_contains "result report missing" "missing result report blocks ACCEPT"
+  assert_review_contains 'rev-parse HEAD' "current HEAD full hash is resolved"
+  assert_review_contains 'rev-parse --short HEAD' "current HEAD short hash is resolved"
+  assert_review_contains "missing HEAD hash" "stale/wrong commit hash blocks ACCEPT"
+  # New uncommitted leftovers detection with logs exclusion.
+  assert_review_contains "leftovers" "new uncommitted leftovers block ACCEPT"
+  assert_review_contains "baseline-dirty-paths" "leftover check compares against task baseline"
+  assert_review_regex 'logs/\(codex\|tests\)' "review/test logs excluded from leftover check"
+  # Guard result persisted by prepare_review so accept can honour it.
+  assert_review_contains "guard-state" "prepare_review persists guard result for accept"
+else
+  fail "review_cycle.sh not found: $REVIEW_CYCLE"
+fi
+
 record "== Summary =="
 record "passed=$PASS failed=$FAIL"
 
