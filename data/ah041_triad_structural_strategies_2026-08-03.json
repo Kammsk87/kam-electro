@@ -1,0 +1,211 @@
+{
+  "task": "TASK-AH-041",
+  "label": "DISCOVERY_NOT_PROOF",
+  "protocol": "reference/AH041_TRIAD_STRUCTURAL_STRATEGIES_PROTOCOL_2026-08-03.md",
+  "pnl_pooling": "NEVER — each member carries its own independent verdict and its own statistics.",
+  "promising_count": 0,
+  "frozen": {
+    "task": "TASK-AH-041",
+    "protocol_date": "2026-08-03",
+    "cost_bps_gross_roundtrip": 11,
+    "double_cost_bps_gross_roundtrip": 22,
+    "lookback_days": 7,
+    "neighbour_lookback_days": [
+      6,
+      8
+    ],
+    "quintile": 0.2,
+    "hold_hours": 24,
+    "min_history_days": 30,
+    "max_single_day_move": 0.25,
+    "splits": {
+      "train": 0.55,
+      "validation": 0.2,
+      "holdout": 0.15,
+      "forward": 0.1
+    },
+    "purge_days": 2,
+    "embargo_days": 7,
+    "null_samples": 1000,
+    "null_seed": 8041,
+    "alpha": 0.05,
+    "max_symbol_share": 0.25,
+    "min_oos_observations": 100,
+    "min_oos_days": 10,
+    "min_combined_days": 30,
+    "min_symbols_per_side": 3
+  },
+  "blocked_families": [
+    "FAILED_BREAKOUT",
+    "RAW_MOMENTUM",
+    "TREND_CONTINUATION",
+    "WALLET_FOLLOW",
+    "PAIRS_RELATIVE_VALUE",
+    "HMM_REGIME"
+  ],
+  "members": [
+    {
+      "member": "CS_RELATIVE_STRENGTH_24H",
+      "verdict": "DATA_INADEQUATE",
+      "executable": false,
+      "missing_inputs": [
+        {
+          "dataset": "universe",
+          "reason": "DATASET_NOT_SUPPLIED",
+          "required_fields": [
+            "universe_id",
+            "frozen_at",
+            "symbols"
+          ],
+          "missing_fields": [
+            "universe_id",
+            "frozen_at",
+            "symbols"
+          ]
+        },
+        {
+          "dataset": "daily_bars",
+          "reason": "DATASET_NOT_SUPPLIED",
+          "required_fields": [
+            "ts",
+            "o",
+            "c"
+          ],
+          "missing_fields": [
+            "ts",
+            "o",
+            "c"
+          ]
+        }
+      ],
+      "required_inputs": {
+        "universe": [
+          "universe_id",
+          "frozen_at",
+          "symbols"
+        ],
+        "daily_bars": [
+          "ts",
+          "o",
+          "c"
+        ]
+      },
+      "substitution_refused": true,
+      "note": "The frozen AH-005A liquid universe and its daily bars are required. No candle series was substituted for the missing inputs."
+    },
+    {
+      "member": "FUNDING_PERSISTENCE_CARRY",
+      "verdict": "DATA_INADEQUATE",
+      "executable": false,
+      "missing_inputs": [
+        {
+          "dataset": "carry",
+          "reason": "DATASET_NOT_SUPPLIED",
+          "required_fields": [
+            "ts",
+            "spot_price",
+            "perp_price",
+            "funding_rate",
+            "funding_publish_ts",
+            "borrow_rate",
+            "basis",
+            "spot_bid",
+            "spot_ask",
+            "perp_bid",
+            "perp_ask"
+          ],
+          "missing_fields": [
+            "ts",
+            "spot_price",
+            "perp_price",
+            "funding_rate",
+            "funding_publish_ts",
+            "borrow_rate",
+            "basis",
+            "spot_bid",
+            "spot_ask",
+            "perp_bid",
+            "perp_ask"
+          ]
+        }
+      ],
+      "required_inputs": {
+        "carry": [
+          "ts",
+          "spot_price",
+          "perp_price",
+          "funding_rate",
+          "funding_publish_ts",
+          "borrow_rate",
+          "basis",
+          "spot_bid",
+          "spot_ask",
+          "perp_bid",
+          "perp_ask"
+        ]
+      },
+      "substitution_refused": true,
+      "note": "Causal synchronized spot, perpetual, funding publication time, borrow, basis and two-leg execution data are all required. Funding and borrow cannot be derived from candles, and no proxy was used."
+    },
+    {
+      "member": "NEWS_FORCED_FLOW_REACTION",
+      "verdict": "DATA_INADEQUATE",
+      "executable": false,
+      "missing_inputs": [
+        {
+          "dataset": "news",
+          "reason": "DATASET_NOT_SUPPLIED",
+          "required_fields": [
+            "first_seen_ts",
+            "event_label",
+            "symbol"
+          ],
+          "missing_fields": [
+            "first_seen_ts",
+            "event_label",
+            "symbol"
+          ]
+        },
+        {
+          "dataset": "news_prices",
+          "reason": "DATASET_NOT_SUPPLIED",
+          "required_fields": [
+            "ts",
+            "symbol",
+            "price",
+            "bid",
+            "ask"
+          ],
+          "missing_fields": [
+            "ts",
+            "symbol",
+            "price",
+            "bid",
+            "ask"
+          ]
+        }
+      ],
+      "required_inputs": {
+        "news": [
+          "first_seen_ts",
+          "event_label",
+          "symbol"
+        ],
+        "news_prices": [
+          "ts",
+          "symbol",
+          "price",
+          "bid",
+          "ask"
+        ]
+      },
+      "substitution_refused": true,
+      "note": "Causal first_seen news time, event label, aligned price and execution data are all required. A price move is not a news event: no candle-derived pseudo-label was substituted."
+    }
+  ],
+  "verdicts": {
+    "CS_RELATIVE_STRENGTH_24H": "DATA_INADEQUATE",
+    "FUNDING_PERSISTENCE_CARRY": "DATA_INADEQUATE",
+    "NEWS_FORCED_FLOW_REACTION": "DATA_INADEQUATE"
+  }
+}
