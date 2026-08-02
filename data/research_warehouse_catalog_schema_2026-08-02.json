@@ -1,0 +1,297 @@
+{
+  "schema_id": "botalin.research_warehouse.catalog",
+  "schema_version": "2026-08-02",
+  "task_id": "TASK-021-BOTALIN-RESEARCH-WAREHOUSE-FOUNDATION-V0",
+  "status": "read_only_foundation_v0",
+  "description": "Versioned record schemas for the Botalin research warehouse catalogue. This file defines structure only. It confers no evidence, no promotion, and no authorization to read, move, or write any runtime data.",
+  "time_namespaces": {
+    "decision_time": {
+      "prefix": "dt.",
+      "meaning": "Known and legitimately readable at decision time t (ingest_ts <= t)."
+    },
+    "execution_time": {
+      "prefix": "ex.",
+      "meaning": "Known only at or after order placement/fill. Never readable by a detector."
+    },
+    "outcome_time": {
+      "prefix": "oc.",
+      "meaning": "Known only after the position resolves. Never readable by a detector, guard, or rule."
+    }
+  },
+  "enums": {
+    "evidence_type": [
+      "BARS",
+      "ORDERBOOK",
+      "TICKS",
+      "TRADES",
+      "LIQUIDATION",
+      "OPEN_INTEREST",
+      "FUNDING",
+      "NEWS",
+      "WALLET_FLOW",
+      "MANUAL_TRADE",
+      "EVENT_LOG",
+      "DECISION_TRACE",
+      "RESULT_ARTIFACT",
+      "REFERENCE_DOC"
+    ],
+    "host_scope": ["SERVER_RESIDENT", "REPO_RESIDENT", "EXTERNAL_VENUE", "SYNTHETIC"],
+    "path_kind": ["FILE", "DIRECTORY", "GLOB", "DB_FILE", "SERVICE_STREAM", "NOT_APPLICABLE"],
+    "write_ownership": [
+      "SERVER_COLLECTOR",
+      "SERVER_RUNNER",
+      "SERVER_ANALYSIS",
+      "OPERATOR_MANUAL",
+      "EXTERNAL_VENUE",
+      "WAREHOUSE_SYNTHETIC",
+      "UNKNOWN"
+    ],
+    "read_only_status": ["READ_ONLY", "APPEND_ONLY_BY_OWNER", "MUTABLE_RUNTIME", "UNKNOWN"],
+    "verification_status": ["VERIFIED_READ_ONLY", "DOCUMENTED_UNVERIFIED", "MISSING", "UNKNOWN"],
+    "evidence_grade": [
+      "RAW_PRIMARY",
+      "DERIVED_PRIMARY",
+      "SECONDARY_DOC",
+      "SECONDARY_CHAT",
+      "SYNTHETIC_FIXTURE"
+    ],
+    "lifecycle_state": [
+      "DATA_HEALTH",
+      "DISCOVERY",
+      "CANDIDATE_PASSPORT",
+      "IDEAL_FILL_AND_OOS",
+      "EXECUTION_REPLAY",
+      "QUARANTINED_PAPER_OBSERVER",
+      "MICRO_LIVE_MECHANICS",
+      "FORWARD_RETENTION",
+      "ROUTER_ADMISSION",
+      "PORTFOLIO_FORWARD",
+      "CLOSED"
+    ],
+    "segment": [
+      "CALIBRATION",
+      "TRAIN",
+      "VALIDATION",
+      "HOLDOUT",
+      "FORWARD",
+      "PAPER",
+      "MICRO_LIVE",
+      "REPLAY",
+      "UNSPECIFIED"
+    ],
+    "axis_L": ["L0", "L1", "L2", "L3"],
+    "axis_X": ["X0", "X1", "X2", "X3"],
+    "gate_status": ["PASS", "FAIL", "NOT_RUN"],
+    "verdict": [
+      "INSUFFICIENT_DATA",
+      "DATA_REQUEST",
+      "HYPOTHESIS_ONLY",
+      "NEEDS_MORE_LOGGING",
+      "GUARD_ONLY",
+      "DUPLICATE_OR_OVERLAP",
+      "QUARANTINED",
+      "REJECTED_FAMILY",
+      "ADMITTED_RESEARCH_ONLY"
+    ],
+    "overlap_status": [
+      "NOT_MEASURED",
+      "DISTINCT_UNPROVEN",
+      "DISTINCT_MEASURED",
+      "OVERLAPPING",
+      "DUPLICATE"
+    ],
+    "closure_status": [
+      "OPEN",
+      "BLOCKED_ON_DATA",
+      "QUARANTINED",
+      "CLOSED_DUPLICATE",
+      "CLOSED_REJECTED"
+    ],
+    "failure_route": [
+      "STRUCTURAL_VARIANT",
+      "DATA_REQUEST",
+      "GUARD_ONLY",
+      "QUARANTINE",
+      "REJECTED_FAMILY"
+    ],
+    "lesson_relation": ["CREATED_BY", "APPLIED_BY"],
+    "lineage_edge_kind": [
+      "CREATED_LESSON",
+      "APPLIED_LESSON",
+      "STRUCTURAL_VARIANT_OF",
+      "DUPLICATE_OF",
+      "DATA_REQUEST_FOR",
+      "GUARD_DERIVED_FROM",
+      "SUPERSEDED_BY"
+    ]
+  },
+  "invariants": {
+    "INV-01_NAMESPACE_PREFIX": "Every decision_time_fields entry starts with 'dt.', execution_time_fields with 'ex.', outcome_time_fields with 'oc.'.",
+    "INV-02_NAMESPACE_DISJOINT": "The three time-namespace lists of an experiment are pairwise disjoint, and no 'ex.' or 'oc.' field appears in frozen_rule.decision_inputs.",
+    "INV-03_REJECTED_FAMILY_LINKAGE": "A STRUCTURAL_VARIANT_OF edge whose parent is closed rejected or quarantined is permitted only when structural_difference, new_task_id and new_model_identity are all present and non-empty.",
+    "INV-04_PROVENANCE_PRESERVED": "Every experiment references at least one existing data_source_id; every result references an existing experiment_id; retained_path and evidence_paths are copied verbatim and never rewritten by the builder.",
+    "INV-05_SECONDARY_EVIDENCE_DOWNGRADE": "A SECONDARY_DOC or SECONDARY_CHAT source describing an evidence_type for which a RAW_PRIMARY source exists must name that source in superseded_by_raw_source_id.",
+    "INV-06_NO_PROMOTION": "verdict ADMITTED_RESEARCH_ONLY requires every declared gate PASS and a non-empty validator_id; the catalogue always reports promising_count = 0.",
+    "INV-07_EXPLICIT_ROOTS_ONLY": "The builder reads only from roots supplied explicitly on the command line, or the committed synthetic fixture in smoke mode. Home, repository root and filesystem root are refused.",
+    "INV-08_SMOKE_NON_MUTATION": "Smoke mode performs no filesystem write of any kind. Output requires an explicit --out path."
+  },
+  "record_types": {
+    "data_source": {
+      "key": "source_id",
+      "collection": "data_sources",
+      "layer": "immutable_data_lake",
+      "fields": {
+        "record_type": { "type": "const", "const": "data_source" },
+        "source_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
+        "title": { "type": "string", "min_length": 3 },
+        "evidence_type": { "type": "enum", "enum": "evidence_type" },
+        "owner_system": { "type": "string", "min_length": 2 },
+        "host_scope": { "type": "enum", "enum": "host_scope" },
+        "retained_path": { "type": "path_reference" },
+        "path_kind": { "type": "enum", "enum": "path_kind" },
+        "run_id": { "type": "string", "nullable": true },
+        "time_span_start": { "type": "iso_datetime", "nullable": true },
+        "time_span_end": { "type": "iso_datetime", "nullable": true },
+        "symbols": { "type": "string_array" },
+        "timeframes": { "type": "string_array" },
+        "schema_fingerprint": { "type": "string", "min_length": 1 },
+        "write_ownership": { "type": "enum", "enum": "write_ownership" },
+        "read_only_status": { "type": "enum", "enum": "read_only_status" },
+        "verification_status": { "type": "enum", "enum": "verification_status" },
+        "evidence_grade": { "type": "enum", "enum": "evidence_grade" },
+        "fixture_flag": { "type": "boolean" },
+        "superseded_by_raw_source_id": { "type": "string", "nullable": true, "optional": true },
+        "known_gaps": { "type": "string_array", "optional": true },
+        "source_of_record": { "type": "string", "min_length": 3 },
+        "notes": { "type": "string", "optional": true }
+      }
+    },
+    "experiment": {
+      "key": "experiment_id",
+      "collection": "experiments",
+      "layer": "research_catalogue",
+      "fields": {
+        "record_type": { "type": "const", "const": "experiment" },
+        "experiment_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
+        "family_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
+        "title": { "type": "string", "min_length": 3 },
+        "model_family": { "type": "string", "min_length": 2 },
+        "mechanism_tags": { "type": "string_array", "min_items": 1 },
+        "data_source_ids": { "type": "string_array", "min_items": 1 },
+        "timeframes": { "type": "string_array" },
+        "universe": { "type": "string_array" },
+        "frozen_rule": { "type": "object" },
+        "decision_time_fields": { "type": "string_array" },
+        "execution_time_fields": { "type": "string_array" },
+        "outcome_time_fields": { "type": "string_array" },
+        "costs": { "type": "object" },
+        "lifecycle_state": { "type": "enum", "enum": "lifecycle_state" },
+        "commit_id": { "type": "string", "nullable": true },
+        "branch": { "type": "string", "nullable": true },
+        "evidence_paths": { "type": "string_array" },
+        "evidence_grade": { "type": "enum", "enum": "evidence_grade" },
+        "fixture_flag": { "type": "boolean" },
+        "prior_trials_seeded": { "type": "integer", "minimum": 0, "optional": true },
+        "source_of_record": { "type": "string", "min_length": 3 },
+        "notes": { "type": "string", "optional": true }
+      }
+    },
+    "result": {
+      "key": "result_id",
+      "collection": "results",
+      "layer": "research_catalogue",
+      "fields": {
+        "record_type": { "type": "const", "const": "result" },
+        "result_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
+        "experiment_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
+        "segment": { "type": "enum", "enum": "segment" },
+        "axis_L": { "type": "enum", "enum": "axis_L" },
+        "axis_X": { "type": "enum", "enum": "axis_X" },
+        "gates": { "type": "gate_map" },
+        "verdict": { "type": "enum", "enum": "verdict" },
+        "metrics_net_of_cost": { "type": "object" },
+        "n_events": { "type": "integer", "minimum": 0, "nullable": true },
+        "n_symbols": { "type": "integer", "minimum": 0, "nullable": true },
+        "n_blocks": { "type": "integer", "minimum": 0, "nullable": true },
+        "validator_id": { "type": "string", "nullable": true },
+        "validator_run_hash": { "type": "string", "nullable": true },
+        "overlap_status": { "type": "enum", "enum": "overlap_status" },
+        "closure_status": { "type": "enum", "enum": "closure_status" },
+        "observed_at": { "type": "iso_datetime", "nullable": true },
+        "evidence_paths": { "type": "string_array" },
+        "evidence_grade": { "type": "enum", "enum": "evidence_grade" },
+        "fixture_flag": { "type": "boolean" },
+        "source_of_record": { "type": "string", "min_length": 3 },
+        "notes": { "type": "string", "optional": true }
+      }
+    },
+    "failure_route": {
+      "key": "failure_route_id",
+      "collection": "failure_routes",
+      "layer": "lessons_and_lineage",
+      "fields": {
+        "record_type": { "type": "const", "const": "failure_route" },
+        "failure_route_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
+        "experiment_id": { "type": "string", "nullable": true },
+        "family_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
+        "failure_mechanism": { "type": "string", "min_length": 8 },
+        "route": { "type": "enum", "enum": "failure_route" },
+        "allowed_successor": { "type": "string", "nullable": true },
+        "blocking_data_gap_id": { "type": "string", "nullable": true },
+        "priority": { "type": "integer", "minimum": 1, "maximum": 9 },
+        "source_of_record": { "type": "string", "min_length": 3 },
+        "notes": { "type": "string", "optional": true }
+      }
+    },
+    "lesson_link": {
+      "key": "lesson_link_id",
+      "collection": "lesson_links",
+      "layer": "lessons_and_lineage",
+      "fields": {
+        "record_type": { "type": "const", "const": "lesson_link" },
+        "lesson_link_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
+        "lesson_id": { "type": "string", "pattern": "^LESSON-[0-9]{3}$" },
+        "lesson_title": { "type": "string", "min_length": 3 },
+        "experiment_id": { "type": "string", "nullable": true },
+        "family_id": { "type": "string", "nullable": true },
+        "relation": { "type": "enum", "enum": "lesson_relation" },
+        "ledger_path": { "type": "path_reference" },
+        "ledger_verification": { "type": "enum", "enum": "verification_status" },
+        "source_of_record": { "type": "string", "min_length": 3 },
+        "notes": { "type": "string", "optional": true }
+      }
+    },
+    "lineage_edge": {
+      "key": "edge_id",
+      "collection": "lineage_edges",
+      "layer": "lessons_and_lineage",
+      "fields": {
+        "record_type": { "type": "const", "const": "lineage_edge" },
+        "edge_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
+        "from_id": { "type": "string", "min_length": 3 },
+        "to_id": { "type": "string", "min_length": 3 },
+        "edge_kind": { "type": "enum", "enum": "lineage_edge_kind" },
+        "structural_difference": { "type": "string", "nullable": true },
+        "new_task_id": { "type": "string", "nullable": true },
+        "new_model_identity": { "type": "string", "nullable": true },
+        "permitted": { "type": "boolean" },
+        "justification": { "type": "string", "min_length": 8 },
+        "source_of_record": { "type": "string", "min_length": 3 },
+        "notes": { "type": "string", "optional": true }
+      }
+    }
+  },
+  "csv_columns": [
+    "record_type",
+    "id",
+    "family_id",
+    "title_or_mechanism",
+    "type_or_segment",
+    "verdict_or_status",
+    "evidence_grade",
+    "verification_status",
+    "fixture_flag",
+    "retained_or_evidence_path",
+    "source_of_record"
+  ]
+}
