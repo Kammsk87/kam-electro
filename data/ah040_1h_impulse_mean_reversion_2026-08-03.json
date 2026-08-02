@@ -1,0 +1,199 @@
+{
+  "label": "DISCOVERY_NOT_PROOF",
+  "task": "TASK-AH-040",
+  "data": {
+    "source_symbols": 109,
+    "eligible_symbols": 87,
+    "window": {
+      "start": "2025-03-20T00:00:00.000Z",
+      "end": "2026-03-19T23:00:00.000Z"
+    }
+  },
+  "rule": "1h 2.5 ATR/5-bar impulse, 2x prior20 volume, RSI14 extreme, next-bar midpoint confirmation, next-open entry, 1 ATR stop, earlier pre-impulse/2R target, 6-bar timeout",
+  "costs": {
+    "roundtrip_bps": 11,
+    "double_bps": 22
+  },
+  "train": {
+    "n": 715,
+    "symbols": 86,
+    "days": 178,
+    "net_mean_bps": -15.4569031676714,
+    "net_median_bps": -7.254681647940488,
+    "win_rate_pct": 48.95104895104895,
+    "p5_bps": -516.6575784196657,
+    "p95_bps": 434.7953394123607,
+    "net_total_bps": -11051.685764885051,
+    "max_drawdown_bps": -20793.78610348579,
+    "exits": {
+      "STOP": 156,
+      "TARGET": 132,
+      "TIMEOUT": 427,
+      "AMBIGUOUS_ADVERSE": 0
+    }
+  },
+  "validation": {
+    "n": 248,
+    "symbols": 83,
+    "days": 60,
+    "net_mean_bps": 88.83671096956067,
+    "net_median_bps": 97.04341809268345,
+    "win_rate_pct": 60.483870967741936,
+    "p5_bps": -553.7797646570355,
+    "p95_bps": 714.2150294250789,
+    "net_total_bps": 22031.504320451048,
+    "max_drawdown_bps": -2803.579050201377,
+    "exits": {
+      "STOP": 42,
+      "TARGET": 37,
+      "TIMEOUT": 169,
+      "AMBIGUOUS_ADVERSE": 0
+    }
+  },
+  "holdout": {
+    "n": 201,
+    "symbols": 79,
+    "days": 51,
+    "net_mean_bps": -23.652248253753317,
+    "net_median_bps": 17.01556420233392,
+    "win_rate_pct": 51.74129353233831,
+    "p5_bps": -590.5476651206607,
+    "p95_bps": 407.1546652814753,
+    "net_total_bps": -4754.101899004417,
+    "max_drawdown_bps": -8912.652514696008,
+    "exits": {
+      "STOP": 52,
+      "TARGET": 37,
+      "TIMEOUT": 112,
+      "AMBIGUOUS_ADVERSE": 0
+    }
+  },
+  "forward": {
+    "n": 134,
+    "symbols": 72,
+    "days": 32,
+    "net_mean_bps": 5.999929749484078,
+    "net_median_bps": 29.658376798404475,
+    "win_rate_pct": 54.47761194029851,
+    "p5_bps": -552.5990930704918,
+    "p95_bps": 503.18789913753267,
+    "net_total_bps": 803.9905864308665,
+    "max_drawdown_bps": -3564.0145317045126,
+    "exits": {
+      "STOP": 34,
+      "TARGET": 29,
+      "TIMEOUT": 71,
+      "AMBIGUOUS_ADVERSE": 0
+    }
+  },
+  "combined_oos": {
+    "n": 335,
+    "symbols": 84,
+    "days": 82,
+    "net_mean_bps": -11.791377052458367,
+    "net_median_bps": 26.01989819528103,
+    "win_rate_pct": 52.83582089552239,
+    "p5_bps": -579.4626791893227,
+    "p95_bps": 444.6068422481677,
+    "net_total_bps": -3950.111312573553,
+    "max_drawdown_bps": -8912.652514696008,
+    "exits": {
+      "STOP": 86,
+      "TARGET": 66,
+      "TIMEOUT": 183,
+      "AMBIGUOUS_ADVERSE": 0
+    }
+  },
+  "null": {
+    "samples": 1000,
+    "observed_net_median_bps": 26.01989819528103,
+    "null_median_bps": -7.981704897916689,
+    "p_value": 0.001
+  },
+  "remove_best_symbol": {
+    "removed": "VVVUSDT",
+    "stats": {
+      "n": 327,
+      "symbols": 83,
+      "days": 82,
+      "net_mean_bps": -19.60913431517484,
+      "net_median_bps": 17.01556420233392,
+      "win_rate_pct": 51.98776758409786,
+      "p5_bps": -579.4626791893227,
+      "p95_bps": 435.08418581251146,
+      "net_total_bps": -6412.186921062173,
+      "max_drawdown_bps": -9513.297012369118,
+      "exits": {
+        "STOP": 85,
+        "TARGET": 64,
+        "TIMEOUT": 178,
+        "AMBIGUOUS_ADVERSE": 0
+      }
+    }
+  },
+  "remove_best_day": {
+    "removed": "2026-02-27",
+    "stats": {
+      "n": 331,
+      "symbols": 84,
+      "days": 81,
+      "net_mean_bps": -15.942467254661226,
+      "net_median_bps": 18.081844619859,
+      "win_rate_pct": 52.56797583081571,
+      "p5_bps": -577.1301930998566,
+      "p95_bps": 423.7071081268806,
+      "net_total_bps": -5276.956661292866,
+      "max_drawdown_bps": -9135.438427735864,
+      "exits": {
+        "STOP": 85,
+        "TARGET": 64,
+        "TIMEOUT": 182,
+        "AMBIGUOUS_ADVERSE": 0
+      }
+    }
+  },
+  "max_symbol_abs_share": 0.07115338591695299,
+  "neighbours": [
+    {
+      "n": 405,
+      "symbols": 86,
+      "days": 84,
+      "net_mean_bps": -14.761468669040035,
+      "net_median_bps": 26.01989819528103,
+      "win_rate_pct": 53.58024691358025,
+      "p5_bps": -577.1301930998566,
+      "p95_bps": 423.7071081268806,
+      "net_total_bps": -5978.394810961214,
+      "max_drawdown_bps": -11893.145974166504,
+      "exits": {
+        "STOP": 103,
+        "TARGET": 89,
+        "TIMEOUT": 213,
+        "AMBIGUOUS_ADVERSE": 0
+      }
+    },
+    {
+      "n": 273,
+      "symbols": 83,
+      "days": 78,
+      "net_mean_bps": -20.489239576627384,
+      "net_median_bps": 8.736842105262813,
+      "win_rate_pct": 51.282051282051285,
+      "p5_bps": -604.6620692836403,
+      "p95_bps": 476.2077365650624,
+      "net_total_bps": -5593.5624044192755,
+      "max_drawdown_bps": -12404.665958986894,
+      "exits": {
+        "STOP": 76,
+        "TARGET": 49,
+        "TIMEOUT": 148,
+        "AMBIGUOUS_ADVERSE": 0
+      }
+    }
+  ],
+  "overlap": {
+    "status": "UNAVAILABLE",
+    "note": "Rejected-family timestamp ledgers not retained with AH-005A."
+  },
+  "verdict": "OOS_FAIL_REJECT_FAMILY"
+}
