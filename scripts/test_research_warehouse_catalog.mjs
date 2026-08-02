@@ -24,6 +24,8 @@ import {
   validateRecord,
   buildCatalog,
   checkInvariants,
+  checkTrialLedger,
+  summarizeTrialLedger,
   computeCoverage,
   catalogToCsv,
   assertSafeRoot,
@@ -263,13 +265,74 @@ function baseResult(overrides = {}) {
   };
 }
 
-function collectionsFrom({ sources = [], experiments = [], results: res = [], edges = [] }) {
+function collectionsFrom({ sources = [], experiments = [], results: res = [], edges = [], trials = [], evidence = [] }) {
   const c = emptyCollections();
   c.data_sources = sources;
   c.experiments = experiments;
   c.results = res;
   c.lineage_edges = edges;
+  c.trial_ledger_entries = trials;
+  c.trial_evidence = evidence;
   return c;
+}
+
+function baseTrial(overrides = {}) {
+  return {
+    record_type: 'trial_ledger_entry',
+    trial_id: 'TL.TEST',
+    parent_experiment_id: 'EXP.TEST_BASE',
+    family_id: 'FAM.TEST',
+    mechanism_tags: ['test'],
+    kind: 'HYPOTHESIS',
+    representation: 'INDIVIDUAL',
+    exact_trial_count: 1,
+    dedup_key: 'test|base|1',
+    counts_toward_lower_bound: true,
+    member_of_aggregate_trial_id: null,
+    attacks_trial_id: null,
+    evidence_path: 'BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#1',
+    verification_grade: 'DOCUMENTED_UNVERIFIED',
+    evidence_grade: 'SECONDARY_DOC',
+    parameter_fingerprint: null,
+    split: 'TRAIN',
+    cost_model_applied: true,
+    verdict: null,
+    failure_route: null,
+    reconciliation_status: 'RECONCILED',
+    missing_child_evidence_id: null,
+    fixture_flag: false,
+    source_of_record: 'test fixture',
+    ...overrides,
+  };
+}
+
+function baseTrialEvidence(overrides = {}) {
+  return {
+    record_type: 'trial_evidence',
+    evidence_id: 'TE.TEST',
+    trial_id: 'TL.TEST',
+    required_artefact: 'the per-variant rows behind this batch',
+    artefact_location_hint: '/opt/example/output/',
+    location_verification: 'MISSING',
+    recoverable_child_count_estimate: null,
+    recovery_phase: 'GO-WAREHOUSE-0B-RECONCILE',
+    blocking_reason: 'the child rows were never mirrored into this repository',
+    fixture_flag: false,
+    source_of_record: 'test fixture',
+    ...overrides,
+  };
+}
+
+/** Builds a one-experiment world whose declared count matches the supplied trials. */
+function ledgerWorld(trials, { declared, evidence = [] } = {}) {
+  const counting = trials.filter((t) => t.counts_toward_lower_bound);
+  const sum = counting.reduce((a, t) => a + t.exact_trial_count, 0);
+  return collectionsFrom({
+    sources: [baseSource()],
+    experiments: [baseExperiment({ prior_trials_seeded: declared ?? sum })],
+    trials,
+    evidence,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -902,6 +965,342 @@ test('query "summary" reports the unverified server inventory honestly', () => {
   assert(s.promising_count === 0, 'promising_count must be 0');
   assert(s.unverified_sources.length > 0, 'the seed must admit which sources were never physically verified');
   assert(s.missing_sources.includes('GAP.OI_LIQ.FINE_GRAIN'), 'the fine-grained OI gap must be reported missing');
+});
+
+// ---------------------------------------------------------------------------
+// 8b. Trial ledger reconciliation
+// ---------------------------------------------------------------------------
+
+section('trial ledger');
+
+test('a well-formed ledger entry and evidence record validate', () => {
+  assert(validateRecord(schema, 'trial_ledger_entry', baseTrial()).length === 0, 'entry should validate');
+  assert(validateRecord(schema, 'trial_evidence', baseTrialEvidence()).length === 0, 'evidence should validate');
+});
+
+test('count conservation holds when the ledger sums to the declared count', () => {
+  const world = ledgerWorld([
+    baseTrial({ trial_id: 'TL.A', dedup_key: 'a' }),
+    baseTrial({ trial_id: 'TL.B', dedup_key: 'b' }),
+  ], { declared: 2 });
+  const { errors } = checkTrialLedger(world);
+  assert(!errors.some((e) => e.startsWith('INV-09')), `got ${JSON.stringify(errors)}`);
+});
+
+test('count conservation fails when the ledger does not sum to the declared count', () => {
+  const world = ledgerWorld([baseTrial({ trial_id: 'TL.A', dedup_key: 'a' })], { declared: 7 });
+  const { errors } = checkTrialLedger(world);
+  assert(
+    errors.some((e) => e.startsWith('INV-09') && e.includes('prior_trials_seeded=7') && e.includes('sum to 1')),
+    `got ${JSON.stringify(errors)}`,
+  );
+});
+
+test('an aggregate batch of N conserves as N, not as one entry', () => {
+  const world = ledgerWorld([
+    baseTrial({ trial_id: 'TL.BATCH', dedup_key: 'batch', representation: 'AGGREGATE_ONLY', exact_trial_count: 930,
+      reconciliation_status: 'AGGREGATE_PENDING_CHILDREN', missing_child_evidence_id: 'TE.TEST' }),
+  ], { declared: 930, evidence: [baseTrialEvidence({ trial_id: 'TL.BATCH', recoverable_child_count_estimate: 930 })] });
+  const { errors, perExperiment } = checkTrialLedger(world);
+  assert(errors.length === 0, `got ${JSON.stringify(errors)}`);
+  assert(perExperiment[0].ledger_sum === 930, 'an aggregate batch must contribute its full count');
+  assert(perExperiment[0].individual_entries === 0, 'a batch is not an individual entry');
+});
+
+test('a ledger entry must name an existing parent experiment', () => {
+  const world = ledgerWorld([baseTrial({ parent_experiment_id: 'EXP.GHOST' })], { declared: 0 });
+  const { rejections } = checkTrialLedger(world);
+  assert(rejections.some((r) => r.reason === 'UNKNOWN_PARENT_EXPERIMENT'), `got ${JSON.stringify(rejections)}`);
+});
+
+test('a ledger entry whose family contradicts its parent is rejected', () => {
+  const world = ledgerWorld([baseTrial({ family_id: 'FAM.OTHER' })], { declared: 0 });
+  const { rejections } = checkTrialLedger(world);
+  assert(rejections.some((r) => r.reason === 'FAMILY_MISMATCH'), `got ${JSON.stringify(rejections)}`);
+});
+
+test('a child of an aggregate batch may not also be counted', () => {
+  const world = ledgerWorld([
+    baseTrial({ trial_id: 'TL.BATCH', dedup_key: 'batch', representation: 'AGGREGATE_ONLY', exact_trial_count: 5,
+      reconciliation_status: 'AGGREGATE_PENDING_CHILDREN', missing_child_evidence_id: 'TE.TEST' }),
+    baseTrial({ trial_id: 'TL.CHILD', dedup_key: 'child', member_of_aggregate_trial_id: 'TL.BATCH',
+      counts_toward_lower_bound: true }),
+  ], { declared: 5, evidence: [baseTrialEvidence({ trial_id: 'TL.BATCH' })] });
+  const { rejections } = checkTrialLedger(world);
+  assert(rejections.some((r) => r.reason === 'DOUBLE_COUNTED_CHILD'), `got ${JSON.stringify(rejections)}`);
+});
+
+test('a recovered child of an aggregate batch is admitted when it is non-counting', () => {
+  const world = ledgerWorld([
+    baseTrial({ trial_id: 'TL.BATCH', dedup_key: 'batch', representation: 'AGGREGATE_ONLY', exact_trial_count: 5,
+      reconciliation_status: 'AGGREGATE_PENDING_CHILDREN', missing_child_evidence_id: 'TE.TEST' }),
+    baseTrial({ trial_id: 'TL.CHILD', dedup_key: 'child', member_of_aggregate_trial_id: 'TL.BATCH',
+      counts_toward_lower_bound: false }),
+  ], { declared: 5, evidence: [baseTrialEvidence({ trial_id: 'TL.BATCH' })] });
+  const { rejections, errors } = checkTrialLedger(world);
+  assert(rejections.length === 0 && errors.length === 0, `got ${JSON.stringify([errors, rejections])}`);
+});
+
+test('a member of a non-aggregate entry is rejected', () => {
+  const world = ledgerWorld([
+    baseTrial({ trial_id: 'TL.A', dedup_key: 'a' }),
+    baseTrial({ trial_id: 'TL.CHILD', dedup_key: 'child', member_of_aggregate_trial_id: 'TL.A',
+      counts_toward_lower_bound: false }),
+  ], { declared: 1 });
+  const { rejections } = checkTrialLedger(world);
+  assert(rejections.some((r) => r.reason === 'NOT_AN_AGGREGATE'), `got ${JSON.stringify(rejections)}`);
+});
+
+test('two counting entries may not share a dedup key', () => {
+  const world = ledgerWorld([
+    baseTrial({ trial_id: 'TL.A', dedup_key: 'same' }),
+    baseTrial({ trial_id: 'TL.B', dedup_key: 'same' }),
+  ], { declared: 2 });
+  const { errors } = checkTrialLedger(world);
+  assert(errors.some((e) => e.startsWith('INV-10') && e.includes('already counted')), `got ${JSON.stringify(errors)}`);
+});
+
+test('an entry with no evidence link is refused', () => {
+  for (const placeholder of ['', 'NONE', 'UNKNOWN', 'TBD', 'n/a']) {
+    const world = ledgerWorld([baseTrial({ evidence_path: placeholder })], { declared: 1 });
+    const { rejections } = checkTrialLedger(world);
+    assert(
+      rejections.some((r) => r.reason === 'NO_EVIDENCE_LINK'),
+      `placeholder '${placeholder}' should be refused`,
+    );
+  }
+});
+
+test('an aggregate batch may not carry a per-variant parameter fingerprint', () => {
+  const world = ledgerWorld([
+    baseTrial({ representation: 'AGGREGATE_ONLY', exact_trial_count: 930, parameter_fingerprint: 'z=3.0;tf=1h',
+      reconciliation_status: 'AGGREGATE_PENDING_CHILDREN', missing_child_evidence_id: 'TE.TEST' }),
+  ], { declared: 930, evidence: [baseTrialEvidence()] });
+  const { rejections } = checkTrialLedger(world);
+  assert(
+    rejections.some((r) => r.reason === 'FABRICATED_PARAMETER_FINGERPRINT'),
+    'inventing a fingerprint for a batch of 930 is exactly the fabrication this forbids',
+  );
+});
+
+test('a fingerprint that declares itself derived is refused', () => {
+  for (const fp of ['inferred_from_batch', 'assumed z=3', 'generated-grid', 'estimated tf', 'guessed']) {
+    const world = ledgerWorld([baseTrial({ parameter_fingerprint: fp })], { declared: 1 });
+    const { rejections } = checkTrialLedger(world);
+    assert(rejections.some((r) => r.reason === 'FABRICATED_PARAMETER_FINGERPRINT'), `'${fp}' should be refused`);
+  }
+});
+
+test('a genuine recorded fingerprint is accepted', () => {
+  for (const fp of ['tf=1h;z=(close-SMA20)/ATR', 'wallets=3', 'window=208d', 'synth_param=1']) {
+    const world = ledgerWorld([baseTrial({ parameter_fingerprint: fp })], { declared: 1 });
+    const { rejections } = checkTrialLedger(world);
+    assert(rejections.length === 0, `'${fp}' should be accepted, got ${JSON.stringify(rejections)}`);
+  }
+});
+
+test('an INDIVIDUAL entry represents exactly one trial', () => {
+  const world = ledgerWorld([baseTrial({ representation: 'INDIVIDUAL', exact_trial_count: 116 })], { declared: 116 });
+  const { rejections } = checkTrialLedger(world);
+  assert(
+    rejections.some((r) => r.reason === 'INDIVIDUAL_COUNT_NOT_ONE'),
+    'claiming 116 individual variants in one row would invent 115 records',
+  );
+});
+
+test('a robustness attack never counts as a trial', () => {
+  const world = ledgerWorld([
+    baseTrial({ trial_id: 'TL.A', dedup_key: 'a' }),
+    baseTrial({ trial_id: 'TL.ATK', dedup_key: 'atk', kind: 'ROBUSTNESS_ATTACK', attacks_trial_id: 'TL.A',
+      counts_toward_lower_bound: true }),
+  ], { declared: 1 });
+  const { rejections } = checkTrialLedger(world);
+  assert(rejections.some((r) => r.reason === 'ATTACK_COUNTED_AS_TRIAL'), `got ${JSON.stringify(rejections)}`);
+});
+
+test('null controls and replays are also barred from counting', () => {
+  for (const kind of ['NULL_CONTROL', 'REPLAY']) {
+    const world = ledgerWorld([
+      baseTrial({ trial_id: 'TL.A', dedup_key: 'a' }),
+      baseTrial({ trial_id: 'TL.X', dedup_key: 'x', kind, attacks_trial_id: 'TL.A', counts_toward_lower_bound: true }),
+    ], { declared: 1 });
+    const { rejections } = checkTrialLedger(world);
+    assert(rejections.some((r) => r.reason === 'ATTACK_COUNTED_AS_TRIAL'), `${kind} must not count`);
+  }
+});
+
+test('an attack must name the trial it attacks, and that trial must exist', () => {
+  const missingTarget = ledgerWorld([
+    baseTrial({ trial_id: 'TL.ATK', dedup_key: 'atk', kind: 'NULL_CONTROL', counts_toward_lower_bound: false }),
+  ], { declared: 0 });
+  assert(
+    checkTrialLedger(missingTarget).rejections.some((r) => r.reason === 'ATTACK_WITHOUT_TARGET'),
+    'an unattached attack is meaningless',
+  );
+
+  const ghostTarget = ledgerWorld([
+    baseTrial({ trial_id: 'TL.ATK', dedup_key: 'atk', kind: 'NULL_CONTROL', attacks_trial_id: 'TL.GHOST',
+      counts_toward_lower_bound: false }),
+  ], { declared: 0 });
+  assert(
+    checkTrialLedger(ghostTarget).rejections.some((r) => r.reason === 'UNKNOWN_ATTACK_TARGET'),
+    'an attack on a nonexistent trial is rejected',
+  );
+});
+
+test('a pending reconciliation must name an existing trial_evidence record', () => {
+  const undeclared = ledgerWorld([
+    baseTrial({ representation: 'AGGREGATE_ONLY', exact_trial_count: 4,
+      reconciliation_status: 'AGGREGATE_PENDING_CHILDREN', missing_child_evidence_id: null }),
+  ], { declared: 4 });
+  assert(
+    checkTrialLedger(undeclared).rejections.some((r) => r.reason === 'MISSING_EVIDENCE_NOT_DECLARED'),
+    'an aggregate that hides its missing children is refused',
+  );
+
+  const ghost = ledgerWorld([
+    baseTrial({ representation: 'AGGREGATE_ONLY', exact_trial_count: 4,
+      reconciliation_status: 'UNRECOVERABLE_PENDING_SOURCE', missing_child_evidence_id: 'TE.GHOST' }),
+  ], { declared: 4 });
+  assert(
+    checkTrialLedger(ghost).rejections.some((r) => r.reason === 'UNKNOWN_TRIAL_EVIDENCE'),
+    'a dangling evidence reference is refused',
+  );
+});
+
+test('an unknown child count is preserved as unknown, never as zero', () => {
+  const unknown = seedCatalog.records.trial_evidence.filter((e) => e.recoverable_child_count_estimate === null);
+  assert(unknown.length > 0, 'the seed must record at least one unknown child count');
+  for (const e of seedCatalog.records.trial_evidence) {
+    assert(
+      e.recoverable_child_count_estimate === null || e.recoverable_child_count_estimate > 0,
+      `${e.evidence_id}: an unrecoverable gap must be null, never 0 trials`,
+    );
+  }
+});
+
+test('every seed ledger entry conserves against its parent', () => {
+  assert(seedCatalog.errors.length === 0, `seed has errors: ${JSON.stringify(seedCatalog.errors.slice(0, 5))}`);
+  for (const row of seedCatalog.trial_conservation_by_experiment) {
+    assert(row.conserved, `${row.experiment_id}: declared ${row.declared} vs ledger ${row.ledger_sum}`);
+  }
+});
+
+test('the seed reconciles the 930 AMEL combinations as aggregates under their own experiment', () => {
+  const amel = seedCatalog.records.trial_ledger_entries.filter(
+    (t) => t.parent_experiment_id === 'EXP.AMEL_SECOND_ORDER_COMBINATIONS' && t.counts_toward_lower_bound,
+  );
+  assert(amel.length === 2, `expected two batches, got ${amel.length}`);
+  assert(amel.every((t) => t.representation === 'AGGREGATE_ONLY'), 'the 930 must stay aggregate-only');
+  assert(amel.reduce((a, t) => a + t.exact_trial_count, 0) === 930, 'the batches must sum to 930');
+  assert(amel.every((t) => t.parameter_fingerprint === null), 'no per-combination fingerprint may be invented');
+  assert(amel.every((t) => t.missing_child_evidence_id), 'each batch must name the artefact that would recover its children');
+
+  const wick = seedCatalog.records.experiments.find((e) => e.experiment_id === 'EXP.WICK_RECLAIM_SWEEP');
+  assert(wick.prior_trials_seeded === 1, 'the 930 must no longer be attributed to the wick-reclaim experiment');
+});
+
+test('the seed reconciles the 116 overfit-lab variants as aggregates that sum correctly', () => {
+  const lab = seedCatalog.records.trial_ledger_entries.filter(
+    (t) => t.parent_experiment_id === 'EXP.OVERFIT_LAB_SINGLE_STRATEGIES' && t.counts_toward_lower_bound,
+  );
+  assert(lab.reduce((a, t) => a + t.exact_trial_count, 0) === 116, 'the batches must sum to 116');
+  assert(lab.every((t) => t.representation === 'AGGREGATE_ONLY'), 'the 116 must stay aggregate-only');
+  const attack = seedCatalog.records.trial_ledger_entries.find((t) => t.trial_id === 'TL.OVERFIT.ATTACK_SUITE');
+  assert(attack && attack.counts_toward_lower_bound === false, 'the attack suite must not inflate the count');
+});
+
+test('the 930 and 116 are the only aggregate batches, and they dominate the total', () => {
+  const s = seedCatalog.trial_ledger;
+  assert(s.aggregate_only_entries === 4, `expected 4 aggregate entries, got ${s.aggregate_only_entries}`);
+  assert(s.aggregate_only_trials === 1046, `expected 1046 aggregate trials, got ${s.aggregate_only_trials}`);
+  assert(s.individual_trials === 20, `expected 20 individual trials, got ${s.individual_trials}`);
+  assert(s.lower_bound_trials === 1066, `expected 1066 lower-bound trials, got ${s.lower_bound_trials}`);
+  assert(
+    s.individual_trials + s.aggregate_only_trials === s.lower_bound_trials,
+    'individual plus aggregate must equal the lower bound',
+  );
+});
+
+test('every counted trial traces to a local artefact', () => {
+  const counting = seedCatalog.records.trial_ledger_entries.filter((t) => t.counts_toward_lower_bound && !t.fixture_flag);
+  for (const t of counting) {
+    assert(t.evidence_path.endsWith('.md') || t.evidence_path.includes('.md#'), `${t.trial_id}: evidence must be a local document`);
+    assert(t.verification_grade === 'DOCUMENTED_UNVERIFIED', `${t.trial_id}: unexpected grade ${t.verification_grade}`);
+  }
+  assert(
+    seedCatalog.trial_ledger.trials_with_unknown_count_grade === 0,
+    'no counted trial may rest on an unknown-grade count',
+  );
+});
+
+test('the ledger summary is a pure function of its inputs', () => {
+  const a = JSON.stringify(summarizeTrialLedger(
+    seedCatalog.records.trial_ledger_entries,
+    seedCatalog.trial_conservation_by_experiment,
+    seedCatalog.records.trial_evidence,
+  ));
+  const b = JSON.stringify(summarizeTrialLedger(
+    seedCatalog.records.trial_ledger_entries,
+    seedCatalog.trial_conservation_by_experiment,
+    seedCatalog.records.trial_evidence,
+  ));
+  assert(a === b, 'the ledger summary is not deterministic');
+});
+
+test('query "trials" separates individual rows from aggregate-only batches', () => {
+  const individual = runQuery(seedCatalog, 'trials', { representation: 'INDIVIDUAL' });
+  const aggregate = runQuery(seedCatalog, 'trials', { representation: 'AGGREGATE_ONLY' });
+  assert(individual.every((t) => t.exact_trial_count === 1), 'individual rows represent one trial each');
+  assert(aggregate.some((t) => t.exact_trial_count === 745), 'the 745-duplicate batch must be visible');
+  assert(aggregate.every((t) => t.parameter_fingerprint === null), 'no aggregate may expose a per-variant fingerprint');
+});
+
+test('query "trials" hides non-counting attacks unless asked for', () => {
+  const counting = runQuery(seedCatalog, 'trials', {});
+  const all = runQuery(seedCatalog, 'trials', { includeNonCounting: true });
+  assert(all.length > counting.length, 'expected --include-non-counting to widen the result');
+  assert(counting.every((t) => t.counts_toward_lower_bound), 'the default view must show only counted trials');
+  assert(all.some((t) => t.kind === 'ROBUSTNESS_ATTACK'), 'attacks must be inspectable when asked for');
+});
+
+test('query "trial-summary" reports the lower bound and the reconciliation coverage', () => {
+  const s = runQuery(seedCatalog, 'trial-summary', {});
+  assert(s.lower_bound_trials === 1066, `unexpected lower bound ${s.lower_bound_trials}`);
+  assert(s.individual_entries === 20 && s.aggregate_only_entries === 4, 'unexpected entry split');
+  assert(s.conservation_violations.length === 0, 'the seed must have no conservation violation');
+  assert(s.missing_evidence_sources.length === 15, `expected 15 missing-evidence sources, got ${s.missing_evidence_sources.length}`);
+  assert(s.independent_experiments === 16, `expected 16 independent experiments, got ${s.independent_experiments}`);
+});
+
+test('query "trial-summary" names every missing-evidence recovery source', () => {
+  const s = runQuery(seedCatalog, 'trial-summary', {});
+  for (const e of s.missing_evidence_sources) {
+    assert(e.required_artefact.length > 8, `${e.evidence_id}: must say what artefact is needed`);
+    assert(e.artefact_location_hint.length > 0, `${e.evidence_id}: must give a location hint`);
+    assert(e.recovery_phase.startsWith('GO-'), `${e.evidence_id}: must name the operator GO phase that unlocks it`);
+  }
+});
+
+test('query "trial-lineage" links parent, trials, outcome and lessons', () => {
+  const rows = runQuery(seedCatalog, 'trial-lineage', { experiment: 'EXP.OVERFIT_LAB_SINGLE_STRATEGIES' });
+  assert(rows.length === 1, 'expected one experiment');
+  const row = rows[0];
+  assert(row.declared_prior_trials_seeded === 116, 'expected the declared count');
+  assert(row.trials.length === 3, `expected two batches plus the attack suite, got ${row.trials.length}`);
+  assert(row.outcomes.some((o) => o.verdict === 'REJECTED_FAMILY'), 'expected the rejected outcome');
+  assert(row.lessons.some((l) => l.lesson_id === 'LESSON-019'), 'expected the multiplicity lesson');
+  assert(row.trials.some((t) => t.missing_evidence?.recoverable_child_count_estimate === 15), 'expected the 15 recoverable children');
+});
+
+test('query "trial-lineage" exposes the attack chain without counting it', () => {
+  const rows = runQuery(seedCatalog, 'trial-lineage', { experiment: 'EXP.HTF_MA_DISTANCE_REVERSION' });
+  const trials = rows[0].trials;
+  const attacks = trials.filter((t) => t.attacks_trial_id);
+  assert(attacks.length === 2, `expected two remove-best attacks, got ${attacks.length}`);
+  assert(attacks.every((t) => !t.counts_toward_lower_bound), 'attacks must not count');
+  assert(attacks.every((t) => t.attacks_trial_id === 'TL.HTF_MA.TF_1H'), 'attacks must name their target');
+  assert(rows[0].declared_prior_trials_seeded === 2, 'only the two timeframe formulations count');
 });
 
 // ---------------------------------------------------------------------------

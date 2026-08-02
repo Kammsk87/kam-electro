@@ -1,6 +1,6 @@
 # Botalin Research Warehouse — Server Activation and Migration Plan
 
-**Task:** TASK-021-BOTALIN-RESEARCH-WAREHOUSE-FOUNDATION-V0
+**Task:** TASK-021-BOTALIN-RESEARCH-WAREHOUSE-FOUNDATION-V0, extended by TASK-022 (Phase 0b, §8.1)
 **Date:** 2026-08-02
 **Status:** PLAN ONLY. Nothing in this document was executed.
 
@@ -134,6 +134,7 @@ previous one, and none is implied by acceptance of this task.
 | # | Phase | Exact GO required |
 |---:|---|---|
 | 0 | **Read-only physical inventory.** Confirm every `DOCUMENTED_UNVERIFIED` path, its size, span, row count and schema fingerprint. Write nothing. | `GO-WAREHOUSE-0-INVENTORY` — read-only shell access to `167.233.205.87`, `ls`/`stat`/`head` only, no writes, no service commands |
+| 0b | **Trial-ledger reconciliation.** Source by source, read the historical trial artefacts already named in the ledger's `trial_evidence` records and replace aggregate batches with recovered individual rows. Read-only; writes only the catalogue. | `GO-WAREHOUSE-0B-RECONCILE` — read-only reads of the specific artefacts listed below, **after** Phase 0 has physically verified each path |
 | 1 | **Provision root.** Create `/opt/botalin-warehouse`, the `warehouse` user, read-only source access. No data. | `GO-WAREHOUSE-1-PROVISION` — permission to create one user and one directory tree |
 | 2 | **Pilot ingest.** One source, one run, into `raw/`, with full hashes and manifests. Source untouched. | `GO-WAREHOUSE-2-PILOT-INGEST` — names the single `source_id` authorized |
 | 3 | **Backfill.** Remaining research-fork sources, source by source, each with its own manifest. | `GO-WAREHOUSE-3-BACKFILL` — enumerates the authorized `source_id` list |
@@ -146,6 +147,44 @@ Phase 0 is the immediate next step and is the cheapest: it converts every
 `DOCUMENTED_UNVERIFIED` record in the catalogue into `VERIFIED_READ_ONLY` or `MISSING`, which is
 where most of the current uncertainty sits.
 
+### 8.1 Phase 0b in detail — trial-ledger reconciliation
+
+The trial ledger currently records **1066 lower-bound trials, of which only 20 exist as individual
+rows**. The remaining 1046 are four aggregate batches. Fifteen ledger entries additionally declare an
+unknown number of further variants. Phase 0b is the work that converts aggregates into rows.
+
+It is deliberately ordered **after** Phase 0 and **before** any provisioning, because reading a
+historical artefact whose path has not been verified is how a reconciliation invents data.
+
+Scope, strictly:
+
+- Read only the artefacts named in the ledger's `trial_evidence` records, one source at a time.
+- For each recovered child row, add an `INDIVIDUAL` entry with `member_of_aggregate_trial_id` set,
+  which the builder forces to be non-counting because the batch already counts it. When a batch is
+  fully decomposed, its `exact_trial_count` is reduced by exactly the number recovered, in the same
+  change, so INV-09 conservation never breaks.
+- A source that turns out to be absent flips its `trial_evidence.location_verification` to `MISSING`
+  and stays an aggregate. It is never quietly dropped and never rewritten to zero trials.
+- Recovered parameter fingerprints are copied verbatim from the artefact. A fingerprint that cannot
+  be read stays `null`; the builder refuses any value that declares itself inferred or estimated.
+
+Phase 0b explicitly does **not** authorize: creating a database, installing DuckDB, ingesting or
+copying any raw dataset, writing anything under `/opt/botalin-edge` or `/opt/botalin`, or starting
+any process or service. Its only output is an updated catalogue in this repository.
+
+The fifteen recovery sources it must work through, highest recoverable value first:
+
+| Source | Recovers | Location verified? |
+|---|---|---|
+| `TE.AMEL_2ND.DUPLICATE_CHILDREN` | 745 known children | no |
+| `TE.AMEL_2ND.NON_DUPLICATE_CHILDREN` | 185 known children | no |
+| `TE.OVERFIT.NON_POSITIVE_CHILDREN` | 101 known children | no |
+| `TE.OVERFIT.TRAIN_POSITIVE_CHILDREN` | 15 known children | no |
+| The other eleven `TE.*` records | unknown counts, preserved as `null` | no |
+
+Until Phase 0b runs, every multiplicity correction computed on this data must treat 1066 as a floor
+that is known to be too low, not as the trial count.
+
 ## 9. What activation would still not buy
 
 1. **No evidence.** A queryable lake makes existing evidence findable. It creates none, upgrades no
@@ -153,7 +192,10 @@ where most of the current uncertainty sits.
 2. **No coverage.** Migration cannot manufacture the 30 matched order-book events the volatility
    family needs, the sub-minute liquidation stream the forced-flow family needs, or the tagger-v2
    NEWS lane. Those remain data-collection requests, each with its own separate GO.
-3. **No provenance repair.** If a historical source cannot supply a `recorded` `ingest_ts`, storing
+3. **No recovered trial count.** Phase 0b can only recover children that were actually written down.
+   Where a sweep's per-variant output was never persisted, the count stays unknown forever, and the
+   deflation for that family remains a lower bound with no attainable ceiling.
+4. **No provenance repair.** If a historical source cannot supply a `recorded` `ingest_ts`, storing
    it in Parquet does not fix that. The affected spans stay unusable for validation, holdout and
    forward work, and the lake makes that visible rather than curing it.
-4. **No paper, no live, no promotion.** `promising_count` stays `0` throughout every phase above.
+5. **No paper, no live, no promotion.** `promising_count` stays `0` throughout every phase above.

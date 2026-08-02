@@ -114,6 +114,23 @@
       "QUARANTINE",
       "REJECTED_FAMILY"
     ],
+    "trial_kind": [
+      "HYPOTHESIS",
+      "PARAMETER_VARIANT",
+      "EXIT_VARIANT",
+      "DATA_SPLIT",
+      "REGIME_VARIANT",
+      "ROBUSTNESS_ATTACK",
+      "NULL_CONTROL",
+      "REPLAY",
+      "DIAGNOSTIC"
+    ],
+    "trial_representation": ["INDIVIDUAL", "AGGREGATE_ONLY"],
+    "reconciliation_status": [
+      "RECONCILED",
+      "AGGREGATE_PENDING_CHILDREN",
+      "UNRECOVERABLE_PENDING_SOURCE"
+    ],
     "lesson_relation": ["CREATED_BY", "APPLIED_BY"],
     "lineage_edge_kind": [
       "CREATED_LESSON",
@@ -133,7 +150,12 @@
     "INV-05_SECONDARY_EVIDENCE_DOWNGRADE": "A SECONDARY_DOC or SECONDARY_CHAT source describing an evidence_type for which a RAW_PRIMARY source exists must name that source in superseded_by_raw_source_id.",
     "INV-06_NO_PROMOTION": "verdict ADMITTED_RESEARCH_ONLY requires every declared gate PASS and a non-empty validator_id; the catalogue always reports promising_count = 0.",
     "INV-07_EXPLICIT_ROOTS_ONLY": "The builder reads only from roots supplied explicitly on the command line, or the committed synthetic fixture in smoke mode. Home, repository root and filesystem root are refused.",
-    "INV-08_SMOKE_NON_MUTATION": "Smoke mode performs no filesystem write of any kind. Output requires an explicit --out path."
+    "INV-08_SMOKE_NON_MUTATION": "Smoke mode performs no filesystem write of any kind. Output requires an explicit --out path.",
+    "INV-09_TRIAL_COUNT_CONSERVATION": "For every experiment declaring prior_trials_seeded, that value equals the sum of exact_trial_count over the counting ledger entries linked to it. A ledger entry must name an existing parent experiment.",
+    "INV-10_AGGREGATE_CHILD_EXCLUSIVITY": "A trial cannot be counted twice. Among counting entries every dedup_key is unique. An entry naming member_of_aggregate_trial_id must be non-counting, and the aggregate it names must exist and be AGGREGATE_ONLY.",
+    "INV-11_NO_FABRICATED_VARIANT": "Every ledger entry needs a real evidence_path; placeholder values are refused. An AGGREGATE_ONLY entry must carry a null parameter_fingerprint, because a per-variant fingerprint derived from an aggregate count would be invented. A fingerprint whose text declares it inferred, assumed, or generated is refused.",
+    "INV-12_MISSING_EVIDENCE_DECLARED": "An entry whose reconciliation_status is AGGREGATE_PENDING_CHILDREN or UNRECOVERABLE_PENDING_SOURCE must name an existing trial_evidence record stating exactly which artefact would reconcile it.",
+    "INV-13_ATTACKS_DO_NOT_ADD_TRIALS": "A ROBUSTNESS_ATTACK, NULL_CONTROL or REPLAY entry is never counting, must name the trial it attacks, and that trial must exist under the same parent experiment. Re-attacking a parameter point does not consume a new independent trial."
   },
   "record_types": {
     "data_source": {
@@ -257,6 +279,57 @@
         "relation": { "type": "enum", "enum": "lesson_relation" },
         "ledger_path": { "type": "path_reference" },
         "ledger_verification": { "type": "enum", "enum": "verification_status" },
+        "source_of_record": { "type": "string", "min_length": 3 },
+        "notes": { "type": "string", "optional": true }
+      }
+    },
+    "trial_ledger_entry": {
+      "key": "trial_id",
+      "collection": "trial_ledger_entries",
+      "layer": "research_catalogue",
+      "fields": {
+        "record_type": { "type": "const", "const": "trial_ledger_entry" },
+        "trial_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
+        "parent_experiment_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
+        "family_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
+        "mechanism_tags": { "type": "string_array", "min_items": 1 },
+        "kind": { "type": "enum", "enum": "trial_kind" },
+        "representation": { "type": "enum", "enum": "trial_representation" },
+        "exact_trial_count": { "type": "integer", "minimum": 1 },
+        "dedup_key": { "type": "string", "min_length": 3 },
+        "counts_toward_lower_bound": { "type": "boolean" },
+        "member_of_aggregate_trial_id": { "type": "string", "nullable": true },
+        "attacks_trial_id": { "type": "string", "nullable": true },
+        "evidence_path": { "type": "path_reference" },
+        "verification_grade": { "type": "enum", "enum": "verification_status" },
+        "evidence_grade": { "type": "enum", "enum": "evidence_grade" },
+        "parameter_fingerprint": { "type": "string", "nullable": true },
+        "split": { "type": "enum", "enum": "segment" },
+        "cost_model_applied": { "type": "boolean" },
+        "verdict": { "type": "enum", "enum": "verdict", "nullable": true },
+        "failure_route": { "type": "enum", "enum": "failure_route", "nullable": true },
+        "reconciliation_status": { "type": "enum", "enum": "reconciliation_status" },
+        "missing_child_evidence_id": { "type": "string", "nullable": true },
+        "fixture_flag": { "type": "boolean" },
+        "source_of_record": { "type": "string", "min_length": 3 },
+        "notes": { "type": "string", "optional": true }
+      }
+    },
+    "trial_evidence": {
+      "key": "evidence_id",
+      "collection": "trial_evidence",
+      "layer": "research_catalogue",
+      "fields": {
+        "record_type": { "type": "const", "const": "trial_evidence" },
+        "evidence_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
+        "trial_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
+        "required_artefact": { "type": "string", "min_length": 8 },
+        "artefact_location_hint": { "type": "path_reference" },
+        "location_verification": { "type": "enum", "enum": "verification_status" },
+        "recoverable_child_count_estimate": { "type": "integer", "minimum": 0, "nullable": true },
+        "recovery_phase": { "type": "string", "min_length": 3 },
+        "blocking_reason": { "type": "string", "min_length": 8 },
+        "fixture_flag": { "type": "boolean" },
         "source_of_record": { "type": "string", "min_length": 3 },
         "notes": { "type": "string", "optional": true }
       }

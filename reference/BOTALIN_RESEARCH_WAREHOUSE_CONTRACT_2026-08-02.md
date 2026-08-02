@@ -1,6 +1,6 @@
 # Botalin Research Warehouse — Contract v0
 
-**Task:** TASK-021-BOTALIN-RESEARCH-WAREHOUSE-FOUNDATION-V0
+**Task:** TASK-021-BOTALIN-RESEARCH-WAREHOUSE-FOUNDATION-V0, extended by TASK-022 (trial ledger, §1 Layer 2b)
 **Date:** 2026-08-02
 **Status:** read-only foundation. No data was migrated, no service was started, no candidate changed state.
 
@@ -78,6 +78,43 @@ GUARD_ONLY | DUPLICATE_OR_OVERLAP | QUARANTINED | REJECTED_FAMILY | ADMITTED_RES
 `ADMITTED_RESEARCH_ONLY` is the ceiling, it requires every declared gate to pass **and** a named
 independent validator, and it is still not paper or live authorization.
 
+#### Layer 2b — Trial ledger (added by TASK-022)
+
+An `experiment` is a family-level object. It is not a trial. The 116 fitted overfit-lab variants
+were one experiment and 116 trials; treating them as one consumed unit understates the multiplicity
+correction by two orders of magnitude. The ledger separates the two.
+
+`trial_ledger_entry` records one trial, or one batch of trials that cannot be decomposed:
+
+| Field | Purpose |
+|---|---|
+| `trial_id`, `parent_experiment_id`, `family_id` | Immutable identity and parent linkage |
+| `kind` | `HYPOTHESIS`, `PARAMETER_VARIANT`, `EXIT_VARIANT`, `DATA_SPLIT`, `REGIME_VARIANT`, `ROBUSTNESS_ATTACK`, `NULL_CONTROL`, `REPLAY`, `DIAGNOSTIC` |
+| `representation` | `INDIVIDUAL` (one recoverable row) or `AGGREGATE_ONLY` (a batch whose children are not recoverable) |
+| `exact_trial_count` | How many trials this entry represents. `INDIVIDUAL` is always exactly 1 |
+| `dedup_key` | The multiplicity identity. Two counting entries may never share one |
+| `counts_toward_lower_bound` | Whether this entry adds to the total |
+| `member_of_aggregate_trial_id` | Set when a child has been recovered from a batch. Forces the child non-counting |
+| `attacks_trial_id` | Set on attacks/controls/replays. Names the point being re-examined |
+| `evidence_path`, `verification_grade` | Where the claim comes from, and how well confirmed |
+| `parameter_fingerprint` | The recorded parameter point, or `null`. Never reconstructed |
+| `split`, `cost_model_applied`, `verdict`, `failure_route` | Evaluation context and outcome |
+| `reconciliation_status` | `RECONCILED`, `AGGREGATE_PENDING_CHILDREN`, `UNRECOVERABLE_PENDING_SOURCE` |
+| `missing_child_evidence_id` | The `trial_evidence` record naming what would resolve it |
+
+`trial_evidence` states exactly which artefact would reconcile a pending entry: the required
+artefact, a location hint, its verification state, the recoverable child count **or `null` when that
+is genuinely unknown**, the recovery phase, and the blocking reason.
+
+**The rule that matters: an aggregate count is never expanded into individual variants.** A batch of
+930 mined combinations is one `AGGREGATE_ONLY` entry with `exact_trial_count: 930` and a `null`
+parameter fingerprint — not 930 fabricated rows, and not one trial either. Both errors are refused
+by the builder (`INDIVIDUAL_COUNT_NOT_ONE` and `FABRICATED_PARAMETER_FINGERPRINT`).
+
+**Attacks do not add trials.** Re-running a rejected rule at ideal fill, attacking it with
+remove-best-symbol, or replaying it against recorded books re-examines an existing parameter point.
+Those entries are structurally barred from counting and must name the trial they attack.
+
 ### Layer 3 — Lessons and lineage graph
 
 `failure_route` records why a family died and where, if anywhere, it may go: exactly one of
@@ -127,6 +164,11 @@ prior trial.
 | INV-06 | `ADMITTED_RESEARCH_ONLY` needs all gates PASS plus a validator; `promising_count` is always 0 |
 | INV-07 | Only explicitly named roots are scanned; home and filesystem root are refused |
 | INV-08 | Smoke mode performs no filesystem write of any kind |
+| INV-09 | Count conservation: each experiment's `prior_trials_seeded` equals the sum of its counting ledger entries |
+| INV-10 | No double counting: unique dedup keys among counting entries; a recovered child of a batch is non-counting |
+| INV-11 | No fabricated variant: every entry needs a real evidence link; aggregates carry no parameter fingerprint |
+| INV-12 | Every pending reconciliation names an existing `trial_evidence` record |
+| INV-13 | Attacks, null controls and replays never add trials and must name their target |
 
 The record schema is **closed**: an unknown field is an error, not an extension point. A field that
 matters enough to record is worth versioning.
@@ -164,6 +206,15 @@ node scripts/analysis/query_research_warehouse_catalog.mjs variants
 node scripts/analysis/query_research_warehouse_catalog.mjs blocking-gap --top 3
 ```
 
+The trial ledger:
+
+```bash
+node scripts/analysis/query_research_warehouse_catalog.mjs trial-summary
+node scripts/analysis/query_research_warehouse_catalog.mjs trials --representation AGGREGATE_ONLY
+node scripts/analysis/query_research_warehouse_catalog.mjs trials --experiment EXP.HTF_MA_DISTANCE_REVERSION --include-non-counting
+node scripts/analysis/query_research_warehouse_catalog.mjs trial-lineage --family FAM.OVERFIT_LAB
+```
+
 Output is deterministic: no clock, no randomness, no environment variable is read anywhere, and the
 catalogue embeds no timestamp. Two builds of the same input are byte-identical, which is what makes
 a committed catalogue reviewable as a diff.
@@ -192,7 +243,8 @@ Writes are structurally bounded: exactly two `writeFileSync` calls exist, both g
 4. That the lesson titles are accurate. Eight of twelve links carry titles reconstructed from task
    reports rather than read from `BOTALIN_LESSONS_LEDGER.md`, and every one of them is marked
    `DOCUMENTED_UNVERIFIED`. They must be reconciled on the first verified read of the ledger.
-5. That the seeded trial counts are complete. They are lower bounds, and any deflation computed from
-   them understates the correction actually required.
+5. That the seeded trial counts are complete. 1046 of the 1066 catalogued trials exist only as
+   aggregate batches, and 15 ledger entries carry an explicitly unknown number of further variants.
+   Any deflation computed from these figures understates the correction actually required.
 6. Anything about any strategy. No verdict was changed, no gate was evaluated, no metric was
    computed. `promising_count` remains `0`.

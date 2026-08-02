@@ -23,8 +23,17 @@
       "run_id": null,
       "time_span_start": null,
       "time_span_end": null,
-      "symbols": ["UNIVERSE_SNAPSHOT"],
-      "timeframes": ["1m", "5m", "15m", "1h", "4h", "1d"],
+      "symbols": [
+        "UNIVERSE_SNAPSHOT"
+      ],
+      "timeframes": [
+        "1m",
+        "5m",
+        "15m",
+        "1h",
+        "4h",
+        "1d"
+      ],
       "schema_fingerprint": "unverified:ohlcv_snapshot+manifest",
       "write_ownership": "SERVER_COLLECTOR",
       "read_only_status": "APPEND_ONLY_BY_OWNER",
@@ -50,8 +59,12 @@
       "run_id": null,
       "time_span_start": null,
       "time_span_end": null,
-      "symbols": ["UNKNOWN"],
-      "timeframes": ["event"],
+      "symbols": [
+        "UNKNOWN"
+      ],
+      "timeframes": [
+        "event"
+      ],
       "schema_fingerprint": "unverified:ob_snapshot_event",
       "write_ownership": "SERVER_COLLECTOR",
       "read_only_status": "APPEND_ONLY_BY_OWNER",
@@ -77,15 +90,21 @@
       "run_id": null,
       "time_span_start": null,
       "time_span_end": null,
-      "symbols": ["UNKNOWN"],
-      "timeframes": ["tick"],
+      "symbols": [
+        "UNKNOWN"
+      ],
+      "timeframes": [
+        "tick"
+      ],
       "schema_fingerprint": "unverified:tick_print",
       "write_ownership": "SERVER_COLLECTOR",
       "read_only_status": "APPEND_ONLY_BY_OWNER",
       "verification_status": "DOCUMENTED_UNVERIFIED",
       "evidence_grade": "RAW_PRIMARY",
       "fixture_flag": false,
-      "known_gaps": ["Not tracked in git; retention policy undocumented"],
+      "known_gaps": [
+        "Not tracked in git; retention policy undocumented"
+      ],
       "source_of_record": "docs/CURRENT_SOURCE_INVENTORY.md#3.5"
     },
     {
@@ -100,8 +119,12 @@
       "run_id": null,
       "time_span_start": null,
       "time_span_end": null,
-      "symbols": ["CROSS_VENUE_SET"],
-      "timeframes": ["funding_interval"],
+      "symbols": [
+        "CROSS_VENUE_SET"
+      ],
+      "timeframes": [
+        "funding_interval"
+      ],
       "schema_fingerprint": "unverified:funding_rate+price_by_venue",
       "write_ownership": "SERVER_COLLECTOR",
       "read_only_status": "APPEND_ONLY_BY_OWNER",
@@ -126,11 +149,28 @@
       "time_span_start": "2026-07-26T10:35:10Z",
       "time_span_end": null,
       "symbols": [
-        "BTCUSDT", "ETHUSDT", "SOLUSDT", "HYPEUSDT", "AVAXUSDT", "DOGEUSDT",
-        "SHIB1000USDT", "1000PEPEUSDT", "ZECUSDT", "BANKUSDT", "EULUSDT",
-        "DEXEUSDT", "ESPORTSUSDT", "XRPUSDT"
+        "BTCUSDT",
+        "ETHUSDT",
+        "SOLUSDT",
+        "HYPEUSDT",
+        "AVAXUSDT",
+        "DOGEUSDT",
+        "SHIB1000USDT",
+        "1000PEPEUSDT",
+        "ZECUSDT",
+        "BANKUSDT",
+        "EULUSDT",
+        "DEXEUSDT",
+        "ESPORTSUSDT",
+        "XRPUSDT"
       ],
-      "timeframes": ["1m", "5m", "15m", "1h", "4h"],
+      "timeframes": [
+        "1m",
+        "5m",
+        "15m",
+        "1h",
+        "4h"
+      ],
       "schema_fingerprint": "unverified:amel_event_v1",
       "write_ownership": "SERVER_COLLECTOR",
       "read_only_status": "APPEND_ONLY_BY_OWNER",
@@ -156,15 +196,21 @@
       "run_id": "amel-1785062109514",
       "time_span_start": "2026-07-26T10:35:10Z",
       "time_span_end": null,
-      "symbols": ["AMEL_UNIVERSE_14"],
-      "timeframes": ["event"],
+      "symbols": [
+        "AMEL_UNIVERSE_14"
+      ],
+      "timeframes": [
+        "event"
+      ],
       "schema_fingerprint": "unverified:amel_ob_top_levels+slippage_7_200_1000",
       "write_ownership": "SERVER_COLLECTOR",
       "read_only_status": "APPEND_ONLY_BY_OWNER",
       "verification_status": "DOCUMENTED_UNVERIFIED",
       "evidence_grade": "RAW_PRIMARY",
       "fixture_flag": false,
-      "known_gaps": ["Size-tier slippage computed for $7/$200/$1k only; larger tiers unrepresented"],
+      "known_gaps": [
+        "Size-tier slippage computed for $7/$200/$1k only; larger tiers unrepresented"
+      ],
       "source_of_record": "BOTALIN_FULL_PROJECT_HANDOFF_2026-07-26.md#2,#7"
     },
     {
@@ -179,17 +225,49 @@
       "run_id": "amel-1785062109514",
       "time_span_start": "2026-07-26T10:35:10Z",
       "time_span_end": null,
-      "symbols": ["AMEL_UNIVERSE_14"],
-      "timeframes": ["event"],
+      "symbols": [
+        "AMEL_UNIVERSE_14"
+      ],
+      "timeframes": [
+        "event"
+      ],
       "schema_fingerprint": "unverified:amel_outcome_v1",
       "write_ownership": "SERVER_COLLECTOR",
       "read_only_status": "APPEND_ONLY_BY_OWNER",
       "verification_status": "DOCUMENTED_UNVERIFIED",
       "evidence_grade": "RAW_PRIMARY",
       "fixture_flag": false,
-      "known_gaps": ["Snapshot count at 2026-07-26 was 0 outcomes"],
+      "known_gaps": [
+        "Snapshot count at 2026-07-26 was 0 outcomes"
+      ],
       "source_of_record": "BOTALIN_FULL_PROJECT_HANDOFF_2026-07-26.md#2",
       "notes": "Outcome-time only. No detector, guard, or router feature may read this source."
+    },
+    {
+      "record_type": "data_source",
+      "source_id": "EDGE.AMEL.REGIME",
+      "title": "Active Market Event Logger — regime labels",
+      "evidence_type": "EVENT_LOG",
+      "owner_system": "botalin-edge",
+      "host_scope": "SERVER_RESIDENT",
+      "retained_path": "/opt/botalin-edge/data/amel/regime_amel-1785062109514.jsonl",
+      "path_kind": "FILE",
+      "run_id": "amel-1785062109514",
+      "time_span_start": "2026-07-26T10:35:10Z",
+      "time_span_end": null,
+      "symbols": ["AMEL_UNIVERSE_14"],
+      "timeframes": ["1m", "5m", "15m", "1h", "4h"],
+      "schema_fingerprint": "unverified:amel_regime_v1",
+      "write_ownership": "SERVER_COLLECTOR",
+      "read_only_status": "APPEND_ONLY_BY_OWNER",
+      "verification_status": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "RAW_PRIMARY",
+      "fixture_flag": false,
+      "known_gaps": [
+        "Snapshot count at 2026-07-26 was 2 regime rows, far too few to label 930 mined combinations"
+      ],
+      "source_of_record": "BOTALIN_FULL_PROJECT_HANDOFF_2026-07-26.md#2,#7",
+      "notes": "Regime labelling input for the AMEL second-order combination mining."
     },
     {
       "record_type": "data_source",
@@ -203,15 +281,22 @@
       "run_id": null,
       "time_span_start": null,
       "time_span_end": null,
-      "symbols": ["SOXL", "LAB"],
-      "timeframes": ["event"],
+      "symbols": [
+        "SOXL",
+        "LAB"
+      ],
+      "timeframes": [
+        "event"
+      ],
       "schema_fingerprint": "unverified:decision_trace_jsonl+event_time_ob",
       "write_ownership": "SERVER_RUNNER",
       "read_only_status": "APPEND_ONLY_BY_OWNER",
       "verification_status": "DOCUMENTED_UNVERIFIED",
       "evidence_grade": "RAW_PRIMARY",
       "fixture_flag": false,
-      "known_gaps": ["Exact retained path not documented; enabled by FADE_DECISION_TRACE=1"],
+      "known_gaps": [
+        "Exact retained path not documented; enabled by FADE_DECISION_TRACE=1"
+      ],
       "source_of_record": "BOTALIN_FULL_PROJECT_HANDOFF_2026-07-26.md#3.1,#6"
     },
     {
@@ -226,15 +311,21 @@
       "run_id": null,
       "time_span_start": null,
       "time_span_end": null,
-      "symbols": ["SHADOW_K27"],
-      "timeframes": ["event"],
+      "symbols": [
+        "SHADOW_K27"
+      ],
+      "timeframes": [
+        "event"
+      ],
       "schema_fingerprint": "unverified:shadow_trade_v1",
       "write_ownership": "SERVER_RUNNER",
       "read_only_status": "APPEND_ONLY_BY_OWNER",
       "verification_status": "DOCUMENTED_UNVERIFIED",
       "evidence_grade": "DERIVED_PRIMARY",
       "fixture_flag": false,
-      "known_gaps": [".gitignore excludes logs/*.jsonl; no committed hash"],
+      "known_gaps": [
+        ".gitignore excludes logs/*.jsonl; no committed hash"
+      ],
       "source_of_record": "docs/CURRENT_SOURCE_INVENTORY.md#3.6",
       "notes": "Shadow is X1 execution realism at best. It never substitutes for executable replay."
     },
@@ -250,8 +341,12 @@
       "run_id": null,
       "time_span_start": null,
       "time_span_end": null,
-      "symbols": ["UNKNOWN"],
-      "timeframes": ["event"],
+      "symbols": [
+        "UNKNOWN"
+      ],
+      "timeframes": [
+        "event"
+      ],
       "schema_fingerprint": "unverified:sqlite_liquidations",
       "write_ownership": "SERVER_COLLECTOR",
       "read_only_status": "MUTABLE_RUNTIME",
@@ -277,15 +372,21 @@
       "run_id": null,
       "time_span_start": null,
       "time_span_end": null,
-      "symbols": ["UNKNOWN"],
-      "timeframes": ["event"],
+      "symbols": [
+        "UNKNOWN"
+      ],
+      "timeframes": [
+        "event"
+      ],
       "schema_fingerprint": "unverified:sqlite_microstructure",
       "write_ownership": "SERVER_COLLECTOR",
       "read_only_status": "MUTABLE_RUNTIME",
       "verification_status": "DOCUMENTED_UNVERIFIED",
       "evidence_grade": "RAW_PRIMARY",
       "fixture_flag": false,
-      "known_gaps": ["Legacy stack; schema and coverage undocumented in the research fork"],
+      "known_gaps": [
+        "Legacy stack; schema and coverage undocumented in the research fork"
+      ],
       "source_of_record": "docs/CURRENT_SOURCE_INVENTORY.md#1,#6"
     },
     {
@@ -300,8 +401,12 @@
       "run_id": null,
       "time_span_start": null,
       "time_span_end": null,
-      "symbols": ["MIXED_PERP"],
-      "timeframes": ["trade"],
+      "symbols": [
+        "MIXED_PERP"
+      ],
+      "timeframes": [
+        "trade"
+      ],
       "schema_fingerprint": "unverified:closed_trade_export",
       "write_ownership": "OPERATOR_MANUAL",
       "read_only_status": "READ_ONLY",
@@ -389,7 +494,9 @@
       "evidence_grade": "SECONDARY_DOC",
       "fixture_flag": false,
       "superseded_by_raw_source_id": "EDGE.DATA.BARS",
-      "known_gaps": ["Dated 2026-07-11; server state has moved since (HEAD 07189b6 then, 21aaa01 on 2026-07-26)"],
+      "known_gaps": [
+        "Dated 2026-07-11; server state has moved since (HEAD 07189b6 then, 21aaa01 on 2026-07-26)"
+      ],
       "source_of_record": "docs/CURRENT_SOURCE_INVENTORY.md"
     },
     {
@@ -405,7 +512,9 @@
       "time_span_start": null,
       "time_span_end": null,
       "symbols": [],
-      "timeframes": ["sub_1m_event"],
+      "timeframes": [
+        "sub_1m_event"
+      ],
       "schema_fingerprint": "required:event_ts+intensity+matched_book_snapshot",
       "write_ownership": "UNKNOWN",
       "read_only_status": "UNKNOWN",
@@ -431,7 +540,9 @@
       "time_span_start": null,
       "time_span_end": null,
       "symbols": [],
-      "timeframes": ["4h_event"],
+      "timeframes": [
+        "4h_event"
+      ],
       "schema_fingerprint": "required:>=30_matched_events_across_>=8_symbols",
       "write_ownership": "UNKNOWN",
       "read_only_status": "UNKNOWN",
@@ -457,7 +568,9 @@
       "time_span_start": null,
       "time_span_end": null,
       "symbols": [],
-      "timeframes": ["event"],
+      "timeframes": [
+        "event"
+      ],
       "schema_fingerprint": "required:first_seen_at+event_class+tagger_version+precision_measurement",
       "write_ownership": "UNKNOWN",
       "read_only_status": "UNKNOWN",
@@ -484,7 +597,9 @@
       "time_span_start": null,
       "time_span_end": null,
       "symbols": [],
-      "timeframes": ["event"],
+      "timeframes": [
+        "event"
+      ],
       "schema_fingerprint": "required:frozen_versioned_watchlist+closed_window_net_flow",
       "write_ownership": "UNKNOWN",
       "read_only_status": "UNKNOWN",
@@ -510,14 +625,22 @@
       "time_span_start": null,
       "time_span_end": null,
       "symbols": [],
-      "timeframes": ["1m", "5m", "15m", "1h", "4h"],
+      "timeframes": [
+        "1m",
+        "5m",
+        "15m",
+        "1h",
+        "4h"
+      ],
       "schema_fingerprint": "required:>=100_usable_events+day_clusters",
       "write_ownership": "UNKNOWN",
       "read_only_status": "UNKNOWN",
       "verification_status": "MISSING",
       "evidence_grade": "RAW_PRIMARY",
       "fixture_flag": false,
-      "known_gaps": ["Recorder was still running; completion checkpoint approximately 2026-08-04"],
+      "known_gaps": [
+        "Recorder was still running; completion checkpoint approximately 2026-08-04"
+      ],
       "source_of_record": "docs/BOTALIN_MASTER_ORCHESTRATION_PLAN_2026-07-30.md#W-06,#W-09"
     },
     {
@@ -532,15 +655,21 @@
       "run_id": "synth-0001",
       "time_span_start": "2026-01-01T00:00:00Z",
       "time_span_end": "2026-01-02T00:00:00Z",
-      "symbols": ["SYNTHUSDT"],
-      "timeframes": ["1h"],
+      "symbols": [
+        "SYNTHUSDT"
+      ],
+      "timeframes": [
+        "1h"
+      ],
       "schema_fingerprint": "synthetic:ts,o,h,l,c,v",
       "write_ownership": "WAREHOUSE_SYNTHETIC",
       "read_only_status": "READ_ONLY",
       "verification_status": "VERIFIED_READ_ONLY",
       "evidence_grade": "SYNTHETIC_FIXTURE",
       "fixture_flag": true,
-      "known_gaps": ["Synthetic. Carries no information about any market."],
+      "known_gaps": [
+        "Synthetic. Carries no information about any market."
+      ],
       "source_of_record": "data/research_warehouse_catalog_fixture_2026-08-02.json"
     },
     {
@@ -555,15 +684,21 @@
       "run_id": "synth-0001",
       "time_span_start": "2026-01-01T00:00:00Z",
       "time_span_end": "2026-01-02T00:00:00Z",
-      "symbols": ["SYNTHUSDT"],
-      "timeframes": ["event"],
+      "symbols": [
+        "SYNTHUSDT"
+      ],
+      "timeframes": [
+        "event"
+      ],
       "schema_fingerprint": "synthetic:ts,bid,ask,depth",
       "write_ownership": "WAREHOUSE_SYNTHETIC",
       "read_only_status": "READ_ONLY",
       "verification_status": "VERIFIED_READ_ONLY",
       "evidence_grade": "SYNTHETIC_FIXTURE",
       "fixture_flag": true,
-      "known_gaps": ["Synthetic. Carries no information about any market."],
+      "known_gaps": [
+        "Synthetic. Carries no information about any market."
+      ],
       "source_of_record": "data/research_warehouse_catalog_fixture_2026-08-02.json"
     }
   ],
@@ -574,27 +709,63 @@
       "family_id": "FAM.FADE_TOKENIZED",
       "title": "Fade tokenized-equity trend during US hours",
       "model_family": "FADE_TOKENIZED",
-      "mechanism_tags": ["mean_reversion", "tokenized_equity", "session_us_hours"],
-      "data_source_ids": ["EDGE.FADE.DECISION_TRACE", "EDGE.DATA.BARS"],
-      "timeframes": ["15m"],
-      "universe": ["SOXL", "LAB"],
+      "mechanism_tags": [
+        "mean_reversion",
+        "tokenized_equity",
+        "session_us_hours"
+      ],
+      "data_source_ids": [
+        "EDGE.FADE.DECISION_TRACE",
+        "EDGE.DATA.BARS"
+      ],
+      "timeframes": [
+        "15m"
+      ],
+      "universe": [
+        "SOXL",
+        "LAB"
+      ],
       "frozen_rule": {
         "frozen": true,
         "entry": "market entry against the prevailing intraday trend",
         "exit": "stop / target / timeout",
-        "decision_inputs": ["dt.ret_15m_k", "dt.session_bucket", "dt.spread_bps"]
+        "decision_inputs": [
+          "dt.ret_15m_k",
+          "dt.session_bucket",
+          "dt.spread_bps"
+        ]
       },
-      "decision_time_fields": ["dt.ret_15m_k", "dt.session_bucket", "dt.spread_bps", "dt.book_age_s"],
-      "execution_time_fields": ["ex.fill_price", "ex.slippage_bps", "ex.fill_ts"],
-      "outcome_time_fields": ["oc.net_pnl", "oc.exit_reason", "oc.holding_time_s"],
-      "costs": { "fees": true, "spread": true, "slippage": true, "funding": true },
+      "decision_time_fields": [
+        "dt.ret_15m_k",
+        "dt.session_bucket",
+        "dt.spread_bps",
+        "dt.book_age_s"
+      ],
+      "execution_time_fields": [
+        "ex.fill_price",
+        "ex.slippage_bps",
+        "ex.fill_ts"
+      ],
+      "outcome_time_fields": [
+        "oc.net_pnl",
+        "oc.exit_reason",
+        "oc.holding_time_s"
+      ],
+      "costs": {
+        "fees": true,
+        "spread": true,
+        "slippage": true,
+        "funding": true
+      },
       "lifecycle_state": "CLOSED",
       "commit_id": null,
       "branch": null,
-      "evidence_paths": ["/opt/botalin-edge/reference/FADE_TREND_SIGNAL_DIAGNOSIS_2026-07-23.md"],
+      "evidence_paths": [
+        "/opt/botalin-edge/reference/FADE_TREND_SIGNAL_DIAGNOSIS_2026-07-23.md"
+      ],
       "evidence_grade": "SECONDARY_DOC",
       "fixture_flag": false,
-      "prior_trials_seeded": 12,
+      "prior_trials_seeded": 5,
       "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#1"
     },
     {
@@ -603,27 +774,56 @@
       "family_id": "FAM.FADE_TOKENIZED",
       "title": "Fade tokenized-equity VWAP deviation",
       "model_family": "FADE_TOKENIZED",
-      "mechanism_tags": ["mean_reversion", "vwap", "tokenized_equity"],
-      "data_source_ids": ["EDGE.DATA.BARS"],
-      "timeframes": ["15m"],
-      "universe": ["SOXL"],
+      "mechanism_tags": [
+        "mean_reversion",
+        "vwap",
+        "tokenized_equity"
+      ],
+      "data_source_ids": [
+        "EDGE.DATA.BARS"
+      ],
+      "timeframes": [
+        "15m"
+      ],
+      "universe": [
+        "SOXL"
+      ],
       "frozen_rule": {
         "frozen": false,
         "entry": "fade deviation from session VWAP",
         "exit": "stop / target / timeout",
-        "decision_inputs": ["dt.vwap_deviation", "dt.session_bucket"]
+        "decision_inputs": [
+          "dt.vwap_deviation",
+          "dt.session_bucket"
+        ]
       },
-      "decision_time_fields": ["dt.vwap_deviation", "dt.session_bucket"],
-      "execution_time_fields": ["ex.fill_price", "ex.slippage_bps"],
-      "outcome_time_fields": ["oc.net_pnl", "oc.exit_reason"],
-      "costs": { "fees": true, "spread": true, "slippage": true, "funding": true },
+      "decision_time_fields": [
+        "dt.vwap_deviation",
+        "dt.session_bucket"
+      ],
+      "execution_time_fields": [
+        "ex.fill_price",
+        "ex.slippage_bps"
+      ],
+      "outcome_time_fields": [
+        "oc.net_pnl",
+        "oc.exit_reason"
+      ],
+      "costs": {
+        "fees": true,
+        "spread": true,
+        "slippage": true,
+        "funding": true
+      },
       "lifecycle_state": "CLOSED",
       "commit_id": null,
       "branch": null,
-      "evidence_paths": ["/opt/botalin-edge/reference/FADE_FAMILY_GOVERNANCE_2026-07-22.md"],
+      "evidence_paths": [
+        "/opt/botalin-edge/reference/FADE_FAMILY_GOVERNANCE_2026-07-22.md"
+      ],
       "evidence_grade": "SECONDARY_DOC",
       "fixture_flag": false,
-      "prior_trials_seeded": 6,
+      "prior_trials_seeded": 1,
       "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#3",
       "notes": "Headline was positive in paper but 86% off-hours and SOXL-only: a session artefact, not a pocket."
     },
@@ -633,20 +833,49 @@
       "family_id": "FAM.HTF_MEAN_REVERSION",
       "title": "HTF MA-distance mean reversion on majors",
       "model_family": "HTF_MEAN_REVERSION",
-      "mechanism_tags": ["mean_reversion", "htf", "ma_distance"],
-      "data_source_ids": ["EDGE.DATA.BARS"],
-      "timeframes": ["1h", "4h"],
-      "universe": ["MAJORS"],
+      "mechanism_tags": [
+        "mean_reversion",
+        "htf",
+        "ma_distance"
+      ],
+      "data_source_ids": [
+        "EDGE.DATA.BARS"
+      ],
+      "timeframes": [
+        "1h",
+        "4h"
+      ],
+      "universe": [
+        "MAJORS"
+      ],
       "frozen_rule": {
         "frozen": true,
         "entry": "z = (close - SMA20) / ATR beyond threshold",
         "exit": "reversion to mean / timeout",
-        "decision_inputs": ["dt.ma_distance_atr_1h", "dt.ma_distance_atr_4h"]
+        "decision_inputs": [
+          "dt.ma_distance_atr_1h",
+          "dt.ma_distance_atr_4h"
+        ]
       },
-      "decision_time_fields": ["dt.ma_distance_atr_1h", "dt.ma_distance_atr_4h", "dt.atr_1h"],
-      "execution_time_fields": ["ex.fill_price"],
-      "outcome_time_fields": ["oc.net_pnl", "oc.mfe", "oc.mae"],
-      "costs": { "fees": true, "spread": true, "slippage": true, "funding": true },
+      "decision_time_fields": [
+        "dt.ma_distance_atr_1h",
+        "dt.ma_distance_atr_4h",
+        "dt.atr_1h"
+      ],
+      "execution_time_fields": [
+        "ex.fill_price"
+      ],
+      "outcome_time_fields": [
+        "oc.net_pnl",
+        "oc.mfe",
+        "oc.mae"
+      ],
+      "costs": {
+        "fees": true,
+        "spread": true,
+        "slippage": true,
+        "funding": true
+      },
       "lifecycle_state": "CLOSED",
       "commit_id": null,
       "branch": null,
@@ -656,7 +885,7 @@
       ],
       "evidence_grade": "SECONDARY_DOC",
       "fixture_flag": false,
-      "prior_trials_seeded": 20,
+      "prior_trials_seeded": 2,
       "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#10"
     },
     {
@@ -665,27 +894,50 @@
       "family_id": "FAM.HTF_MEAN_REVERSION",
       "title": "Independent rediscovery of HTF mean reversion by the non-AMEL factory",
       "model_family": "HTF_MEAN_REVERSION",
-      "mechanism_tags": ["mean_reversion", "htf", "independent_rediscovery"],
-      "data_source_ids": ["EDGE.DATA.BARS"],
-      "timeframes": ["1h"],
-      "universe": ["MAJORS"],
+      "mechanism_tags": [
+        "mean_reversion",
+        "htf",
+        "independent_rediscovery"
+      ],
+      "data_source_ids": [
+        "EDGE.DATA.BARS"
+      ],
+      "timeframes": [
+        "1h"
+      ],
+      "universe": [
+        "MAJORS"
+      ],
       "frozen_rule": {
         "frozen": false,
         "entry": "factory-mined mean-reversion trigger",
         "exit": "factory-mined exit",
-        "decision_inputs": ["dt.ma_distance_atr_1h"]
+        "decision_inputs": [
+          "dt.ma_distance_atr_1h"
+        ]
       },
-      "decision_time_fields": ["dt.ma_distance_atr_1h"],
-      "execution_time_fields": ["ex.fill_price"],
-      "outcome_time_fields": ["oc.net_pnl"],
-      "costs": { "fees": true, "spread": true, "slippage": true, "funding": true },
+      "decision_time_fields": [
+        "dt.ma_distance_atr_1h"
+      ],
+      "execution_time_fields": [
+        "ex.fill_price"
+      ],
+      "outcome_time_fields": [
+        "oc.net_pnl"
+      ],
+      "costs": {
+        "fees": true,
+        "spread": true,
+        "slippage": true,
+        "funding": true
+      },
       "lifecycle_state": "CLOSED",
       "commit_id": null,
       "branch": null,
       "evidence_paths": [],
       "evidence_grade": "SECONDARY_DOC",
       "fixture_flag": false,
-      "prior_trials_seeded": 0,
+      "prior_trials_seeded": 1,
       "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#11",
       "notes": "Net median +8.56 bps in a recent sample, then failed OOS. Duplicate of EXP.HTF_MA_DISTANCE_REVERSION."
     },
@@ -695,27 +947,57 @@
       "family_id": "FAM.HTF_VOL_COMPRESSION",
       "title": "HTF volatility compression to expansion, 4h, alt-scoped",
       "model_family": "HTF_VOL_COMPRESSION",
-      "mechanism_tags": ["volatility_state_transition", "htf", "altcoins"],
-      "data_source_ids": ["EDGE.DATA.BARS", "GAP.OB.HTF_VOLCOMP_COVERAGE"],
-      "timeframes": ["4h"],
-      "universe": ["ALTS"],
+      "mechanism_tags": [
+        "volatility_state_transition",
+        "htf",
+        "altcoins"
+      ],
+      "data_source_ids": [
+        "EDGE.DATA.BARS",
+        "GAP.OB.HTF_VOLCOMP_COVERAGE"
+      ],
+      "timeframes": [
+        "4h"
+      ],
+      "universe": [
+        "ALTS"
+      ],
       "frozen_rule": {
         "frozen": false,
         "entry": "sustained multi-window compression then expansion onset",
         "exit": "expansion exhaustion / time stop",
-        "decision_inputs": ["dt.vol_compression_4h", "dt.rv_4h", "dt.liquidity_tier"]
+        "decision_inputs": [
+          "dt.vol_compression_4h",
+          "dt.rv_4h",
+          "dt.liquidity_tier"
+        ]
       },
-      "decision_time_fields": ["dt.vol_compression_4h", "dt.rv_4h", "dt.liquidity_tier"],
-      "execution_time_fields": ["ex.fill_price", "ex.depth_at_price"],
-      "outcome_time_fields": ["oc.net_pnl", "oc.exit_reason"],
-      "costs": { "fees": true, "spread": true, "slippage": true, "funding": true },
+      "decision_time_fields": [
+        "dt.vol_compression_4h",
+        "dt.rv_4h",
+        "dt.liquidity_tier"
+      ],
+      "execution_time_fields": [
+        "ex.fill_price",
+        "ex.depth_at_price"
+      ],
+      "outcome_time_fields": [
+        "oc.net_pnl",
+        "oc.exit_reason"
+      ],
+      "costs": {
+        "fees": true,
+        "spread": true,
+        "slippage": true,
+        "funding": true
+      },
       "lifecycle_state": "DATA_HEALTH",
       "commit_id": null,
       "branch": null,
       "evidence_paths": [],
       "evidence_grade": "SECONDARY_DOC",
       "fixture_flag": false,
-      "prior_trials_seeded": 8,
+      "prior_trials_seeded": 1,
       "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#12",
       "notes": "The 4h/alt scope was chosen knowing the 1h scope failed, so it counts as a prior trial and may be confirmed only on data generated after that failure was recorded."
     },
@@ -725,27 +1007,49 @@
       "family_id": "FAM.HTF_VOL_COMPRESSION",
       "title": "HTF volatility compression to expansion, 1h formulation",
       "model_family": "HTF_VOL_COMPRESSION",
-      "mechanism_tags": ["volatility_state_transition", "htf"],
-      "data_source_ids": ["EDGE.DATA.BARS"],
-      "timeframes": ["1h"],
-      "universe": ["MIXED"],
+      "mechanism_tags": [
+        "volatility_state_transition",
+        "htf"
+      ],
+      "data_source_ids": [
+        "EDGE.DATA.BARS"
+      ],
+      "timeframes": [
+        "1h"
+      ],
+      "universe": [
+        "MIXED"
+      ],
       "frozen_rule": {
         "frozen": true,
         "entry": "compression then expansion onset, 1h",
         "exit": "time stop",
-        "decision_inputs": ["dt.vol_compression_1h"]
+        "decision_inputs": [
+          "dt.vol_compression_1h"
+        ]
       },
-      "decision_time_fields": ["dt.vol_compression_1h"],
-      "execution_time_fields": ["ex.fill_price"],
-      "outcome_time_fields": ["oc.net_pnl"],
-      "costs": { "fees": true, "spread": true, "slippage": true, "funding": true },
+      "decision_time_fields": [
+        "dt.vol_compression_1h"
+      ],
+      "execution_time_fields": [
+        "ex.fill_price"
+      ],
+      "outcome_time_fields": [
+        "oc.net_pnl"
+      ],
+      "costs": {
+        "fees": true,
+        "spread": true,
+        "slippage": true,
+        "funding": true
+      },
       "lifecycle_state": "CLOSED",
       "commit_id": null,
       "branch": null,
       "evidence_paths": [],
       "evidence_grade": "SECONDARY_DOC",
       "fixture_flag": false,
-      "prior_trials_seeded": 5,
+      "prior_trials_seeded": 1,
       "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#13"
     },
     {
@@ -754,20 +1058,49 @@
       "family_id": "FAM.FAILED_BREAKOUT",
       "title": "Failed-breakout reversal, US hours, 15m",
       "model_family": "FAILED_BREAKOUT",
-      "mechanism_tags": ["failed_breakout", "reversal", "session_us_hours"],
-      "data_source_ids": ["EDGE.DATA.BARS", "EDGE.AMEL.EVENTS"],
-      "timeframes": ["15m"],
-      "universe": ["MIXED"],
+      "mechanism_tags": [
+        "failed_breakout",
+        "reversal",
+        "session_us_hours"
+      ],
+      "data_source_ids": [
+        "EDGE.DATA.BARS",
+        "EDGE.AMEL.EVENTS"
+      ],
+      "timeframes": [
+        "15m"
+      ],
+      "universe": [
+        "MIXED"
+      ],
       "frozen_rule": {
         "frozen": true,
         "entry": "breakout fails and price reclaims the level",
         "exit": "stop / target / timeout",
-        "decision_inputs": ["dt.dist_to_prior_hi_lo_15m", "dt.session_bucket"]
+        "decision_inputs": [
+          "dt.dist_to_prior_hi_lo_15m",
+          "dt.session_bucket"
+        ]
       },
-      "decision_time_fields": ["dt.dist_to_prior_hi_lo_15m", "dt.session_bucket"],
-      "execution_time_fields": ["ex.fill_price", "ex.slippage_bps"],
-      "outcome_time_fields": ["oc.net_pnl", "oc.mfe", "oc.mae"],
-      "costs": { "fees": true, "spread": true, "slippage": true, "funding": true },
+      "decision_time_fields": [
+        "dt.dist_to_prior_hi_lo_15m",
+        "dt.session_bucket"
+      ],
+      "execution_time_fields": [
+        "ex.fill_price",
+        "ex.slippage_bps"
+      ],
+      "outcome_time_fields": [
+        "oc.net_pnl",
+        "oc.mfe",
+        "oc.mae"
+      ],
+      "costs": {
+        "fees": true,
+        "spread": true,
+        "slippage": true,
+        "funding": true
+      },
       "lifecycle_state": "CLOSED",
       "commit_id": null,
       "branch": null,
@@ -777,7 +1110,7 @@
       ],
       "evidence_grade": "SECONDARY_DOC",
       "fixture_flag": false,
-      "prior_trials_seeded": 9,
+      "prior_trials_seeded": 1,
       "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#15"
     },
     {
@@ -786,27 +1119,59 @@
       "family_id": "FAM.AMEL_DIRECTIONAL",
       "title": "Wick reclaim / sweep fade",
       "model_family": "AMEL_DIRECTIONAL",
-      "mechanism_tags": ["wick_rejection", "liquidity_sweep", "event_driven"],
-      "data_source_ids": ["EDGE.AMEL.EVENTS", "EDGE.AMEL.ORDERBOOK", "GAP.AMEL.SEVEN_DAY"],
-      "timeframes": ["5m", "15m"],
-      "universe": ["AMEL_UNIVERSE_14"],
+      "mechanism_tags": [
+        "wick_rejection",
+        "liquidity_sweep",
+        "event_driven"
+      ],
+      "data_source_ids": [
+        "EDGE.AMEL.EVENTS",
+        "EDGE.AMEL.ORDERBOOK",
+        "GAP.AMEL.SEVEN_DAY"
+      ],
+      "timeframes": [
+        "5m",
+        "15m"
+      ],
+      "universe": [
+        "AMEL_UNIVERSE_14"
+      ],
       "frozen_rule": {
         "frozen": false,
         "entry": "wick reclaim after sweep of a liquidity level",
         "exit": "not yet frozen",
-        "decision_inputs": ["dt.wick_ratio", "dt.book_imbalance", "dt.trade_rate"]
+        "decision_inputs": [
+          "dt.wick_ratio",
+          "dt.book_imbalance",
+          "dt.trade_rate"
+        ]
       },
-      "decision_time_fields": ["dt.wick_ratio", "dt.book_imbalance", "dt.trade_rate"],
-      "execution_time_fields": ["ex.fill_price", "ex.depth_at_price"],
-      "outcome_time_fields": ["oc.net_pnl", "oc.mfe"],
-      "costs": { "fees": true, "spread": true, "slippage": true, "funding": true },
+      "decision_time_fields": [
+        "dt.wick_ratio",
+        "dt.book_imbalance",
+        "dt.trade_rate"
+      ],
+      "execution_time_fields": [
+        "ex.fill_price",
+        "ex.depth_at_price"
+      ],
+      "outcome_time_fields": [
+        "oc.net_pnl",
+        "oc.mfe"
+      ],
+      "costs": {
+        "fees": true,
+        "spread": true,
+        "slippage": true,
+        "funding": true
+      },
       "lifecycle_state": "DISCOVERY",
       "commit_id": null,
       "branch": null,
       "evidence_paths": [],
       "evidence_grade": "SECONDARY_DOC",
       "fixture_flag": false,
-      "prior_trials_seeded": 930,
+      "prior_trials_seeded": 1,
       "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#16,#19",
       "notes": "Only AMEL leftover with a positive mean after $200 cost (~+0.126%). Median near zero: probable payoff trap."
     },
@@ -816,27 +1181,51 @@
       "family_id": "FAM.AMEL_DIRECTIONAL",
       "title": "AMEL momentum impulse, 5m",
       "model_family": "AMEL_DIRECTIONAL",
-      "mechanism_tags": ["momentum_impulse", "event_driven"],
-      "data_source_ids": ["EDGE.AMEL.EVENTS"],
-      "timeframes": ["5m"],
-      "universe": ["AMEL_UNIVERSE_14"],
+      "mechanism_tags": [
+        "momentum_impulse",
+        "event_driven"
+      ],
+      "data_source_ids": [
+        "EDGE.AMEL.EVENTS"
+      ],
+      "timeframes": [
+        "5m"
+      ],
+      "universe": [
+        "AMEL_UNIVERSE_14"
+      ],
       "frozen_rule": {
         "frozen": true,
         "entry": "active-event momentum impulse baseline",
         "exit": "fixed horizon",
-        "decision_inputs": ["dt.impulse_z", "dt.trade_rate"]
+        "decision_inputs": [
+          "dt.impulse_z",
+          "dt.trade_rate"
+        ]
       },
-      "decision_time_fields": ["dt.impulse_z", "dt.trade_rate"],
-      "execution_time_fields": ["ex.fill_price"],
-      "outcome_time_fields": ["oc.net_pnl"],
-      "costs": { "fees": true, "spread": true, "slippage": true, "funding": true },
+      "decision_time_fields": [
+        "dt.impulse_z",
+        "dt.trade_rate"
+      ],
+      "execution_time_fields": [
+        "ex.fill_price"
+      ],
+      "outcome_time_fields": [
+        "oc.net_pnl"
+      ],
+      "costs": {
+        "fees": true,
+        "spread": true,
+        "slippage": true,
+        "funding": true
+      },
       "lifecycle_state": "CLOSED",
       "commit_id": null,
       "branch": null,
       "evidence_paths": [],
       "evidence_grade": "SECONDARY_DOC",
       "fixture_flag": false,
-      "prior_trials_seeded": 0,
+      "prior_trials_seeded": 1,
       "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#17"
     },
     {
@@ -845,15 +1234,30 @@
       "family_id": "FAM.CARRY",
       "title": "Hyperliquid funding carry",
       "model_family": "CARRY",
-      "mechanism_tags": ["funding_carry", "contractual_cash_flow", "market_neutral"],
-      "data_source_ids": ["EDGE.DATA.DISPERSION"],
-      "timeframes": ["1h", "1d"],
-      "universe": ["HL_PERP_SUBSET"],
+      "mechanism_tags": [
+        "funding_carry",
+        "contractual_cash_flow",
+        "market_neutral"
+      ],
+      "data_source_ids": [
+        "EDGE.DATA.DISPERSION"
+      ],
+      "timeframes": [
+        "1h",
+        "1d"
+      ],
+      "universe": [
+        "HL_PERP_SUBSET"
+      ],
       "frozen_rule": {
         "frozen": false,
         "entry": "funding persistently beyond the frozen cost floor with hedge leg available",
         "exit": "funding decays through the floor / hedge break / depth loss / time stop",
-        "decision_inputs": ["dt.funding_rate_current", "dt.funding_percentile_trailing", "dt.depth_within_bps_bid"]
+        "decision_inputs": [
+          "dt.funding_rate_current",
+          "dt.funding_percentile_trailing",
+          "dt.depth_within_bps_bid"
+        ]
       },
       "decision_time_fields": [
         "dt.funding_rate_current",
@@ -861,9 +1265,20 @@
         "dt.depth_within_bps_bid",
         "dt.min_to_next_funding"
       ],
-      "execution_time_fields": ["ex.fill_price", "ex.hedge_leg_fill_price"],
-      "outcome_time_fields": ["oc.net_carry_collected", "oc.realized_basis_risk"],
-      "costs": { "fees": true, "spread": true, "slippage": true, "funding": true },
+      "execution_time_fields": [
+        "ex.fill_price",
+        "ex.hedge_leg_fill_price"
+      ],
+      "outcome_time_fields": [
+        "oc.net_carry_collected",
+        "oc.realized_basis_risk"
+      ],
+      "costs": {
+        "fees": true,
+        "spread": true,
+        "slippage": true,
+        "funding": true
+      },
       "lifecycle_state": "DATA_HEALTH",
       "commit_id": null,
       "branch": null,
@@ -873,7 +1288,7 @@
       ],
       "evidence_grade": "SECONDARY_DOC",
       "fixture_flag": false,
-      "prior_trials_seeded": 3,
+      "prior_trials_seeded": 2,
       "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#28",
       "notes": "Closest documented cash path: 208d history +13.5% annualized. Forward funding softened below 10-12% and the custody monitor is a blocker."
     },
@@ -883,27 +1298,56 @@
       "family_id": "FAM.FORCED_FLOW",
       "title": "Liquidation cascade fade / continuation",
       "model_family": "FORCED_FLOW",
-      "mechanism_tags": ["forced_flow", "liquidation", "event_driven"],
-      "data_source_ids": ["LEGACY.LIQUIDATIONS_DB", "GAP.OI_LIQ.FINE_GRAIN"],
-      "timeframes": ["1m", "5m"],
-      "universe": ["MIXED"],
+      "mechanism_tags": [
+        "forced_flow",
+        "liquidation",
+        "event_driven"
+      ],
+      "data_source_ids": [
+        "LEGACY.LIQUIDATIONS_DB",
+        "GAP.OI_LIQ.FINE_GRAIN"
+      ],
+      "timeframes": [
+        "1m",
+        "5m"
+      ],
+      "universe": [
+        "MIXED"
+      ],
       "frozen_rule": {
         "frozen": false,
         "entry": "not definable at current granularity",
         "exit": "not definable at current granularity",
-        "decision_inputs": ["dt.liq_intensity", "dt.oi_change_window", "dt.book_imbalance"]
+        "decision_inputs": [
+          "dt.liq_intensity",
+          "dt.oi_change_window",
+          "dt.book_imbalance"
+        ]
       },
-      "decision_time_fields": ["dt.liq_intensity", "dt.oi_change_window", "dt.book_imbalance"],
-      "execution_time_fields": ["ex.fill_price"],
-      "outcome_time_fields": ["oc.net_pnl"],
-      "costs": { "fees": true, "spread": true, "slippage": true, "funding": true },
+      "decision_time_fields": [
+        "dt.liq_intensity",
+        "dt.oi_change_window",
+        "dt.book_imbalance"
+      ],
+      "execution_time_fields": [
+        "ex.fill_price"
+      ],
+      "outcome_time_fields": [
+        "oc.net_pnl"
+      ],
+      "costs": {
+        "fees": true,
+        "spread": true,
+        "slippage": true,
+        "funding": true
+      },
       "lifecycle_state": "DATA_HEALTH",
       "commit_id": null,
       "branch": null,
       "evidence_paths": [],
       "evidence_grade": "SECONDARY_DOC",
       "fixture_flag": false,
-      "prior_trials_seeded": 4,
+      "prior_trials_seeded": 1,
       "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#32,#33",
       "notes": "Clean identifiable payer, but 5m OI granularity hides the cascade. This is a data request before it is a hypothesis."
     },
@@ -913,27 +1357,51 @@
       "family_id": "FAM.WALLET_FLOW",
       "title": "Whale wallet versus crowd-ratio divergence",
       "model_family": "WALLET_FLOW",
-      "mechanism_tags": ["wallet_flow", "positioning", "regime_intelligence"],
-      "data_source_ids": ["GAP.WALLET.SEVEN_WALLET_BALANCED"],
-      "timeframes": ["1h"],
-      "universe": ["HL_TRACKED"],
+      "mechanism_tags": [
+        "wallet_flow",
+        "positioning",
+        "regime_intelligence"
+      ],
+      "data_source_ids": [
+        "GAP.WALLET.SEVEN_WALLET_BALANCED"
+      ],
+      "timeframes": [
+        "1h"
+      ],
+      "universe": [
+        "HL_TRACKED"
+      ],
       "frozen_rule": {
         "frozen": false,
         "entry": "GUARD ONLY - may suppress, may never emit a direction",
         "exit": "not applicable",
-        "decision_inputs": ["dt.whale_crowd_divergence", "dt.wallet_net_flow_1h"]
+        "decision_inputs": [
+          "dt.whale_crowd_divergence",
+          "dt.wallet_net_flow_1h"
+        ]
       },
-      "decision_time_fields": ["dt.whale_crowd_divergence", "dt.wallet_net_flow_1h", "dt.crowd_ratio"],
+      "decision_time_fields": [
+        "dt.whale_crowd_divergence",
+        "dt.wallet_net_flow_1h",
+        "dt.crowd_ratio"
+      ],
       "execution_time_fields": [],
-      "outcome_time_fields": ["oc.suppressed_state_outcome"],
-      "costs": { "fees": true, "spread": true, "slippage": true, "funding": true },
+      "outcome_time_fields": [
+        "oc.suppressed_state_outcome"
+      ],
+      "costs": {
+        "fees": true,
+        "spread": true,
+        "slippage": true,
+        "funding": true
+      },
       "lifecycle_state": "DATA_HEALTH",
       "commit_id": null,
       "branch": null,
       "evidence_paths": [],
       "evidence_grade": "SECONDARY_DOC",
       "fixture_flag": false,
-      "prior_trials_seeded": 2,
+      "prior_trials_seeded": 1,
       "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#24,#25",
       "notes": "Directional variants were negative. This is intelligence and guard material, never copy-trading."
     },
@@ -943,10 +1411,20 @@
       "family_id": "FAM.ACCOUNT_FORENSICS",
       "title": "Historical Bybit account forensics, 1238 closed trades",
       "model_family": "ACCOUNT_FORENSICS",
-      "mechanism_tags": ["risk_forensics", "anti_pattern", "leverage"],
-      "data_source_ids": ["BYBIT.ACCOUNT.HISTORY"],
-      "timeframes": ["trade"],
-      "universe": ["MIXED_PERP"],
+      "mechanism_tags": [
+        "risk_forensics",
+        "anti_pattern",
+        "leverage"
+      ],
+      "data_source_ids": [
+        "BYBIT.ACCOUNT.HISTORY"
+      ],
+      "timeframes": [
+        "trade"
+      ],
+      "universe": [
+        "MIXED_PERP"
+      ],
       "frozen_rule": {
         "frozen": true,
         "entry": "not a strategy - retrospective classification of executed trades",
@@ -954,16 +1432,27 @@
         "decision_inputs": []
       },
       "decision_time_fields": [],
-      "execution_time_fields": ["ex.leverage_used", "ex.fill_price"],
-      "outcome_time_fields": ["oc.net_pnl", "oc.liquidation_flag"],
-      "costs": { "fees": true, "spread": true, "slippage": true, "funding": true },
+      "execution_time_fields": [
+        "ex.leverage_used",
+        "ex.fill_price"
+      ],
+      "outcome_time_fields": [
+        "oc.net_pnl",
+        "oc.liquidation_flag"
+      ],
+      "costs": {
+        "fees": true,
+        "spread": true,
+        "slippage": true,
+        "funding": true
+      },
       "lifecycle_state": "CLOSED",
       "commit_id": null,
       "branch": null,
       "evidence_paths": [],
       "evidence_grade": "SECONDARY_DOC",
       "fixture_flag": false,
-      "prior_trials_seeded": 1,
+      "prior_trials_seeded": 2,
       "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#26,#27",
       "notes": "Result -$8.63k overall, 18 liquidations costing -$10.87k. High winrate with terrible payoff: risk-of-ruin evidence."
     },
@@ -973,20 +1462,44 @@
       "family_id": "FAM.OVERFIT_LAB",
       "title": "Overfit lab: 116 fitted single-strategy variants",
       "model_family": "OVERFIT_LAB",
-      "mechanism_tags": ["overfit_demonstration", "multiplicity", "null_control"],
-      "data_source_ids": ["EDGE.DATA.BARS"],
-      "timeframes": ["1h", "4h"],
-      "universe": ["MIXED"],
+      "mechanism_tags": [
+        "overfit_demonstration",
+        "multiplicity",
+        "null_control"
+      ],
+      "data_source_ids": [
+        "EDGE.DATA.BARS"
+      ],
+      "timeframes": [
+        "1h",
+        "4h"
+      ],
+      "universe": [
+        "MIXED"
+      ],
       "frozen_rule": {
         "frozen": false,
         "entry": "116 fitted variants across a parameter surface",
         "exit": "fitted",
-        "decision_inputs": ["dt.mixed_fitted_features"]
+        "decision_inputs": [
+          "dt.mixed_fitted_features"
+        ]
       },
-      "decision_time_fields": ["dt.mixed_fitted_features"],
-      "execution_time_fields": ["ex.fill_price"],
-      "outcome_time_fields": ["oc.net_pnl"],
-      "costs": { "fees": true, "spread": true, "slippage": true, "funding": true },
+      "decision_time_fields": [
+        "dt.mixed_fitted_features"
+      ],
+      "execution_time_fields": [
+        "ex.fill_price"
+      ],
+      "outcome_time_fields": [
+        "oc.net_pnl"
+      ],
+      "costs": {
+        "fees": true,
+        "spread": true,
+        "slippage": true,
+        "funding": true
+      },
       "lifecycle_state": "CLOSED",
       "commit_id": null,
       "branch": null,
@@ -1003,24 +1516,58 @@
       "family_id": "FAM.ROUTER",
       "title": "Multi-strategy regime router, architecture v0",
       "model_family": "ROUTER",
-      "mechanism_tags": ["router", "regime_mapping", "no_trade_default"],
-      "data_source_ids": ["EDGE.DATA.BARS", "EDGE.AMEL.EVENTS"],
-      "timeframes": ["1m", "5m", "15m", "1h", "4h", "1d"],
-      "universe": ["MIXED"],
+      "mechanism_tags": [
+        "router",
+        "regime_mapping",
+        "no_trade_default"
+      ],
+      "data_source_ids": [
+        "EDGE.DATA.BARS",
+        "EDGE.AMEL.EVENTS"
+      ],
+      "timeframes": [
+        "1m",
+        "5m",
+        "15m",
+        "1h",
+        "4h",
+        "1d"
+      ],
+      "universe": [
+        "MIXED"
+      ],
       "frozen_rule": {
         "frozen": true,
         "entry": "pure function of decision-time features, frozen sleeve registry and portfolio state; default NO_TRADE",
         "exit": "per admitted sleeve",
-        "decision_inputs": ["dt.regime_vector", "dt.data_health"]
+        "decision_inputs": [
+          "dt.regime_vector",
+          "dt.data_health"
+        ]
       },
-      "decision_time_fields": ["dt.regime_vector", "dt.data_health", "dt.portfolio_state_hash"],
-      "execution_time_fields": ["ex.execution_assumptions"],
-      "outcome_time_fields": ["oc.counterfactual_outcomes"],
-      "costs": { "fees": true, "spread": true, "slippage": true, "funding": true },
+      "decision_time_fields": [
+        "dt.regime_vector",
+        "dt.data_health",
+        "dt.portfolio_state_hash"
+      ],
+      "execution_time_fields": [
+        "ex.execution_assumptions"
+      ],
+      "outcome_time_fields": [
+        "oc.counterfactual_outcomes"
+      ],
+      "costs": {
+        "fees": true,
+        "spread": true,
+        "slippage": true,
+        "funding": true
+      },
       "lifecycle_state": "DATA_HEALTH",
       "commit_id": "27923a91",
       "branch": "task/TASK-006-MULTI-STRATEGY-ROUTER-ARCHITECTURE-V0",
-      "evidence_paths": ["tasks/results/TASK-006-MULTI-STRATEGY-ROUTER-ARCHITECTURE-V0-RESULT.md"],
+      "evidence_paths": [
+        "tasks/results/TASK-006-MULTI-STRATEGY-ROUTER-ARCHITECTURE-V0-RESULT.md"
+      ],
       "evidence_grade": "DERIVED_PRIMARY",
       "fixture_flag": false,
       "prior_trials_seeded": 0,
@@ -1033,28 +1580,115 @@
       "family_id": "FIXTURE.FAM.SYNTH",
       "title": "Synthetic well-formed experiment for smoke mode",
       "model_family": "SYNTHETIC",
-      "mechanism_tags": ["synthetic"],
-      "data_source_ids": ["FIXTURE.SYNTH.BARS", "FIXTURE.SYNTH.OB"],
-      "timeframes": ["1h"],
-      "universe": ["SYNTHUSDT"],
+      "mechanism_tags": [
+        "synthetic"
+      ],
+      "data_source_ids": [
+        "FIXTURE.SYNTH.BARS",
+        "FIXTURE.SYNTH.OB"
+      ],
+      "timeframes": [
+        "1h"
+      ],
+      "universe": [
+        "SYNTHUSDT"
+      ],
       "frozen_rule": {
         "frozen": true,
         "entry": "synthetic threshold on a synthetic feature",
         "exit": "fixed horizon",
-        "decision_inputs": ["dt.synth_feature"]
+        "decision_inputs": [
+          "dt.synth_feature"
+        ]
       },
-      "decision_time_fields": ["dt.synth_feature"],
-      "execution_time_fields": ["ex.synth_fill_price"],
-      "outcome_time_fields": ["oc.synth_net_pnl"],
-      "costs": { "fees": true, "spread": true, "slippage": true, "funding": true },
+      "decision_time_fields": [
+        "dt.synth_feature"
+      ],
+      "execution_time_fields": [
+        "ex.synth_fill_price"
+      ],
+      "outcome_time_fields": [
+        "oc.synth_net_pnl"
+      ],
+      "costs": {
+        "fees": true,
+        "spread": true,
+        "slippage": true,
+        "funding": true
+      },
       "lifecycle_state": "DISCOVERY",
       "commit_id": null,
       "branch": null,
-      "evidence_paths": ["SYNTHETIC:none"],
+      "evidence_paths": [
+        "SYNTHETIC:none"
+      ],
       "evidence_grade": "SYNTHETIC_FIXTURE",
       "fixture_flag": true,
-      "prior_trials_seeded": 0,
+      "prior_trials_seeded": 3,
       "source_of_record": "data/research_warehouse_catalog_fixture_2026-08-02.json"
+    },
+    {
+      "record_type": "experiment",
+      "experiment_id": "EXP.AMEL_SECOND_ORDER_COMBINATIONS",
+      "family_id": "FAM.AMEL_DIRECTIONAL",
+      "title": "AMEL second-order event/regime/liquidity combination mining",
+      "model_family": "AMEL_DIRECTIONAL",
+      "mechanism_tags": [
+        "second_order_mining",
+        "event_regime_liquidity_combination",
+        "guard_candidate"
+      ],
+      "data_source_ids": [
+        "EDGE.AMEL.EVENTS",
+        "EDGE.AMEL.ORDERBOOK",
+        "EDGE.AMEL.REGIME"
+      ],
+      "timeframes": [
+        "1m",
+        "5m",
+        "15m",
+        "1h",
+        "4h"
+      ],
+      "universe": [
+        "AMEL_UNIVERSE_14"
+      ],
+      "frozen_rule": {
+        "frozen": false,
+        "entry": "combination of an event class, a regime label and a liquidity bucket",
+        "exit": "not frozen; combinations were mined, not preregistered",
+        "decision_inputs": [
+          "dt.event_class",
+          "dt.regime_label",
+          "dt.liquidity_tier"
+        ]
+      },
+      "decision_time_fields": [
+        "dt.event_class",
+        "dt.regime_label",
+        "dt.liquidity_tier"
+      ],
+      "execution_time_fields": [
+        "ex.fill_price"
+      ],
+      "outcome_time_fields": [
+        "oc.net_pnl"
+      ],
+      "costs": {
+        "fees": true,
+        "spread": true,
+        "slippage": true,
+        "funding": true
+      },
+      "lifecycle_state": "CLOSED",
+      "commit_id": null,
+      "branch": null,
+      "evidence_paths": [],
+      "evidence_grade": "SECONDARY_DOC",
+      "fixture_flag": false,
+      "prior_trials_seeded": 930,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#19",
+      "notes": "Split out by TASK-022. TASK-021 attributed these 930 combinations to EXP.WICK_RECLAIM_SWEEP, which conflated a single mechanism evaluation with a 930-combination mining sweep."
     }
   ],
   "results": [
@@ -1065,9 +1699,24 @@
       "segment": "MICRO_LIVE",
       "axis_L": "L3",
       "axis_X": "X3",
-      "gates": { "G0": "PASS", "G1": "FAIL", "G2": "NOT_RUN", "G3": "PASS", "G4": "NOT_RUN", "G5": "NOT_RUN", "G6": "NOT_RUN", "G7": "NOT_RUN", "G8": "PASS", "G9": "NOT_RUN" },
+      "gates": {
+        "G0": "PASS",
+        "G1": "FAIL",
+        "G2": "NOT_RUN",
+        "G3": "PASS",
+        "G4": "NOT_RUN",
+        "G5": "NOT_RUN",
+        "G6": "NOT_RUN",
+        "G7": "NOT_RUN",
+        "G8": "PASS",
+        "G9": "NOT_RUN"
+      },
       "verdict": "REJECTED_FAMILY",
-      "metrics_net_of_cost": { "clean_fills": 3, "sessions_run": 3, "net_pnl_usd": -0.1124 },
+      "metrics_net_of_cost": {
+        "clean_fills": 3,
+        "sessions_run": 3,
+        "net_pnl_usd": -0.1124
+      },
       "n_events": 3,
       "n_symbols": 2,
       "n_blocks": 3,
@@ -1076,7 +1725,9 @@
       "overlap_status": "NOT_MEASURED",
       "closure_status": "CLOSED_REJECTED",
       "observed_at": "2026-07-26T00:00:00Z",
-      "evidence_paths": ["/opt/botalin-edge/reference/FADE_TREND_SIGNAL_DIAGNOSIS_2026-07-23.md"],
+      "evidence_paths": [
+        "/opt/botalin-edge/reference/FADE_TREND_SIGNAL_DIAGNOSIS_2026-07-23.md"
+      ],
       "evidence_grade": "SECONDARY_DOC",
       "fixture_flag": false,
       "source_of_record": "BOTALIN_FULL_PROJECT_HANDOFF_2026-07-26.md#2,#5",
@@ -1089,9 +1740,23 @@
       "segment": "PAPER",
       "axis_L": "L0",
       "axis_X": "X1",
-      "gates": { "G0": "FAIL", "G1": "NOT_RUN", "G2": "NOT_RUN", "G3": "NOT_RUN", "G4": "NOT_RUN", "G5": "FAIL", "G6": "NOT_RUN", "G7": "NOT_RUN", "G8": "PASS", "G9": "NOT_RUN" },
+      "gates": {
+        "G0": "FAIL",
+        "G1": "NOT_RUN",
+        "G2": "NOT_RUN",
+        "G3": "NOT_RUN",
+        "G4": "NOT_RUN",
+        "G5": "FAIL",
+        "G6": "NOT_RUN",
+        "G7": "NOT_RUN",
+        "G8": "PASS",
+        "G9": "NOT_RUN"
+      },
       "verdict": "REJECTED_FAMILY",
-      "metrics_net_of_cost": { "offhours_share": 0.86, "symbol_concentration": "SOXL_only" },
+      "metrics_net_of_cost": {
+        "offhours_share": 0.86,
+        "symbol_concentration": "SOXL_only"
+      },
       "n_events": null,
       "n_symbols": 1,
       "n_blocks": null,
@@ -1112,9 +1777,23 @@
       "segment": "HOLDOUT",
       "axis_L": "L2",
       "axis_X": "X0",
-      "gates": { "G0": "PASS", "G1": "PASS", "G2": "NOT_RUN", "G3": "NOT_RUN", "G4": "FAIL", "G5": "FAIL", "G6": "NOT_RUN", "G7": "NOT_RUN", "G8": "PASS", "G9": "NOT_RUN" },
+      "gates": {
+        "G0": "PASS",
+        "G1": "PASS",
+        "G2": "NOT_RUN",
+        "G3": "NOT_RUN",
+        "G4": "FAIL",
+        "G5": "FAIL",
+        "G6": "NOT_RUN",
+        "G7": "NOT_RUN",
+        "G8": "PASS",
+        "G9": "NOT_RUN"
+      },
       "verdict": "REJECTED_FAMILY",
-      "metrics_net_of_cost": { "holdout_1h": "slightly_positive", "holdout_4h": "negative" },
+      "metrics_net_of_cost": {
+        "holdout_1h": "slightly_positive",
+        "holdout_4h": "negative"
+      },
       "n_events": null,
       "n_symbols": null,
       "n_blocks": null,
@@ -1123,7 +1802,9 @@
       "overlap_status": "DUPLICATE",
       "closure_status": "CLOSED_REJECTED",
       "observed_at": "2026-07-22T00:00:00Z",
-      "evidence_paths": ["/opt/botalin-edge/reference/HTF_MA_DISTANCE_REVERSION_US_HOURS_V0_BACKTEST_REVIEW.md"],
+      "evidence_paths": [
+        "/opt/botalin-edge/reference/HTF_MA_DISTANCE_REVERSION_US_HOURS_V0_BACKTEST_REVIEW.md"
+      ],
       "evidence_grade": "SECONDARY_DOC",
       "fixture_flag": false,
       "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#10",
@@ -1136,9 +1817,22 @@
       "segment": "HOLDOUT",
       "axis_L": "L2",
       "axis_X": "X0",
-      "gates": { "G0": "PASS", "G1": "PASS", "G2": "NOT_RUN", "G3": "NOT_RUN", "G4": "FAIL", "G5": "NOT_RUN", "G6": "NOT_RUN", "G7": "FAIL", "G8": "PASS", "G9": "NOT_RUN" },
+      "gates": {
+        "G0": "PASS",
+        "G1": "PASS",
+        "G2": "NOT_RUN",
+        "G3": "NOT_RUN",
+        "G4": "FAIL",
+        "G5": "NOT_RUN",
+        "G6": "NOT_RUN",
+        "G7": "FAIL",
+        "G8": "PASS",
+        "G9": "NOT_RUN"
+      },
       "verdict": "DUPLICATE_OR_OVERLAP",
-      "metrics_net_of_cost": { "net_median_bps": 8.56 },
+      "metrics_net_of_cost": {
+        "net_median_bps": 8.56
+      },
       "n_events": null,
       "n_symbols": null,
       "n_blocks": null,
@@ -1160,9 +1854,24 @@
       "segment": "VALIDATION",
       "axis_L": "L1",
       "axis_X": "X0",
-      "gates": { "G0": "FAIL", "G1": "PASS", "G2": "PASS", "G3": "NOT_RUN", "G4": "NOT_RUN", "G5": "NOT_RUN", "G6": "PASS", "G7": "NOT_RUN", "G8": "PASS", "G9": "NOT_RUN" },
+      "gates": {
+        "G0": "FAIL",
+        "G1": "PASS",
+        "G2": "PASS",
+        "G3": "NOT_RUN",
+        "G4": "NOT_RUN",
+        "G5": "NOT_RUN",
+        "G6": "PASS",
+        "G7": "NOT_RUN",
+        "G8": "PASS",
+        "G9": "NOT_RUN"
+      },
       "verdict": "NEEDS_MORE_LOGGING",
-      "metrics_net_of_cost": { "usable_ob_events": 4, "param_neighborhood": "many_params_positive", "null_p": "low" },
+      "metrics_net_of_cost": {
+        "usable_ob_events": 4,
+        "param_neighborhood": "many_params_positive",
+        "null_p": "low"
+      },
       "n_events": 4,
       "n_symbols": null,
       "n_blocks": null,
@@ -1184,9 +1893,22 @@
       "segment": "HOLDOUT",
       "axis_L": "L2",
       "axis_X": "X0",
-      "gates": { "G0": "PASS", "G1": "FAIL", "G2": "NOT_RUN", "G3": "NOT_RUN", "G4": "FAIL", "G5": "NOT_RUN", "G6": "NOT_RUN", "G7": "NOT_RUN", "G8": "PASS", "G9": "NOT_RUN" },
+      "gates": {
+        "G0": "PASS",
+        "G1": "FAIL",
+        "G2": "NOT_RUN",
+        "G3": "NOT_RUN",
+        "G4": "FAIL",
+        "G5": "NOT_RUN",
+        "G6": "NOT_RUN",
+        "G7": "NOT_RUN",
+        "G8": "PASS",
+        "G9": "NOT_RUN"
+      },
       "verdict": "REJECTED_FAMILY",
-      "metrics_net_of_cost": { "stability": "unstable_across_folds" },
+      "metrics_net_of_cost": {
+        "stability": "unstable_across_folds"
+      },
       "n_events": null,
       "n_symbols": null,
       "n_blocks": null,
@@ -1207,9 +1929,23 @@
       "segment": "REPLAY",
       "axis_L": "L2",
       "axis_X": "X2",
-      "gates": { "G0": "PASS", "G1": "FAIL", "G2": "FAIL", "G3": "FAIL", "G4": "NOT_RUN", "G5": "NOT_RUN", "G6": "NOT_RUN", "G7": "NOT_RUN", "G8": "PASS", "G9": "NOT_RUN" },
+      "gates": {
+        "G0": "PASS",
+        "G1": "FAIL",
+        "G2": "FAIL",
+        "G3": "FAIL",
+        "G4": "NOT_RUN",
+        "G5": "NOT_RUN",
+        "G6": "NOT_RUN",
+        "G7": "NOT_RUN",
+        "G8": "PASS",
+        "G9": "NOT_RUN"
+      },
       "verdict": "QUARANTINED",
-      "metrics_net_of_cost": { "initial_atlas_mfe_mae": "1.4-1.5", "replay": "signal_bad_median_issue" },
+      "metrics_net_of_cost": {
+        "initial_atlas_mfe_mae": "1.4-1.5",
+        "replay": "signal_bad_median_issue"
+      },
       "n_events": null,
       "n_symbols": null,
       "n_blocks": null,
@@ -1218,7 +1954,9 @@
       "overlap_status": "NOT_MEASURED",
       "closure_status": "QUARANTINED",
       "observed_at": "2026-07-23T00:00:00Z",
-      "evidence_paths": ["/opt/botalin-edge/reference/FAILED_BREAKOUT_AT_EVENT_SLIPPAGE_2026-07-23.md"],
+      "evidence_paths": [
+        "/opt/botalin-edge/reference/FAILED_BREAKOUT_AT_EVENT_SLIPPAGE_2026-07-23.md"
+      ],
       "evidence_grade": "SECONDARY_DOC",
       "fixture_flag": false,
       "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#15",
@@ -1231,9 +1969,23 @@
       "segment": "TRAIN",
       "axis_L": "L0",
       "axis_X": "X0",
-      "gates": { "G0": "PASS", "G1": "PASS", "G2": "NOT_RUN", "G3": "NOT_RUN", "G4": "NOT_RUN", "G5": "FAIL", "G6": "NOT_RUN", "G7": "NOT_RUN", "G8": "PASS", "G9": "NOT_RUN" },
+      "gates": {
+        "G0": "PASS",
+        "G1": "PASS",
+        "G2": "NOT_RUN",
+        "G3": "NOT_RUN",
+        "G4": "NOT_RUN",
+        "G5": "FAIL",
+        "G6": "NOT_RUN",
+        "G7": "NOT_RUN",
+        "G8": "PASS",
+        "G9": "NOT_RUN"
+      },
       "verdict": "NEEDS_MORE_LOGGING",
-      "metrics_net_of_cost": { "mean_after_200usd_cost_pct": 0.126, "median_pct": 0.0 },
+      "metrics_net_of_cost": {
+        "mean_after_200usd_cost_pct": 0.126,
+        "median_pct": 0
+      },
       "n_events": null,
       "n_symbols": null,
       "n_blocks": 3,
@@ -1255,9 +2007,22 @@
       "segment": "TRAIN",
       "axis_L": "L0",
       "axis_X": "X0",
-      "gates": { "G0": "PASS", "G1": "FAIL", "G2": "NOT_RUN", "G3": "NOT_RUN", "G4": "NOT_RUN", "G5": "NOT_RUN", "G6": "NOT_RUN", "G7": "FAIL", "G8": "PASS", "G9": "NOT_RUN" },
+      "gates": {
+        "G0": "PASS",
+        "G1": "FAIL",
+        "G2": "NOT_RUN",
+        "G3": "NOT_RUN",
+        "G4": "NOT_RUN",
+        "G5": "NOT_RUN",
+        "G6": "NOT_RUN",
+        "G7": "FAIL",
+        "G8": "PASS",
+        "G9": "NOT_RUN"
+      },
       "verdict": "DUPLICATE_OR_OVERLAP",
-      "metrics_net_of_cost": { "expectancy": "negative" },
+      "metrics_net_of_cost": {
+        "expectancy": "negative"
+      },
       "n_events": null,
       "n_symbols": null,
       "n_blocks": null,
@@ -1278,9 +2043,24 @@
       "segment": "TRAIN",
       "axis_L": "L0",
       "axis_X": "X0",
-      "gates": { "G0": "FAIL", "G1": "NOT_RUN", "G2": "NOT_RUN", "G3": "NOT_RUN", "G4": "NOT_RUN", "G5": "NOT_RUN", "G6": "NOT_RUN", "G7": "NOT_RUN", "G8": "PASS", "G9": "NOT_RUN" },
+      "gates": {
+        "G0": "FAIL",
+        "G1": "NOT_RUN",
+        "G2": "NOT_RUN",
+        "G3": "NOT_RUN",
+        "G4": "NOT_RUN",
+        "G5": "NOT_RUN",
+        "G6": "NOT_RUN",
+        "G7": "NOT_RUN",
+        "G8": "PASS",
+        "G9": "NOT_RUN"
+      },
       "verdict": "DATA_REQUEST",
-      "metrics_net_of_cost": { "history_days": 208, "annualized_pct": 13.5, "forward_funding": "softened_below_10_12_pct" },
+      "metrics_net_of_cost": {
+        "history_days": 208,
+        "annualized_pct": 13.5,
+        "forward_funding": "softened_below_10_12_pct"
+      },
       "n_events": null,
       "n_symbols": null,
       "n_blocks": null,
@@ -1289,7 +2069,9 @@
       "overlap_status": "DISTINCT_UNPROVEN",
       "closure_status": "BLOCKED_ON_DATA",
       "observed_at": "2026-07-30T00:00:00Z",
-      "evidence_paths": ["/opt/botalin-edge/reference/HL_CARRY_2026-07-30_DECISION_PACK.md"],
+      "evidence_paths": [
+        "/opt/botalin-edge/reference/HL_CARRY_2026-07-30_DECISION_PACK.md"
+      ],
       "evidence_grade": "SECONDARY_DOC",
       "fixture_flag": false,
       "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#28",
@@ -1302,9 +2084,23 @@
       "segment": "UNSPECIFIED",
       "axis_L": "L0",
       "axis_X": "X0",
-      "gates": { "G0": "FAIL", "G1": "NOT_RUN", "G2": "NOT_RUN", "G3": "NOT_RUN", "G4": "NOT_RUN", "G5": "NOT_RUN", "G6": "NOT_RUN", "G7": "NOT_RUN", "G8": "NOT_RUN", "G9": "NOT_RUN" },
+      "gates": {
+        "G0": "FAIL",
+        "G1": "NOT_RUN",
+        "G2": "NOT_RUN",
+        "G3": "NOT_RUN",
+        "G4": "NOT_RUN",
+        "G5": "NOT_RUN",
+        "G6": "NOT_RUN",
+        "G7": "NOT_RUN",
+        "G8": "NOT_RUN",
+        "G9": "NOT_RUN"
+      },
       "verdict": "DATA_REQUEST",
-      "metrics_net_of_cost": { "oi_granularity": "5m", "required_granularity": "sub_1m_event" },
+      "metrics_net_of_cost": {
+        "oi_granularity": "5m",
+        "required_granularity": "sub_1m_event"
+      },
       "n_events": null,
       "n_symbols": null,
       "n_blocks": null,
@@ -1325,9 +2121,24 @@
       "segment": "TRAIN",
       "axis_L": "L0",
       "axis_X": "X0",
-      "gates": { "G0": "FAIL", "G1": "FAIL", "G2": "NOT_RUN", "G3": "NOT_RUN", "G4": "NOT_RUN", "G5": "FAIL", "G6": "NOT_RUN", "G7": "NOT_RUN", "G8": "PASS", "G9": "NOT_RUN" },
+      "gates": {
+        "G0": "FAIL",
+        "G1": "FAIL",
+        "G2": "NOT_RUN",
+        "G3": "NOT_RUN",
+        "G4": "NOT_RUN",
+        "G5": "FAIL",
+        "G6": "NOT_RUN",
+        "G7": "NOT_RUN",
+        "G8": "PASS",
+        "G9": "NOT_RUN"
+      },
       "verdict": "GUARD_ONLY",
-      "metrics_net_of_cost": { "directional_variants": "negative", "wallet_count": 3, "skew": "all_short" },
+      "metrics_net_of_cost": {
+        "directional_variants": "negative",
+        "wallet_count": 3,
+        "skew": "all_short"
+      },
       "n_events": null,
       "n_symbols": null,
       "n_blocks": null,
@@ -1348,9 +2159,26 @@
       "segment": "UNSPECIFIED",
       "axis_L": "L3",
       "axis_X": "X3",
-      "gates": { "G0": "PASS", "G1": "FAIL", "G2": "NOT_RUN", "G3": "NOT_RUN", "G4": "NOT_RUN", "G5": "NOT_RUN", "G6": "NOT_RUN", "G7": "NOT_RUN", "G8": "PASS", "G9": "NOT_RUN" },
+      "gates": {
+        "G0": "PASS",
+        "G1": "FAIL",
+        "G2": "NOT_RUN",
+        "G3": "NOT_RUN",
+        "G4": "NOT_RUN",
+        "G5": "NOT_RUN",
+        "G6": "NOT_RUN",
+        "G7": "NOT_RUN",
+        "G8": "PASS",
+        "G9": "NOT_RUN"
+      },
       "verdict": "REJECTED_FAMILY",
-      "metrics_net_of_cost": { "trades": 1238, "net_usd": -8630, "liquidations": 18, "liquidation_cost_usd": -10870, "safe_subset_n": 19 },
+      "metrics_net_of_cost": {
+        "trades": 1238,
+        "net_usd": -8630,
+        "liquidations": 18,
+        "liquidation_cost_usd": -10870,
+        "safe_subset_n": 19
+      },
       "n_events": 1238,
       "n_symbols": null,
       "n_blocks": null,
@@ -1372,9 +2200,24 @@
       "segment": "VALIDATION",
       "axis_L": "L0",
       "axis_X": "X0",
-      "gates": { "G0": "PASS", "G1": "PASS", "G2": "FAIL", "G3": "NOT_RUN", "G4": "FAIL", "G5": "FAIL", "G6": "FAIL", "G7": "NOT_RUN", "G8": "PASS", "G9": "NOT_RUN" },
+      "gates": {
+        "G0": "PASS",
+        "G1": "PASS",
+        "G2": "FAIL",
+        "G3": "NOT_RUN",
+        "G4": "FAIL",
+        "G5": "FAIL",
+        "G6": "FAIL",
+        "G7": "NOT_RUN",
+        "G8": "PASS",
+        "G9": "NOT_RUN"
+      },
       "verdict": "REJECTED_FAMILY",
-      "metrics_net_of_cost": { "variants": 116, "train_positive": 15, "survived_attacks": 0 },
+      "metrics_net_of_cost": {
+        "variants": 116,
+        "train_positive": 15,
+        "survived_attacks": 0
+      },
       "n_events": null,
       "n_symbols": null,
       "n_blocks": null,
@@ -1395,9 +2238,24 @@
       "segment": "REPLAY",
       "axis_L": "L1",
       "axis_X": "X0",
-      "gates": { "G0": "FAIL", "G1": "NOT_RUN", "G2": "NOT_RUN", "G3": "NOT_RUN", "G4": "NOT_RUN", "G5": "NOT_RUN", "G6": "NOT_RUN", "G7": "NOT_RUN", "G8": "NOT_RUN", "G9": "NOT_RUN" },
+      "gates": {
+        "G0": "FAIL",
+        "G1": "NOT_RUN",
+        "G2": "NOT_RUN",
+        "G3": "NOT_RUN",
+        "G4": "NOT_RUN",
+        "G5": "NOT_RUN",
+        "G6": "NOT_RUN",
+        "G7": "NOT_RUN",
+        "G8": "NOT_RUN",
+        "G9": "NOT_RUN"
+      },
       "verdict": "HYPOTHESIS_ONLY",
-      "metrics_net_of_cost": { "allow_rate": 0.0, "no_trade_rate": 1.0, "replay_hours": 24 },
+      "metrics_net_of_cost": {
+        "allow_rate": 0,
+        "no_trade_rate": 1,
+        "replay_hours": 24
+      },
       "n_events": null,
       "n_symbols": null,
       "n_blocks": null,
@@ -1406,7 +2264,9 @@
       "overlap_status": "NOT_MEASURED",
       "closure_status": "OPEN",
       "observed_at": "2026-07-30T00:00:00Z",
-      "evidence_paths": ["tasks/results/TASK-006-MULTI-STRATEGY-ROUTER-ARCHITECTURE-V0-RESULT.md"],
+      "evidence_paths": [
+        "tasks/results/TASK-006-MULTI-STRATEGY-ROUTER-ARCHITECTURE-V0-RESULT.md"
+      ],
       "evidence_grade": "DERIVED_PRIMARY",
       "fixture_flag": false,
       "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#38",
@@ -1419,9 +2279,22 @@
       "segment": "TRAIN",
       "axis_L": "L0",
       "axis_X": "X0",
-      "gates": { "G0": "PASS", "G1": "NOT_RUN", "G2": "NOT_RUN", "G3": "NOT_RUN", "G4": "NOT_RUN", "G5": "NOT_RUN", "G6": "NOT_RUN", "G7": "NOT_RUN", "G8": "NOT_RUN", "G9": "NOT_RUN" },
+      "gates": {
+        "G0": "PASS",
+        "G1": "NOT_RUN",
+        "G2": "NOT_RUN",
+        "G3": "NOT_RUN",
+        "G4": "NOT_RUN",
+        "G5": "NOT_RUN",
+        "G6": "NOT_RUN",
+        "G7": "NOT_RUN",
+        "G8": "NOT_RUN",
+        "G9": "NOT_RUN"
+      },
       "verdict": "HYPOTHESIS_ONLY",
-      "metrics_net_of_cost": { "synthetic": true },
+      "metrics_net_of_cost": {
+        "synthetic": true
+      },
       "n_events": 10,
       "n_symbols": 1,
       "n_blocks": 1,
@@ -1430,10 +2303,52 @@
       "overlap_status": "NOT_MEASURED",
       "closure_status": "OPEN",
       "observed_at": "2026-01-02T00:00:00Z",
-      "evidence_paths": ["SYNTHETIC:none"],
+      "evidence_paths": [
+        "SYNTHETIC:none"
+      ],
       "evidence_grade": "SYNTHETIC_FIXTURE",
       "fixture_flag": true,
       "source_of_record": "data/research_warehouse_catalog_fixture_2026-08-02.json"
+    },
+    {
+      "record_type": "result",
+      "result_id": "RES.AMEL_2ND.MINING_SWEEP",
+      "experiment_id": "EXP.AMEL_SECOND_ORDER_COMBINATIONS",
+      "segment": "TRAIN",
+      "axis_L": "L0",
+      "axis_X": "X0",
+      "gates": {
+        "G0": "PASS",
+        "G1": "NOT_RUN",
+        "G2": "NOT_RUN",
+        "G3": "NOT_RUN",
+        "G4": "NOT_RUN",
+        "G5": "FAIL",
+        "G6": "NOT_RUN",
+        "G7": "FAIL",
+        "G8": "PASS",
+        "G9": "NOT_RUN"
+      },
+      "verdict": "GUARD_ONLY",
+      "metrics_net_of_cost": {
+        "combinations": 930,
+        "duplicate": 745,
+        "non_duplicate": 185,
+        "positives": "tiny_N_one_symbol_or_overlapping"
+      },
+      "n_events": null,
+      "n_symbols": null,
+      "n_blocks": null,
+      "validator_id": null,
+      "validator_run_hash": null,
+      "overlap_status": "OVERLAPPING",
+      "closure_status": "CLOSED_DUPLICATE",
+      "observed_at": "2026-07-29T00:00:00Z",
+      "evidence_paths": [],
+      "evidence_grade": "SECONDARY_DOC",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#19",
+      "notes": "No preregistration. Useful for guard and liquidity filters only. The 930 combinations are the single largest documented consumer of the shared AMEL evidence."
     }
   ],
   "failure_routes": [
@@ -1585,6 +2500,19 @@
       "priority": 9,
       "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#39",
       "notes": "Its lasting effect is on the trials ledger: any deflation computed on this data must inherit these 116 trials."
+    },
+    {
+      "record_type": "failure_route",
+      "failure_route_id": "FR.AMEL_SECOND_ORDER",
+      "experiment_id": "EXP.AMEL_SECOND_ORDER_COMBINATIONS",
+      "family_id": "FAM.AMEL_DIRECTIONAL",
+      "failure_mechanism": "A 930-combination sweep with no preregistration: 745 were duplicates and the remaining positives were tiny-N, one-symbol, or overlapping. The sweep itself is the multiplicity problem.",
+      "route": "GUARD_ONLY",
+      "allowed_successor": null,
+      "blocking_data_gap_id": "GAP.AMEL.SEVEN_DAY",
+      "priority": 6,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#19",
+      "notes": "Retained because these 930 trials must be inherited by any future deflation computed on AMEL data."
     }
   ],
   "lesson_links": [
@@ -1820,6 +2748,1272 @@
       "permitted": false,
       "justification": "Retained deliberately as a refused edge: a proposed retry of a rejected family with no recorded structural difference, no new task id, and no new model identity. The builder must reject it, and the query CLI must never list it as a permitted variant.",
       "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#1"
+    }
+  ],
+  "trial_ledger_entries": [
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.FADE_TREND.EARLY_MICRO_SERIES",
+      "parent_experiment_id": "EXP.FADE_TOKENIZED_TREND_US_HOURS",
+      "family_id": "FAM.FADE_TOKENIZED",
+      "mechanism_tags": [
+        "mean_reversion",
+        "tokenized_equity"
+      ],
+      "kind": "HYPOTHESIS",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "fade_trend|early_micro|v0",
+      "counts_toward_lower_bound": true,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "BOTALIN_FULL_PROJECT_HANDOFF_2026-07-26.md#5.1",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": null,
+      "split": "MICRO_LIVE",
+      "cost_model_applied": true,
+      "verdict": "REJECTED_FAMILY",
+      "failure_route": "REJECTED_FAMILY",
+      "reconciliation_status": "RECONCILED",
+      "missing_child_evidence_id": null,
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_FULL_PROJECT_HANDOFF_2026-07-26.md#5.1",
+      "notes": "Early one-trade / micro-series. Named as a distinct series in the handoff."
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.FADE_TREND.V2_WRONG_CONFIG_SERIES",
+      "parent_experiment_id": "EXP.FADE_TOKENIZED_TREND_US_HOURS",
+      "family_id": "FAM.FADE_TOKENIZED",
+      "mechanism_tags": [
+        "mean_reversion",
+        "tokenized_equity"
+      ],
+      "kind": "PARAMETER_VARIANT",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "fade_trend|v2_retry|raw_long_wrong_config",
+      "counts_toward_lower_bound": true,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "BOTALIN_FULL_PROJECT_HANDOFF_2026-07-26.md#5.2",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": null,
+      "split": "MICRO_LIVE",
+      "cost_model_applied": true,
+      "verdict": "REJECTED_FAMILY",
+      "failure_route": "REJECTED_FAMILY",
+      "reconciliation_status": "RECONCILED",
+      "missing_child_evidence_id": null,
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_FULL_PROJECT_HANDOFF_2026-07-26.md#5.2",
+      "notes": "Config was wrong; the profitable trades caught an off-hours drift, not a FADE edge."
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.FADE_TREND.SIDE_REMAP_SERIES",
+      "parent_experiment_id": "EXP.FADE_TOKENIZED_TREND_US_HOURS",
+      "family_id": "FAM.FADE_TOKENIZED",
+      "mechanism_tags": [
+        "mean_reversion",
+        "tokenized_equity"
+      ],
+      "kind": "PARAMETER_VARIANT",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "fade_trend|true_alpha_side_remap",
+      "counts_toward_lower_bound": true,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "BOTALIN_FULL_PROJECT_HANDOFF_2026-07-26.md#5.3",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": null,
+      "split": "MICRO_LIVE",
+      "cost_model_applied": true,
+      "verdict": "REJECTED_FAMILY",
+      "failure_route": "REJECTED_FAMILY",
+      "reconciliation_status": "RECONCILED",
+      "missing_child_evidence_id": null,
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_FULL_PROJECT_HANDOFF_2026-07-26.md#5.3"
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.FADE_TREND.US_HOURS_MARKET_ENTRY",
+      "parent_experiment_id": "EXP.FADE_TOKENIZED_TREND_US_HOURS",
+      "family_id": "FAM.FADE_TOKENIZED",
+      "mechanism_tags": [
+        "mean_reversion",
+        "tokenized_equity",
+        "session_us_hours"
+      ],
+      "kind": "PARAMETER_VARIANT",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "fade_trend|us_hours|market_entry|v2_dc",
+      "counts_toward_lower_bound": true,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "BOTALIN_FULL_PROJECT_HANDOFF_2026-07-26.md#5.4",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": null,
+      "split": "MICRO_LIVE",
+      "cost_model_applied": true,
+      "verdict": "REJECTED_FAMILY",
+      "failure_route": "REJECTED_FAMILY",
+      "reconciliation_status": "UNRECOVERABLE_PENDING_SOURCE",
+      "missing_child_evidence_id": "TE.FADE_TREND.SESSION_ROSTER",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_FULL_PROJECT_HANDOFF_2026-07-26.md#2,#5.4",
+      "notes": "Three sessions, 3/20 clean fills, net -$0.1124 at the 2026-07-26 snapshot."
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.FADE_TREND.OFFHOURS_SHORT_SERIES",
+      "parent_experiment_id": "EXP.FADE_TOKENIZED_TREND_US_HOURS",
+      "family_id": "FAM.FADE_TOKENIZED",
+      "mechanism_tags": [
+        "mean_reversion",
+        "tokenized_equity",
+        "off_hours"
+      ],
+      "kind": "REGIME_VARIANT",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "fade_trend|off_hours|short",
+      "counts_toward_lower_bound": true,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#5",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": null,
+      "split": "MICRO_LIVE",
+      "cost_model_applied": true,
+      "verdict": "REJECTED_FAMILY",
+      "failure_route": "REJECTED_FAMILY",
+      "reconciliation_status": "RECONCILED",
+      "missing_child_evidence_id": null,
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#5",
+      "notes": "Live 5-fill series, 4/4 shorts negative or flat against an upward off-hours drift."
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.FADE_TREND.STALE_SIGNAL_DIAGNOSIS",
+      "parent_experiment_id": "EXP.FADE_TOKENIZED_TREND_US_HOURS",
+      "family_id": "FAM.FADE_TOKENIZED",
+      "mechanism_tags": [
+        "diagnostic"
+      ],
+      "kind": "DIAGNOSTIC",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "fade_trend|stale_signal_diagnosis",
+      "counts_toward_lower_bound": false,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "BOTALIN_FULL_PROJECT_HANDOFF_2026-07-26.md#5.6",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": null,
+      "split": "UNSPECIFIED",
+      "cost_model_applied": true,
+      "verdict": null,
+      "failure_route": null,
+      "reconciliation_status": "RECONCILED",
+      "missing_child_evidence_id": null,
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_FULL_PROJECT_HANDOFF_2026-07-26.md#5.6",
+      "notes": "A diagnosis of why signals were stale. It evaluated no new rule, so it consumes no trial."
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.FADE_TREND.IDEAL_FILL_RECHECK",
+      "parent_experiment_id": "EXP.FADE_TOKENIZED_TREND_US_HOURS",
+      "family_id": "FAM.FADE_TOKENIZED",
+      "mechanism_tags": [
+        "ideal_fill"
+      ],
+      "kind": "ROBUSTNESS_ATTACK",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "fade_trend|ideal_fill_recheck",
+      "counts_toward_lower_bound": false,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": "TL.FADE_TREND.US_HOURS_MARKET_ENTRY",
+      "evidence_path": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#1",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": null,
+      "split": "REPLAY",
+      "cost_model_applied": true,
+      "verdict": null,
+      "failure_route": null,
+      "reconciliation_status": "RECONCILED",
+      "missing_child_evidence_id": null,
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#1",
+      "notes": "Re-evaluating the same rule at ideal fill is an attack on an existing point, not a new trial."
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.FADE_VWAP.PAPER_EVAL",
+      "parent_experiment_id": "EXP.FADE_TOKENIZED_VWAP",
+      "family_id": "FAM.FADE_TOKENIZED",
+      "mechanism_tags": [
+        "mean_reversion",
+        "vwap"
+      ],
+      "kind": "HYPOTHESIS",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "fade_vwap|paper|v0",
+      "counts_toward_lower_bound": true,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#3",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": null,
+      "split": "PAPER",
+      "cost_model_applied": true,
+      "verdict": "REJECTED_FAMILY",
+      "failure_route": "REJECTED_FAMILY",
+      "reconciliation_status": "UNRECOVERABLE_PENDING_SOURCE",
+      "missing_child_evidence_id": "TE.FADE_VWAP.VARIANT_ROSTER",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#3"
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.HTF_MA.TF_1H",
+      "parent_experiment_id": "EXP.HTF_MA_DISTANCE_REVERSION",
+      "family_id": "FAM.HTF_MEAN_REVERSION",
+      "mechanism_tags": [
+        "mean_reversion",
+        "ma_distance"
+      ],
+      "kind": "PARAMETER_VARIANT",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "htf_ma_distance|tf=1h",
+      "counts_toward_lower_bound": true,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#10",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": "tf=1h;z=(close-SMA20)/ATR",
+      "split": "HOLDOUT",
+      "cost_model_applied": true,
+      "verdict": "REJECTED_FAMILY",
+      "failure_route": "REJECTED_FAMILY",
+      "reconciliation_status": "UNRECOVERABLE_PENDING_SOURCE",
+      "missing_child_evidence_id": "TE.HTF_MA.PARAM_GRID",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#10",
+      "notes": "Slightly positive on the 1h holdout, carried by BTC and by June alone."
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.HTF_MA.TF_4H",
+      "parent_experiment_id": "EXP.HTF_MA_DISTANCE_REVERSION",
+      "family_id": "FAM.HTF_MEAN_REVERSION",
+      "mechanism_tags": [
+        "mean_reversion",
+        "ma_distance"
+      ],
+      "kind": "PARAMETER_VARIANT",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "htf_ma_distance|tf=4h",
+      "counts_toward_lower_bound": true,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#10",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": "tf=4h;z=(close-SMA20)/ATR",
+      "split": "HOLDOUT",
+      "cost_model_applied": true,
+      "verdict": "REJECTED_FAMILY",
+      "failure_route": "REJECTED_FAMILY",
+      "reconciliation_status": "RECONCILED",
+      "missing_child_evidence_id": null,
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#10",
+      "notes": "Negative out of sample."
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.HTF_MA.REMOVE_BEST_SYMBOL",
+      "parent_experiment_id": "EXP.HTF_MA_DISTANCE_REVERSION",
+      "family_id": "FAM.HTF_MEAN_REVERSION",
+      "mechanism_tags": [
+        "concentration"
+      ],
+      "kind": "ROBUSTNESS_ATTACK",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "htf_ma_distance|attack|remove_best_symbol",
+      "counts_toward_lower_bound": false,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": "TL.HTF_MA.TF_1H",
+      "evidence_path": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#10",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": null,
+      "split": "HOLDOUT",
+      "cost_model_applied": true,
+      "verdict": null,
+      "failure_route": null,
+      "reconciliation_status": "RECONCILED",
+      "missing_child_evidence_id": null,
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#10"
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.HTF_MA.REMOVE_BEST_DAY",
+      "parent_experiment_id": "EXP.HTF_MA_DISTANCE_REVERSION",
+      "family_id": "FAM.HTF_MEAN_REVERSION",
+      "mechanism_tags": [
+        "concentration"
+      ],
+      "kind": "ROBUSTNESS_ATTACK",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "htf_ma_distance|attack|remove_best_day",
+      "counts_toward_lower_bound": false,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": "TL.HTF_MA.TF_1H",
+      "evidence_path": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#10",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": null,
+      "split": "HOLDOUT",
+      "cost_model_applied": true,
+      "verdict": null,
+      "failure_route": null,
+      "reconciliation_status": "RECONCILED",
+      "missing_child_evidence_id": null,
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#10"
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.HTF_MR_REDISC.FACTORY_RUN",
+      "parent_experiment_id": "EXP.HTF_MEAN_REVERSION_REDISCOVERY",
+      "family_id": "FAM.HTF_MEAN_REVERSION",
+      "mechanism_tags": [
+        "mean_reversion",
+        "independent_rediscovery"
+      ],
+      "kind": "HYPOTHESIS",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "htf_mr|non_amel_factory_rediscovery",
+      "counts_toward_lower_bound": true,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#11",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": null,
+      "split": "TRAIN",
+      "cost_model_applied": true,
+      "verdict": "DUPLICATE_OR_OVERLAP",
+      "failure_route": null,
+      "reconciliation_status": "UNRECOVERABLE_PENDING_SOURCE",
+      "missing_child_evidence_id": "TE.HTF_MR_REDISC.FACTORY_CANDIDATES",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#11",
+      "notes": "TASK-021 recorded this as 0 seeded trials. A rediscovery run consumed the same data and is now counted."
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.HTF_VOLCOMP_4H.PRIMARY",
+      "parent_experiment_id": "EXP.HTF_VOL_COMPRESSION_4H_ALT",
+      "family_id": "FAM.HTF_VOL_COMPRESSION",
+      "mechanism_tags": [
+        "volatility_state_transition",
+        "altcoins"
+      ],
+      "kind": "HYPOTHESIS",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "htf_volcomp|tf=4h|scope=alts",
+      "counts_toward_lower_bound": true,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#12",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": "tf=4h;scope=alts",
+      "split": "VALIDATION",
+      "cost_model_applied": true,
+      "verdict": "NEEDS_MORE_LOGGING",
+      "failure_route": "DATA_REQUEST",
+      "reconciliation_status": "UNRECOVERABLE_PENDING_SOURCE",
+      "missing_child_evidence_id": "TE.HTF_VOLCOMP_4H.PARAM_SWEEP",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#12"
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.HTF_VOLCOMP_4H.NULL_CONTROL",
+      "parent_experiment_id": "EXP.HTF_VOL_COMPRESSION_4H_ALT",
+      "family_id": "FAM.HTF_VOL_COMPRESSION",
+      "mechanism_tags": [
+        "matched_null"
+      ],
+      "kind": "NULL_CONTROL",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "htf_volcomp|4h|matched_null",
+      "counts_toward_lower_bound": false,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": "TL.HTF_VOLCOMP_4H.PRIMARY",
+      "evidence_path": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#12",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": null,
+      "split": "VALIDATION",
+      "cost_model_applied": true,
+      "verdict": null,
+      "failure_route": null,
+      "reconciliation_status": "RECONCILED",
+      "missing_child_evidence_id": null,
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#12",
+      "notes": "Null p was low. A matched null is a control on an existing point, never an additional trial."
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.HTF_VOLCOMP_1H.ATLAS",
+      "parent_experiment_id": "EXP.HTF_VOL_COMPRESSION_1H",
+      "family_id": "FAM.HTF_VOL_COMPRESSION",
+      "mechanism_tags": [
+        "volatility_state_transition"
+      ],
+      "kind": "HYPOTHESIS",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "htf_volcomp|tf=1h",
+      "counts_toward_lower_bound": true,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#13",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": "tf=1h",
+      "split": "HOLDOUT",
+      "cost_model_applied": true,
+      "verdict": "REJECTED_FAMILY",
+      "failure_route": "STRUCTURAL_VARIANT",
+      "reconciliation_status": "UNRECOVERABLE_PENDING_SOURCE",
+      "missing_child_evidence_id": "TE.HTF_VOLCOMP_1H.ATLAS_ROWS",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#13"
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.FAILED_BO.PRIMARY_ATLAS",
+      "parent_experiment_id": "EXP.FAILED_BREAKOUT_REVERSAL_US_HOURS",
+      "family_id": "FAM.FAILED_BREAKOUT",
+      "mechanism_tags": [
+        "failed_breakout",
+        "reversal"
+      ],
+      "kind": "HYPOTHESIS",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "failed_breakout|us_hours|15m",
+      "counts_toward_lower_bound": true,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#15",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": null,
+      "split": "TRAIN",
+      "cost_model_applied": true,
+      "verdict": "QUARANTINED",
+      "failure_route": "QUARANTINE",
+      "reconciliation_status": "UNRECOVERABLE_PENDING_SOURCE",
+      "missing_child_evidence_id": "TE.FAILED_BO.ATLAS_ROWS",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#15",
+      "notes": "The primary atlas showed MFE/MAE 1.4-1.5."
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.FAILED_BO.FRESH_REPLAY",
+      "parent_experiment_id": "EXP.FAILED_BREAKOUT_REVERSAL_US_HOURS",
+      "family_id": "FAM.FAILED_BREAKOUT",
+      "mechanism_tags": [
+        "execution_replay"
+      ],
+      "kind": "REPLAY",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "failed_breakout|fresh_replay",
+      "counts_toward_lower_bound": false,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": "TL.FAILED_BO.PRIMARY_ATLAS",
+      "evidence_path": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#15",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": null,
+      "split": "REPLAY",
+      "cost_model_applied": true,
+      "verdict": null,
+      "failure_route": null,
+      "reconciliation_status": "RECONCILED",
+      "missing_child_evidence_id": null,
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#15",
+      "notes": "The replay is what killed the family. It re-evaluated the same rule and adds no trial."
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.WICK_RECLAIM.JOINT_ATLAS",
+      "parent_experiment_id": "EXP.WICK_RECLAIM_SWEEP",
+      "family_id": "FAM.AMEL_DIRECTIONAL",
+      "mechanism_tags": [
+        "wick_rejection",
+        "liquidity_sweep"
+      ],
+      "kind": "HYPOTHESIS",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "amel|wick_reclaim_sweep|joint_atlas",
+      "counts_toward_lower_bound": true,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#16",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": null,
+      "split": "TRAIN",
+      "cost_model_applied": true,
+      "verdict": "NEEDS_MORE_LOGGING",
+      "failure_route": "DATA_REQUEST",
+      "reconciliation_status": "UNRECOVERABLE_PENDING_SOURCE",
+      "missing_child_evidence_id": "TE.WICK_RECLAIM.EXIT_VARIANTS",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#16",
+      "notes": "TASK-021 wrongly attributed the 930 AMEL second-order combinations to this experiment. They belong to EXP.AMEL_SECOND_ORDER_COMBINATIONS."
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.AMEL_2ND.DUPLICATE_BATCH",
+      "parent_experiment_id": "EXP.AMEL_SECOND_ORDER_COMBINATIONS",
+      "family_id": "FAM.AMEL_DIRECTIONAL",
+      "mechanism_tags": [
+        "event_regime_liquidity_combination",
+        "second_order_mining"
+      ],
+      "kind": "REGIME_VARIANT",
+      "representation": "AGGREGATE_ONLY",
+      "exact_trial_count": 745,
+      "dedup_key": "amel|second_order|batch=duplicate",
+      "counts_toward_lower_bound": true,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#19",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": null,
+      "split": "TRAIN",
+      "cost_model_applied": true,
+      "verdict": "DUPLICATE_OR_OVERLAP",
+      "failure_route": "GUARD_ONLY",
+      "reconciliation_status": "AGGREGATE_PENDING_CHILDREN",
+      "missing_child_evidence_id": "TE.AMEL_2ND.DUPLICATE_CHILDREN",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#19",
+      "notes": "The inventory states 745 of the 930 combinations were duplicates. Each still consumed the shared data, so all 745 count."
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.AMEL_2ND.NON_DUPLICATE_BATCH",
+      "parent_experiment_id": "EXP.AMEL_SECOND_ORDER_COMBINATIONS",
+      "family_id": "FAM.AMEL_DIRECTIONAL",
+      "mechanism_tags": [
+        "event_regime_liquidity_combination",
+        "second_order_mining"
+      ],
+      "kind": "REGIME_VARIANT",
+      "representation": "AGGREGATE_ONLY",
+      "exact_trial_count": 185,
+      "dedup_key": "amel|second_order|batch=non_duplicate",
+      "counts_toward_lower_bound": true,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#19",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": null,
+      "split": "TRAIN",
+      "cost_model_applied": true,
+      "verdict": "NEEDS_MORE_LOGGING",
+      "failure_route": "GUARD_ONLY",
+      "reconciliation_status": "AGGREGATE_PENDING_CHILDREN",
+      "missing_child_evidence_id": "TE.AMEL_2ND.NON_DUPLICATE_CHILDREN",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#19",
+      "notes": "930 total minus 745 duplicates. Positives were tiny-N, one-symbol, or overlapping."
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.AMEL_MOMENTUM.BASELINE",
+      "parent_experiment_id": "EXP.AMEL_MOMENTUM_IMPULSE_5M",
+      "family_id": "FAM.AMEL_DIRECTIONAL",
+      "mechanism_tags": [
+        "momentum_impulse"
+      ],
+      "kind": "HYPOTHESIS",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "amel|momentum_impulse|tf=5m",
+      "counts_toward_lower_bound": true,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#17",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": null,
+      "split": "TRAIN",
+      "cost_model_applied": true,
+      "verdict": "DUPLICATE_OR_OVERLAP",
+      "failure_route": null,
+      "reconciliation_status": "RECONCILED",
+      "missing_child_evidence_id": null,
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#17",
+      "notes": "TASK-021 recorded 0 seeded trials. The active-event baseline was an evaluation and is now counted."
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.HL_CARRY.HISTORY_208D",
+      "parent_experiment_id": "EXP.HL_CARRY",
+      "family_id": "FAM.CARRY",
+      "mechanism_tags": [
+        "funding_carry"
+      ],
+      "kind": "HYPOTHESIS",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "hl_carry|history|208d",
+      "counts_toward_lower_bound": true,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#28",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": "window=208d",
+      "split": "TRAIN",
+      "cost_model_applied": true,
+      "verdict": "DATA_REQUEST",
+      "failure_route": "DATA_REQUEST",
+      "reconciliation_status": "RECONCILED",
+      "missing_child_evidence_id": null,
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#28",
+      "notes": "Backward-looking carry accrual of +13.5% annualized over 208 days. Not an out-of-sample result."
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.HL_CARRY.FORWARD_FUNDING_CHECK",
+      "parent_experiment_id": "EXP.HL_CARRY",
+      "family_id": "FAM.CARRY",
+      "mechanism_tags": [
+        "funding_carry",
+        "persistence"
+      ],
+      "kind": "DATA_SPLIT",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "hl_carry|forward_funding_persistence",
+      "counts_toward_lower_bound": true,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#28",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": null,
+      "split": "FORWARD",
+      "cost_model_applied": true,
+      "verdict": "DATA_REQUEST",
+      "failure_route": "DATA_REQUEST",
+      "reconciliation_status": "RECONCILED",
+      "missing_child_evidence_id": null,
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#28",
+      "notes": "Forward funding softened below the 10-12% floor."
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.LIQ_CASCADE.OI_FUNDING_ATLAS",
+      "parent_experiment_id": "EXP.LIQUIDATION_CASCADE_RESPONSE",
+      "family_id": "FAM.FORCED_FLOW",
+      "mechanism_tags": [
+        "forced_flow",
+        "open_interest"
+      ],
+      "kind": "HYPOTHESIS",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "forced_flow|oi_funding_unwind_atlas",
+      "counts_toward_lower_bound": true,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#32",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": null,
+      "split": "UNSPECIFIED",
+      "cost_model_applied": true,
+      "verdict": "DATA_REQUEST",
+      "failure_route": "DATA_REQUEST",
+      "reconciliation_status": "UNRECOVERABLE_PENDING_SOURCE",
+      "missing_child_evidence_id": "TE.LIQ_CASCADE.TESTED_VARIANTS",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#32,#33"
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.WALLET.THREE_WALLET_RUN",
+      "parent_experiment_id": "EXP.WALLET_CROWD_DIVERGENCE",
+      "family_id": "FAM.WALLET_FLOW",
+      "mechanism_tags": [
+        "wallet_flow",
+        "positioning"
+      ],
+      "kind": "HYPOTHESIS",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "wallet_flow|three_wallet_run",
+      "counts_toward_lower_bound": true,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#24",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": "wallets=3",
+      "split": "TRAIN",
+      "cost_model_applied": true,
+      "verdict": "GUARD_ONLY",
+      "failure_route": "GUARD_ONLY",
+      "reconciliation_status": "UNRECOVERABLE_PENDING_SOURCE",
+      "missing_child_evidence_id": "TE.WALLET.DIRECTIONAL_VARIANTS",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#24,#25"
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.BYBIT.FORENSIC_CLASSIFICATION",
+      "parent_experiment_id": "EXP.BYBIT_ACCOUNT_FORENSICS",
+      "family_id": "FAM.ACCOUNT_FORENSICS",
+      "mechanism_tags": [
+        "risk_forensics"
+      ],
+      "kind": "DIAGNOSTIC",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "bybit_history|forensic_classification",
+      "counts_toward_lower_bound": true,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#26",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": null,
+      "split": "UNSPECIFIED",
+      "cost_model_applied": true,
+      "verdict": "REJECTED_FAMILY",
+      "failure_route": "GUARD_ONLY",
+      "reconciliation_status": "RECONCILED",
+      "missing_child_evidence_id": null,
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#26",
+      "notes": "1238 closed trades, net -$8.63k, 18 liquidations costing -$10.87k."
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.BYBIT.LOW_LEVERAGE_SAFE_SUBSET",
+      "parent_experiment_id": "EXP.BYBIT_ACCOUNT_FORENSICS",
+      "family_id": "FAM.ACCOUNT_FORENSICS",
+      "mechanism_tags": [
+        "risk_forensics",
+        "subset_analysis"
+      ],
+      "kind": "DATA_SPLIT",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "bybit_history|subset=liquid_lt3x_no_liq",
+      "counts_toward_lower_bound": true,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#27",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": "leverage<3x;liquid;no_liquidation",
+      "split": "UNSPECIFIED",
+      "cost_model_applied": true,
+      "verdict": "INSUFFICIENT_DATA",
+      "failure_route": "GUARD_ONLY",
+      "reconciliation_status": "UNRECOVERABLE_PENDING_SOURCE",
+      "missing_child_evidence_id": "TE.BYBIT.STOP_TARGET_GRID",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#27",
+      "notes": "N=19 and net negative. TASK-021 counted the whole family as one trial; this split is a second."
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.OVERFIT.TRAIN_POSITIVE_BATCH",
+      "parent_experiment_id": "EXP.OVERFIT_LAB_SINGLE_STRATEGIES",
+      "family_id": "FAM.OVERFIT_LAB",
+      "mechanism_tags": [
+        "overfit_demonstration"
+      ],
+      "kind": "PARAMETER_VARIANT",
+      "representation": "AGGREGATE_ONLY",
+      "exact_trial_count": 15,
+      "dedup_key": "overfit_lab|batch=train_positive",
+      "counts_toward_lower_bound": true,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#39",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": null,
+      "split": "VALIDATION",
+      "cost_model_applied": true,
+      "verdict": "REJECTED_FAMILY",
+      "failure_route": "REJECTED_FAMILY",
+      "reconciliation_status": "AGGREGATE_PENDING_CHILDREN",
+      "missing_child_evidence_id": "TE.OVERFIT.TRAIN_POSITIVE_CHILDREN",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#39",
+      "notes": "The inventory states 15 of the 116 fitted variants were train-positive."
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.OVERFIT.NON_POSITIVE_BATCH",
+      "parent_experiment_id": "EXP.OVERFIT_LAB_SINGLE_STRATEGIES",
+      "family_id": "FAM.OVERFIT_LAB",
+      "mechanism_tags": [
+        "overfit_demonstration"
+      ],
+      "kind": "PARAMETER_VARIANT",
+      "representation": "AGGREGATE_ONLY",
+      "exact_trial_count": 101,
+      "dedup_key": "overfit_lab|batch=not_train_positive",
+      "counts_toward_lower_bound": true,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#39",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": null,
+      "split": "VALIDATION",
+      "cost_model_applied": true,
+      "verdict": "REJECTED_FAMILY",
+      "failure_route": "REJECTED_FAMILY",
+      "reconciliation_status": "AGGREGATE_PENDING_CHILDREN",
+      "missing_child_evidence_id": "TE.OVERFIT.NON_POSITIVE_CHILDREN",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#39",
+      "notes": "116 fitted variants minus the 15 train-positive."
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.OVERFIT.ATTACK_SUITE",
+      "parent_experiment_id": "EXP.OVERFIT_LAB_SINGLE_STRATEGIES",
+      "family_id": "FAM.OVERFIT_LAB",
+      "mechanism_tags": [
+        "robustness"
+      ],
+      "kind": "ROBUSTNESS_ATTACK",
+      "representation": "AGGREGATE_ONLY",
+      "exact_trial_count": 15,
+      "dedup_key": "overfit_lab|attack_suite",
+      "counts_toward_lower_bound": false,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": "TL.OVERFIT.TRAIN_POSITIVE_BATCH",
+      "evidence_path": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#39",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "SECONDARY_DOC",
+      "parameter_fingerprint": null,
+      "split": "VALIDATION",
+      "cost_model_applied": true,
+      "verdict": null,
+      "failure_route": null,
+      "reconciliation_status": "RECONCILED",
+      "missing_child_evidence_id": null,
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#39",
+      "notes": "Zero of the 15 survived. Attacking 15 points does not add 15 trials."
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "TL.ROUTER.REPLAY_24H",
+      "parent_experiment_id": "EXP.MULTI_STRATEGY_ROUTER_V0",
+      "family_id": "FAM.ROUTER",
+      "mechanism_tags": [
+        "router",
+        "no_trade_default"
+      ],
+      "kind": "DIAGNOSTIC",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "router|replay_24h",
+      "counts_toward_lower_bound": false,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "tasks/results/TASK-006-MULTI-STRATEGY-ROUTER-ARCHITECTURE-V0-RESULT.md",
+      "verification_grade": "DOCUMENTED_UNVERIFIED",
+      "evidence_grade": "DERIVED_PRIMARY",
+      "parameter_fingerprint": null,
+      "split": "REPLAY",
+      "cost_model_applied": true,
+      "verdict": null,
+      "failure_route": null,
+      "reconciliation_status": "RECONCILED",
+      "missing_child_evidence_id": null,
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#38",
+      "notes": "ALLOW=0%, NO_TRADE 100% over 24h. The router evaluated no strategy rule of its own, so it consumes no trial."
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "FIXTURE.TL.SYNTH_INDIVIDUAL",
+      "parent_experiment_id": "FIXTURE.EXP.SYNTH_OK",
+      "family_id": "FIXTURE.FAM.SYNTH",
+      "mechanism_tags": [
+        "synthetic"
+      ],
+      "kind": "HYPOTHESIS",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "synth|individual|1",
+      "counts_toward_lower_bound": true,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "SYNTHETIC:in_manifest",
+      "verification_grade": "VERIFIED_READ_ONLY",
+      "evidence_grade": "SYNTHETIC_FIXTURE",
+      "parameter_fingerprint": null,
+      "split": "TRAIN",
+      "cost_model_applied": true,
+      "verdict": null,
+      "failure_route": null,
+      "reconciliation_status": "RECONCILED",
+      "missing_child_evidence_id": null,
+      "fixture_flag": true,
+      "source_of_record": "data/research_warehouse_catalog_fixture_2026-08-02.json"
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "FIXTURE.TL.SYNTH_AGGREGATE",
+      "parent_experiment_id": "FIXTURE.EXP.SYNTH_OK",
+      "family_id": "FIXTURE.FAM.SYNTH",
+      "mechanism_tags": [
+        "synthetic"
+      ],
+      "kind": "PARAMETER_VARIANT",
+      "representation": "AGGREGATE_ONLY",
+      "exact_trial_count": 2,
+      "dedup_key": "synth|aggregate|batch",
+      "counts_toward_lower_bound": true,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": null,
+      "evidence_path": "SYNTHETIC:in_manifest",
+      "verification_grade": "VERIFIED_READ_ONLY",
+      "evidence_grade": "SYNTHETIC_FIXTURE",
+      "parameter_fingerprint": null,
+      "split": "TRAIN",
+      "cost_model_applied": true,
+      "verdict": null,
+      "failure_route": null,
+      "reconciliation_status": "AGGREGATE_PENDING_CHILDREN",
+      "missing_child_evidence_id": "FIXTURE.TE.SYNTH_CHILDREN",
+      "fixture_flag": true,
+      "source_of_record": "data/research_warehouse_catalog_fixture_2026-08-02.json"
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "FIXTURE.TL.SYNTH_CHILD_OF_AGGREGATE",
+      "parent_experiment_id": "FIXTURE.EXP.SYNTH_OK",
+      "family_id": "FIXTURE.FAM.SYNTH",
+      "mechanism_tags": [
+        "synthetic"
+      ],
+      "kind": "PARAMETER_VARIANT",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "synth|aggregate|child_1",
+      "counts_toward_lower_bound": false,
+      "member_of_aggregate_trial_id": "FIXTURE.TL.SYNTH_AGGREGATE",
+      "attacks_trial_id": null,
+      "evidence_path": "SYNTHETIC:in_manifest",
+      "verification_grade": "VERIFIED_READ_ONLY",
+      "evidence_grade": "SYNTHETIC_FIXTURE",
+      "parameter_fingerprint": "synth_param=1",
+      "split": "TRAIN",
+      "cost_model_applied": true,
+      "verdict": null,
+      "failure_route": null,
+      "reconciliation_status": "RECONCILED",
+      "missing_child_evidence_id": null,
+      "fixture_flag": true,
+      "source_of_record": "data/research_warehouse_catalog_fixture_2026-08-02.json",
+      "notes": "A recovered child of the aggregate batch. It is non-counting because the batch already counts it."
+    },
+    {
+      "record_type": "trial_ledger_entry",
+      "trial_id": "FIXTURE.TL.SYNTH_NULL_CONTROL",
+      "parent_experiment_id": "FIXTURE.EXP.SYNTH_OK",
+      "family_id": "FIXTURE.FAM.SYNTH",
+      "mechanism_tags": [
+        "synthetic"
+      ],
+      "kind": "NULL_CONTROL",
+      "representation": "INDIVIDUAL",
+      "exact_trial_count": 1,
+      "dedup_key": "synth|null_control",
+      "counts_toward_lower_bound": false,
+      "member_of_aggregate_trial_id": null,
+      "attacks_trial_id": "FIXTURE.TL.SYNTH_INDIVIDUAL",
+      "evidence_path": "SYNTHETIC:in_manifest",
+      "verification_grade": "VERIFIED_READ_ONLY",
+      "evidence_grade": "SYNTHETIC_FIXTURE",
+      "parameter_fingerprint": null,
+      "split": "TRAIN",
+      "cost_model_applied": true,
+      "verdict": null,
+      "failure_route": null,
+      "reconciliation_status": "RECONCILED",
+      "missing_child_evidence_id": null,
+      "fixture_flag": true,
+      "source_of_record": "data/research_warehouse_catalog_fixture_2026-08-02.json"
+    }
+  ],
+  "trial_evidence": [
+    {
+      "record_type": "trial_evidence",
+      "evidence_id": "TE.FADE_TREND.SESSION_ROSTER",
+      "trial_id": "TL.FADE_TREND.US_HOURS_MARKET_ENTRY",
+      "required_artefact": "FADE data-collection session roster and per-session decision-trace run index for the v2_DC model",
+      "artefact_location_hint": "/opt/botalin-edge/logs/fade_decision_trace/ (run index; exact filename not documented)",
+      "location_verification": "MISSING",
+      "recoverable_child_count_estimate": null,
+      "recovery_phase": "GO-WAREHOUSE-0B-RECONCILE",
+      "blocking_reason": "Only the aggregate session count is documented locally; the per-session parameter points were never written into a local artefact.",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_FULL_PROJECT_HANDOFF_2026-07-26.md#2,#6"
+    },
+    {
+      "record_type": "trial_evidence",
+      "evidence_id": "TE.FADE_VWAP.VARIANT_ROSTER",
+      "trial_id": "TL.FADE_VWAP.PAPER_EVAL",
+      "required_artefact": "Paper-factory candidate registry rows for the VWAP variant, including every parameter point evaluated",
+      "artefact_location_hint": "/opt/botalin-edge/reference/FADE_FAMILY_GOVERNANCE_2026-07-22.md and the paper-factory candidate store",
+      "location_verification": "MISSING",
+      "recoverable_child_count_estimate": null,
+      "recovery_phase": "GO-WAREHOUSE-0B-RECONCILE",
+      "blocking_reason": "The inventory records one paper evaluation and no parameter roster. The true variant count is unknown and must not be guessed.",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#3"
+    },
+    {
+      "record_type": "trial_evidence",
+      "evidence_id": "TE.HTF_MA.PARAM_GRID",
+      "trial_id": "TL.HTF_MA.TF_1H",
+      "required_artefact": "Parameter grid actually swept for the MA-distance reversion OOS/robustness/L2 study",
+      "artefact_location_hint": "/opt/botalin-edge/reference/HTF_MA_DISTANCE_REVERSION_US_HOURS_V0_BACKTEST_REVIEW.md",
+      "location_verification": "MISSING",
+      "recoverable_child_count_estimate": null,
+      "recovery_phase": "GO-WAREHOUSE-0B-RECONCILE",
+      "blocking_reason": "The review is named locally but not mirrored. Only the two timeframe formulations are documented here; the SMA/ATR/z grid size is unknown.",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#10"
+    },
+    {
+      "record_type": "trial_evidence",
+      "evidence_id": "TE.HTF_MR_REDISC.FACTORY_CANDIDATES",
+      "trial_id": "TL.HTF_MR_REDISC.FACTORY_RUN",
+      "required_artefact": "Non-AMEL candidate factory output listing every mined candidate in the run that rediscovered mean reversion",
+      "artefact_location_hint": "/opt/botalin-edge/data/ (non-AMEL factory output; path not documented)",
+      "location_verification": "MISSING",
+      "recoverable_child_count_estimate": null,
+      "recovery_phase": "GO-WAREHOUSE-0B-RECONCILE",
+      "blocking_reason": "A factory run evaluates many candidates. Only the single surviving rediscovery is documented locally.",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#11,#40"
+    },
+    {
+      "record_type": "trial_evidence",
+      "evidence_id": "TE.HTF_VOLCOMP_4H.PARAM_SWEEP",
+      "trial_id": "TL.HTF_VOLCOMP_4H.PRIMARY",
+      "required_artefact": "Parameter-neighbourhood sweep behind the \"many params positive\" robustness claim",
+      "artefact_location_hint": "/opt/botalin-edge/scripts/analysis/vol_compression_expansion_ob_universe_slippage.mjs output",
+      "location_verification": "MISSING",
+      "recoverable_child_count_estimate": null,
+      "recovery_phase": "GO-WAREHOUSE-0B-RECONCILE",
+      "blocking_reason": "The robustness claim is aggregate prose. Converting \"many\" into a number without the sweep output would be an invented count.",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#12"
+    },
+    {
+      "record_type": "trial_evidence",
+      "evidence_id": "TE.HTF_VOLCOMP_1H.ATLAS_ROWS",
+      "trial_id": "TL.HTF_VOLCOMP_1H.ATLAS",
+      "required_artefact": "Per-row output of the 1h volatility-compression atlas",
+      "artefact_location_hint": "/opt/botalin-edge/data/ (atlas output; path not documented)",
+      "location_verification": "MISSING",
+      "recoverable_child_count_estimate": null,
+      "recovery_phase": "GO-WAREHOUSE-0B-RECONCILE",
+      "blocking_reason": "An atlas evaluates many configurations. The local record states only that the 1h family died.",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#13"
+    },
+    {
+      "record_type": "trial_evidence",
+      "evidence_id": "TE.FAILED_BO.ATLAS_ROWS",
+      "trial_id": "TL.FAILED_BO.PRIMARY_ATLAS",
+      "required_artefact": "Per-row output of the failed-breakout primary atlas and of the fresh replay that overturned it",
+      "artefact_location_hint": "/opt/botalin-edge/reference/FAILED_BREAKOUT_AT_EVENT_SLIPPAGE_2026-07-23.md",
+      "location_verification": "MISSING",
+      "recoverable_child_count_estimate": null,
+      "recovery_phase": "GO-WAREHOUSE-0B-RECONCILE",
+      "blocking_reason": "Only the summary MFE/MAE figures are documented locally; the per-configuration rows were never mirrored.",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#15"
+    },
+    {
+      "record_type": "trial_evidence",
+      "evidence_id": "TE.WICK_RECLAIM.EXIT_VARIANTS",
+      "trial_id": "TL.WICK_RECLAIM.JOINT_ATLAS",
+      "required_artefact": "Entry/exit variant grid evaluated for wick reclaim inside the AMEL joint atlas",
+      "artefact_location_hint": "/opt/botalin-edge/scripts/analysis/active_market_event_logger_report.mjs output for run amel-1785062109514",
+      "location_verification": "MISSING",
+      "recoverable_child_count_estimate": null,
+      "recovery_phase": "GO-WAREHOUSE-0B-RECONCILE",
+      "blocking_reason": "The joint atlas reports one summary figure per mechanism. The exit grid behind it is not documented locally.",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#16"
+    },
+    {
+      "record_type": "trial_evidence",
+      "evidence_id": "TE.AMEL_2ND.DUPLICATE_CHILDREN",
+      "trial_id": "TL.AMEL_2ND.DUPLICATE_BATCH",
+      "required_artefact": "Per-combination rows of the AMEL second-order miner, duplicate-classified subset",
+      "artefact_location_hint": "/opt/botalin-edge/scripts/analysis/ second-order miner output for run amel-1785062109514",
+      "location_verification": "MISSING",
+      "recoverable_child_count_estimate": 745,
+      "recovery_phase": "GO-WAREHOUSE-0B-RECONCILE",
+      "blocking_reason": "The count 745 is stated in the inventory but no per-combination row is available locally. The children are known to exist and are known in number; they are simply not recoverable from this repository.",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#19"
+    },
+    {
+      "record_type": "trial_evidence",
+      "evidence_id": "TE.AMEL_2ND.NON_DUPLICATE_CHILDREN",
+      "trial_id": "TL.AMEL_2ND.NON_DUPLICATE_BATCH",
+      "required_artefact": "Per-combination rows of the AMEL second-order miner, non-duplicate subset",
+      "artefact_location_hint": "/opt/botalin-edge/scripts/analysis/ second-order miner output for run amel-1785062109514",
+      "location_verification": "MISSING",
+      "recoverable_child_count_estimate": 185,
+      "recovery_phase": "GO-WAREHOUSE-0B-RECONCILE",
+      "blocking_reason": "Derived as 930 total minus 745 duplicates. Both figures come from one inventory row; neither is confirmed against the miner output.",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#19"
+    },
+    {
+      "record_type": "trial_evidence",
+      "evidence_id": "TE.LIQ_CASCADE.TESTED_VARIANTS",
+      "trial_id": "TL.LIQ_CASCADE.OI_FUNDING_ATLAS",
+      "required_artefact": "The crowded funding/OI unwind variants recorded as \"tested variants net negative\"",
+      "artefact_location_hint": "/opt/botalin-edge/data/ (OI/funding atlas output; path not documented)",
+      "location_verification": "MISSING",
+      "recoverable_child_count_estimate": null,
+      "recovery_phase": "GO-WAREHOUSE-0B-RECONCILE",
+      "blocking_reason": "The inventory says variants were tested but gives no count. Any number here would be invented.",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#32"
+    },
+    {
+      "record_type": "trial_evidence",
+      "evidence_id": "TE.WALLET.DIRECTIONAL_VARIANTS",
+      "trial_id": "TL.WALLET.THREE_WALLET_RUN",
+      "required_artefact": "The directional wallet/crowd variants recorded as negative, and the multi-layer V1 guard/directional/fade-crowd replay",
+      "artefact_location_hint": "/opt/botalin-edge/data/ (wallet-flow lane output; path not documented)",
+      "location_verification": "MISSING",
+      "recoverable_child_count_estimate": null,
+      "recovery_phase": "GO-WAREHOUSE-0B-RECONCILE",
+      "blocking_reason": "Two inventory rows describe negative directional variants without a count.",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#24,#37"
+    },
+    {
+      "record_type": "trial_evidence",
+      "evidence_id": "TE.BYBIT.STOP_TARGET_GRID",
+      "trial_id": "TL.BYBIT.LOW_LEVERAGE_SAFE_SUBSET",
+      "required_artefact": "The stop/target grid evaluated on the low-leverage safe subset",
+      "artefact_location_hint": "operator-supplied Bybit export plus the forensic analysis output; neither has a recorded retained path",
+      "location_verification": "MISSING",
+      "recoverable_child_count_estimate": null,
+      "recovery_phase": "GO-WAREHOUSE-0B-RECONCILE",
+      "blocking_reason": "The inventory states \"no stop/target grid positive\", implying a grid was swept, but records neither its size nor its location. The underlying export has no retained path at all.",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#27"
+    },
+    {
+      "record_type": "trial_evidence",
+      "evidence_id": "TE.OVERFIT.TRAIN_POSITIVE_CHILDREN",
+      "trial_id": "TL.OVERFIT.TRAIN_POSITIVE_BATCH",
+      "required_artefact": "Per-variant definitions and metrics for the 15 train-positive overfit-lab variants",
+      "artefact_location_hint": "/opt/botalin-edge/data/ (overfit lab output; path not documented)",
+      "location_verification": "MISSING",
+      "recoverable_child_count_estimate": 15,
+      "recovery_phase": "GO-WAREHOUSE-0B-RECONCILE",
+      "blocking_reason": "The count is stated in the inventory; the variant definitions are not available locally.",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#39"
+    },
+    {
+      "record_type": "trial_evidence",
+      "evidence_id": "TE.OVERFIT.NON_POSITIVE_CHILDREN",
+      "trial_id": "TL.OVERFIT.NON_POSITIVE_BATCH",
+      "required_artefact": "Per-variant definitions and metrics for the 101 non-train-positive overfit-lab variants",
+      "artefact_location_hint": "/opt/botalin-edge/data/ (overfit lab output; path not documented)",
+      "location_verification": "MISSING",
+      "recoverable_child_count_estimate": 101,
+      "recovery_phase": "GO-WAREHOUSE-0B-RECONCILE",
+      "blocking_reason": "Derived as 116 minus 15. Neither figure is confirmed against the lab output.",
+      "fixture_flag": false,
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#39"
+    },
+    {
+      "record_type": "trial_evidence",
+      "evidence_id": "FIXTURE.TE.SYNTH_CHILDREN",
+      "trial_id": "FIXTURE.TL.SYNTH_AGGREGATE",
+      "required_artefact": "Synthetic child rows for the synthetic aggregate batch",
+      "artefact_location_hint": "SYNTHETIC:in_manifest",
+      "location_verification": "VERIFIED_READ_ONLY",
+      "recoverable_child_count_estimate": 2,
+      "recovery_phase": "GO-WAREHOUSE-0B-RECONCILE",
+      "blocking_reason": "Synthetic fixture. Exists only to exercise the aggregate/child machinery.",
+      "fixture_flag": true,
+      "source_of_record": "data/research_warehouse_catalog_fixture_2026-08-02.json"
     }
   ]
 }

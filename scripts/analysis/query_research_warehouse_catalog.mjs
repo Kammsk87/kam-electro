@@ -28,7 +28,18 @@ import {
   DEFAULT_SCHEMA_PATH,
 } from './build_research_warehouse_catalog.mjs';
 
-const COMMANDS = ['data', 'mechanism', 'why-rejected', 'variants', 'blocking-gap', 'lessons', 'summary'];
+const COMMANDS = [
+  'data',
+  'mechanism',
+  'why-rejected',
+  'variants',
+  'blocking-gap',
+  'lessons',
+  'summary',
+  'trials',
+  'trial-summary',
+  'trial-lineage',
+];
 
 const USAGE = `query_research_warehouse_catalog.mjs — read-only queries over the Botalin research warehouse catalogue
 
@@ -43,6 +54,10 @@ Commands:
   blocking-gap   The data gap blocking the highest-priority next test. Filters: --top <n>
   lessons        Lesson links and their verification state. Filters: --lesson --family
   summary        Catalogue counts, coverage, and unindexed evidence types.
+  trials         Individual and aggregate-only ledger entries. Filters: --experiment --family --kind
+                 --representation INDIVIDUAL|AGGREGATE_ONLY --include-non-counting
+  trial-summary  Lower-bound total, individual vs aggregate split, conservation, missing-evidence sources.
+  trial-lineage  Parent experiment -> trials -> outcome -> lessons. Filters: --experiment --family --trial
 
 Catalogue source:
   --catalog <file>   Read a catalogue JSON previously emitted by the builder.
@@ -87,6 +102,10 @@ export function parseArgs(argv) {
       case '--family': opts.filters.family = next(); break;
       case '--experiment': opts.filters.experiment = next(); break;
       case '--lesson': opts.filters.lesson = next(); break;
+      case '--kind': opts.filters.kind = next(); break;
+      case '--representation': opts.filters.representation = next(); break;
+      case '--trial': opts.filters.trial = next(); break;
+      case '--include-non-counting': opts.filters.includeNonCounting = true; break;
       case '--top': opts.filters.top = Number.parseInt(next(), 10); break;
       case '-h':
       case '--help': opts.help = true; break;
@@ -305,6 +324,100 @@ export function queryLessons(catalog, f = {}) {
     }));
 }
 
+export function queryTrials(catalog, f = {}) {
+  return catalog.records.trial_ledger_entries
+    .filter((t) => (f.experiment ? t.parent_experiment_id === f.experiment : true))
+    .filter((t) => (f.family ? t.family_id === f.family : true))
+    .filter((t) => (f.kind ? t.kind === f.kind.toUpperCase() : true))
+    .filter((t) => (f.representation ? t.representation === f.representation.toUpperCase() : true))
+    .filter((t) => (f.includeNonCounting ? true : t.counts_toward_lower_bound))
+    .map((t) => ({
+      trial_id: t.trial_id,
+      parent_experiment_id: t.parent_experiment_id,
+      family_id: t.family_id,
+      kind: t.kind,
+      representation: t.representation,
+      exact_trial_count: t.exact_trial_count,
+      counts_toward_lower_bound: t.counts_toward_lower_bound,
+      dedup_key: t.dedup_key,
+      parameter_fingerprint: t.parameter_fingerprint,
+      split: t.split,
+      cost_model_applied: t.cost_model_applied,
+      verdict: t.verdict,
+      failure_route: t.failure_route,
+      reconciliation_status: t.reconciliation_status,
+      missing_child_evidence_id: t.missing_child_evidence_id,
+      member_of_aggregate_trial_id: t.member_of_aggregate_trial_id,
+      attacks_trial_id: t.attacks_trial_id,
+      evidence_path: t.evidence_path,
+      verification_grade: t.verification_grade,
+      fixture_flag: t.fixture_flag,
+    }));
+}
+
+export function queryTrialSummary(catalog, f = {}) {
+  const byExperiment = catalog.trial_conservation_by_experiment
+    .filter((e) => (f.family ? e.family_id === f.family : true))
+    .filter((e) => (f.experiment ? e.experiment_id === f.experiment : true));
+  return {
+    ...catalog.trial_ledger,
+    independent_experiments: byExperiment.filter((e) => !e.fixture).length,
+    by_experiment: byExperiment,
+    conservation_violations: byExperiment.filter((e) => !e.conserved),
+  };
+}
+
+export function queryTrialLineage(catalog, f = {}) {
+  const entries = catalog.records.trial_ledger_entries;
+  const evidenceById = new Map(catalog.records.trial_evidence.map((e) => [e.evidence_id, e]));
+  const experiments = catalog.records.experiments
+    .filter((e) => (f.experiment ? e.experiment_id === f.experiment : true))
+    .filter((e) => (f.family ? e.family_id === f.family : true))
+    .filter((e) => (f.trial ? entries.some((t) => t.trial_id === f.trial && t.parent_experiment_id === e.experiment_id) : true));
+
+  return experiments.map((exp) => {
+    const linked = entries
+      .filter((t) => t.parent_experiment_id === exp.experiment_id)
+      .filter((t) => (f.trial ? t.trial_id === f.trial : true));
+    return {
+      experiment_id: exp.experiment_id,
+      family_id: exp.family_id,
+      lifecycle_state: exp.lifecycle_state,
+      declared_prior_trials_seeded: exp.prior_trials_seeded ?? null,
+      trials: linked.map((t) => ({
+        trial_id: t.trial_id,
+        kind: t.kind,
+        representation: t.representation,
+        exact_trial_count: t.exact_trial_count,
+        counts_toward_lower_bound: t.counts_toward_lower_bound,
+        verdict: t.verdict,
+        failure_route: t.failure_route,
+        reconciliation_status: t.reconciliation_status,
+        attacks_trial_id: t.attacks_trial_id,
+        member_of_aggregate_trial_id: t.member_of_aggregate_trial_id,
+        missing_evidence: t.missing_child_evidence_id
+          ? {
+              evidence_id: t.missing_child_evidence_id,
+              required_artefact: evidenceById.get(t.missing_child_evidence_id)?.required_artefact ?? null,
+              recoverable_child_count_estimate:
+                evidenceById.get(t.missing_child_evidence_id)?.recoverable_child_count_estimate ?? null,
+              recovery_phase: evidenceById.get(t.missing_child_evidence_id)?.recovery_phase ?? null,
+            }
+          : null,
+      })),
+      outcomes: catalog.records.results
+        .filter((r) => r.experiment_id === exp.experiment_id)
+        .map((r) => ({ result_id: r.result_id, segment: r.segment, verdict: r.verdict, closure_status: r.closure_status })),
+      failure_routes: catalog.records.failure_routes
+        .filter((fr) => fr.experiment_id === exp.experiment_id)
+        .map((fr) => ({ failure_route_id: fr.failure_route_id, route: fr.route, allowed_successor: fr.allowed_successor })),
+      lessons: catalog.records.lesson_links
+        .filter((l) => l.experiment_id === exp.experiment_id || l.family_id === exp.family_id)
+        .map((l) => ({ lesson_id: l.lesson_id, lesson_title: l.lesson_title, relation: l.relation })),
+    };
+  });
+}
+
 export function querySummary(catalog) {
   return {
     schema_version: catalog.catalog_schema_version,
@@ -401,6 +514,63 @@ function renderText(command, payload) {
         bullet(`ledger     ${l.ledger_path}`);
       }
       break;
+    case 'trials':
+      lines.push(`ledger entries matching filter: ${payload.length}`);
+      for (const t of payload) {
+        const counted = t.counts_toward_lower_bound ? `counts x${t.exact_trial_count}` : 'NOT COUNTED';
+        lines.push(`- ${t.trial_id}  [${t.kind} / ${t.representation}]  ${counted}`);
+        bullet(`parent      ${t.parent_experiment_id} (${t.family_id})`);
+        bullet(`split       ${t.split}  costs=${t.cost_model_applied}  verdict=${t.verdict ?? '-'}  route=${t.failure_route ?? '-'}`);
+        bullet(`fingerprint ${t.parameter_fingerprint ?? 'none recorded'}`);
+        bullet(`dedup       ${t.dedup_key}`);
+        bullet(`evidence    ${t.evidence_path}  [${t.verification_grade}]`);
+        bullet(`reconcile   ${t.reconciliation_status}${t.missing_child_evidence_id ? ` -> ${t.missing_child_evidence_id}` : ''}`);
+        if (t.member_of_aggregate_trial_id) bullet(`inside      ${t.member_of_aggregate_trial_id}`);
+        if (t.attacks_trial_id) bullet(`attacks     ${t.attacks_trial_id}`);
+      }
+      break;
+    case 'trial-summary':
+      lines.push(`lower-bound trials: ${payload.lower_bound_trials}`);
+      lines.push(`  individually recorded : ${payload.individual_trials} trials in ${payload.individual_entries} entries`);
+      lines.push(`  aggregate-only        : ${payload.aggregate_only_trials} trials in ${payload.aggregate_only_entries} entries`);
+      lines.push(`  non-counting entries  : ${payload.non_counting_entries} (attacks, null controls, replays, diagnostics)`);
+      lines.push(`independent experiments: ${payload.independent_experiments}`);
+      lines.push(`count conservation: ${payload.experiments_conserved}/${payload.experiments_total} experiments`);
+      lines.push(`trials whose count is stated in a local artefact: ${payload.trials_with_artefact_stated_count}`);
+      lines.push(`reconciled entries: ${payload.reconciled_entries}   pending: ${payload.entries_pending_reconciliation}`);
+      if (payload.conservation_violations.length > 0) {
+        lines.push('CONSERVATION VIOLATIONS:');
+        for (const v of payload.conservation_violations) {
+          lines.push(`  ${v.experiment_id}: declared ${v.declared} vs ledger ${v.ledger_sum}`);
+        }
+      }
+      lines.push(`missing-evidence sources: ${payload.missing_evidence_sources.length}`);
+      for (const e of payload.missing_evidence_sources) {
+        const n = e.recoverable_child_count_estimate === null ? 'unknown' : String(e.recoverable_child_count_estimate);
+        lines.push(`- ${e.evidence_id}  children=${n}  phase=${e.recovery_phase}`);
+        bullet(`needs    ${e.required_artefact}`);
+        bullet(`location ${e.artefact_location_hint} [${e.location_verification}]`);
+      }
+      break;
+    case 'trial-lineage':
+      lines.push(`experiments matching filter: ${payload.length}`);
+      for (const e of payload) {
+        lines.push(`- ${e.experiment_id} (${e.family_id})  declared ${e.declared_prior_trials_seeded} prior trials`);
+        for (const t of e.trials) {
+          const c = t.counts_toward_lower_bound ? `x${t.exact_trial_count}` : 'not counted';
+          bullet(`trial   ${t.trial_id} [${t.kind}/${t.representation}] ${c} -> ${t.verdict ?? '-'}`);
+          if (t.attacks_trial_id) bullet(`        attacks ${t.attacks_trial_id}`);
+          if (t.member_of_aggregate_trial_id) bullet(`        inside ${t.member_of_aggregate_trial_id}`);
+          if (t.missing_evidence) {
+            const n = t.missing_evidence.recoverable_child_count_estimate;
+            bullet(`        missing evidence ${t.missing_evidence.evidence_id} (children=${n === null ? 'unknown' : n})`);
+          }
+        }
+        for (const o of e.outcomes) bullet(`outcome ${o.result_id} [${o.segment}] ${o.verdict} (${o.closure_status})`);
+        for (const fr of e.failure_routes) bullet(`route   ${fr.failure_route_id} ${fr.route} -> ${fr.allowed_successor ?? 'NONE'}`);
+        for (const l of e.lessons) bullet(`lesson  ${l.lesson_id} ${l.lesson_title} [${l.relation}]`);
+      }
+      break;
     case 'summary':
       lines.push(`schema ${payload.schema_version}  mode ${payload.mode}  promising_count ${payload.promising_count}`);
       lines.push('counts: ' + Object.entries(payload.counts).map(([k, v]) => `${k}=${v}`).join(' '));
@@ -424,6 +594,9 @@ export function runQuery(catalog, command, filters) {
     case 'blocking-gap': return queryBlockingGap(catalog, filters);
     case 'lessons': return queryLessons(catalog, filters);
     case 'summary': return querySummary(catalog);
+    case 'trials': return queryTrials(catalog, filters);
+    case 'trial-summary': return queryTrialSummary(catalog, filters);
+    case 'trial-lineage': return queryTrialLineage(catalog, filters);
     default: throw new Error(`Unknown command '${command}'`);
   }
 }

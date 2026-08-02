@@ -282,8 +282,232 @@ export function collectManifestPaths(root, depth = MAX_SCAN_DEPTH) {
 const TERMINAL_PARENT_STATES = new Set(['CLOSED_REJECTED', 'QUARANTINED']);
 const TERMINAL_VERDICTS = new Set(['REJECTED_FAMILY', 'QUARANTINED']);
 
+// Re-running an attack against an existing parameter point does not consume a new
+// independent trial. These kinds may never count toward the lower bound.
+const ATTACK_KINDS = new Set(['ROBUSTNESS_ATTACK', 'NULL_CONTROL', 'REPLAY']);
+
+// Evidence paths that assert nothing. An entry offering one of these has no evidence link.
+const PLACEHOLDER_EVIDENCE = new Set(['', '-', 'NONE', 'N/A', 'NA', 'UNKNOWN', 'TBD', 'TODO', 'NOT_PROVISIONED']);
+
+// A fingerprint whose own text admits it was derived rather than recorded is a fabricated variant.
+// Word-bounded on purpose: 'synth_param=1' on a labelled fixture is a real fingerprint, whereas
+// 'inferred_from_batch' is an admission that no per-variant record exists.
+// The lookahead rather than \b is deliberate: '_' is a word character, so \b would let
+// 'inferred_from_batch' through, which is precisely the string this must catch.
+const FABRICATED_FINGERPRINT =
+  /^(inferred|assumed|generated|fabricated|derived|estimated|placeholder|guess(ed)?|unknown)(?![A-Za-z0-9])/i;
+
+const PENDING_RECONCILIATION = new Set(['AGGREGATE_PENDING_CHILDREN', 'UNRECOVERABLE_PENDING_SOURCE']);
+
 function nonEmpty(v) {
   return typeof v === 'string' && v.trim().length > 0;
+}
+
+/**
+ * Trial-ledger invariants (INV-09 .. INV-13). Separated from checkInvariants so the
+ * reconciliation logic can be read and tested on its own.
+ */
+export function checkTrialLedger(collections) {
+  const errors = [];
+  const rejections = [];
+
+  const experimentById = new Map(collections.experiments.map((r) => [r.experiment_id, r]));
+  const entryById = new Map(collections.trial_ledger_entries.map((r) => [r.trial_id, r]));
+  const evidenceById = new Map(collections.trial_evidence.map((r) => [r.evidence_id, r]));
+  const kept = [];
+
+  for (const entry of collections.trial_ledger_entries) {
+    const label = `trial_ledger_entry[${entry.trial_id}]`;
+    const problems = [];
+
+    // INV-09 — parent linkage.
+    if (!experimentById.has(entry.parent_experiment_id)) {
+      problems.push({ reason: 'UNKNOWN_PARENT_EXPERIMENT', detail: `unknown parent '${entry.parent_experiment_id}'` });
+    } else {
+      const parent = experimentById.get(entry.parent_experiment_id);
+      if (parent.family_id !== entry.family_id) {
+        problems.push({
+          reason: 'FAMILY_MISMATCH',
+          detail: `entry family '${entry.family_id}' != parent family '${parent.family_id}'`,
+        });
+      }
+    }
+
+    // INV-11 — real evidence link, no fabricated fingerprint.
+    if (PLACEHOLDER_EVIDENCE.has(String(entry.evidence_path).trim().toUpperCase())) {
+      problems.push({ reason: 'NO_EVIDENCE_LINK', detail: `evidence_path '${entry.evidence_path}' asserts nothing` });
+    }
+    if (entry.representation === 'AGGREGATE_ONLY' && entry.parameter_fingerprint !== null) {
+      problems.push({
+        reason: 'FABRICATED_PARAMETER_FINGERPRINT',
+        detail: 'an AGGREGATE_ONLY batch cannot carry a per-variant parameter fingerprint',
+      });
+    }
+    if (nonEmpty(entry.parameter_fingerprint) && FABRICATED_FINGERPRINT.test(entry.parameter_fingerprint.trim())) {
+      problems.push({
+        reason: 'FABRICATED_PARAMETER_FINGERPRINT',
+        detail: `fingerprint '${entry.parameter_fingerprint}' declares itself derived rather than recorded`,
+      });
+    }
+    if (entry.representation === 'INDIVIDUAL' && entry.exact_trial_count !== 1) {
+      problems.push({
+        reason: 'INDIVIDUAL_COUNT_NOT_ONE',
+        detail: `an INDIVIDUAL entry represents exactly one trial, got ${entry.exact_trial_count}`,
+      });
+    }
+
+    // INV-10 — a child inside an aggregate batch may never also be counted.
+    if (nonEmpty(entry.member_of_aggregate_trial_id)) {
+      const parentBatch = entryById.get(entry.member_of_aggregate_trial_id);
+      if (!parentBatch) {
+        problems.push({ reason: 'UNKNOWN_AGGREGATE', detail: `unknown aggregate '${entry.member_of_aggregate_trial_id}'` });
+      } else if (parentBatch.representation !== 'AGGREGATE_ONLY') {
+        problems.push({ reason: 'NOT_AN_AGGREGATE', detail: `'${parentBatch.trial_id}' is not an AGGREGATE_ONLY batch` });
+      }
+      if (entry.counts_toward_lower_bound !== false) {
+        problems.push({
+          reason: 'DOUBLE_COUNTED_CHILD',
+          detail: 'a member of an aggregate batch is already counted inside that batch',
+        });
+      }
+    }
+
+    // INV-13 — attacks never add trials.
+    if (ATTACK_KINDS.has(entry.kind)) {
+      if (entry.counts_toward_lower_bound !== false) {
+        problems.push({
+          reason: 'ATTACK_COUNTED_AS_TRIAL',
+          detail: `a ${entry.kind} entry may not count toward the lower bound`,
+        });
+      }
+      if (!nonEmpty(entry.attacks_trial_id)) {
+        problems.push({ reason: 'ATTACK_WITHOUT_TARGET', detail: `a ${entry.kind} entry must name the trial it attacks` });
+      } else {
+        const target = entryById.get(entry.attacks_trial_id);
+        if (!target) {
+          problems.push({ reason: 'UNKNOWN_ATTACK_TARGET', detail: `unknown target '${entry.attacks_trial_id}'` });
+        } else if (target.parent_experiment_id !== entry.parent_experiment_id) {
+          problems.push({
+            reason: 'ATTACK_CROSSES_EXPERIMENT',
+            detail: `target '${target.trial_id}' belongs to a different experiment`,
+          });
+        }
+      }
+    }
+
+    // INV-12 — a pending reconciliation must say what would resolve it.
+    if (PENDING_RECONCILIATION.has(entry.reconciliation_status)) {
+      if (!nonEmpty(entry.missing_child_evidence_id)) {
+        problems.push({
+          reason: 'MISSING_EVIDENCE_NOT_DECLARED',
+          detail: `${entry.reconciliation_status} requires a trial_evidence record naming the recovery source`,
+        });
+      } else if (!evidenceById.has(entry.missing_child_evidence_id)) {
+        problems.push({
+          reason: 'UNKNOWN_TRIAL_EVIDENCE',
+          detail: `unknown trial_evidence '${entry.missing_child_evidence_id}'`,
+        });
+      }
+    }
+
+    if (problems.length > 0) {
+      for (const p of problems) {
+        errors.push(`INV-TRIAL ${label}: ${p.detail}`);
+        rejections.push({ record_type: 'trial_ledger_entry', id: entry.trial_id, reason: p.reason, detail: p.detail });
+      }
+      continue;
+    }
+    kept.push(entry);
+  }
+
+  // INV-10 — dedup keys must be unique among counting entries.
+  const seenDedup = new Map();
+  for (const entry of kept.filter((e) => e.counts_toward_lower_bound)) {
+    if (seenDedup.has(entry.dedup_key)) {
+      errors.push(
+        `INV-10 trial_ledger_entry[${entry.trial_id}]: dedup_key '${entry.dedup_key}' already counted by ` +
+          `'${seenDedup.get(entry.dedup_key)}'`,
+      );
+    } else {
+      seenDedup.set(entry.dedup_key, entry.trial_id);
+    }
+  }
+
+  // INV-12 — every trial_evidence record must attach to a known entry.
+  for (const ev of collections.trial_evidence) {
+    if (!entryById.has(ev.trial_id)) {
+      errors.push(`INV-12 trial_evidence[${ev.evidence_id}]: unknown trial '${ev.trial_id}'`);
+    }
+  }
+
+  // INV-09 — count conservation, per parent experiment.
+  const perExperiment = [];
+  for (const exp of collections.experiments) {
+    if (exp.prior_trials_seeded === undefined || exp.prior_trials_seeded === null) continue;
+    const linked = kept.filter((e) => e.parent_experiment_id === exp.experiment_id);
+    const counting = linked.filter((e) => e.counts_toward_lower_bound);
+    const summed = counting.reduce((a, e) => a + e.exact_trial_count, 0);
+    if (summed !== exp.prior_trials_seeded) {
+      errors.push(
+        `INV-09 experiment[${exp.experiment_id}]: prior_trials_seeded=${exp.prior_trials_seeded} but linked ` +
+          `counting ledger entries sum to ${summed}`,
+      );
+    }
+    perExperiment.push({
+      experiment_id: exp.experiment_id,
+      family_id: exp.family_id,
+      declared: exp.prior_trials_seeded,
+      ledger_sum: summed,
+      conserved: summed === exp.prior_trials_seeded,
+      individual_entries: counting.filter((e) => e.representation === 'INDIVIDUAL').length,
+      aggregate_entries: counting.filter((e) => e.representation === 'AGGREGATE_ONLY').length,
+      aggregate_trials: counting
+        .filter((e) => e.representation === 'AGGREGATE_ONLY')
+        .reduce((a, e) => a + e.exact_trial_count, 0),
+      non_counting_entries: linked.filter((e) => !e.counts_toward_lower_bound).length,
+      fixture: Boolean(exp.fixture_flag),
+    });
+  }
+
+  return { errors, rejections, keptEntries: kept, perExperiment };
+}
+
+/** Aggregates the ledger into the headline reconciliation figures. Pure. */
+export function summarizeTrialLedger(entries, perExperiment, evidence) {
+  const real = entries.filter((e) => !e.fixture_flag);
+  const counting = real.filter((e) => e.counts_toward_lower_bound);
+  const individual = counting.filter((e) => e.representation === 'INDIVIDUAL');
+  const aggregate = counting.filter((e) => e.representation === 'AGGREGATE_ONLY');
+
+  const sum = (rows) => rows.reduce((a, e) => a + e.exact_trial_count, 0);
+  const artefactStated = counting.filter((e) => e.verification_grade === 'DOCUMENTED_UNVERIFIED');
+  const unknownGrade = counting.filter((e) => e.verification_grade === 'UNKNOWN');
+
+  return {
+    lower_bound_trials: sum(counting),
+    individual_entries: individual.length,
+    individual_trials: sum(individual),
+    aggregate_only_entries: aggregate.length,
+    aggregate_only_trials: sum(aggregate),
+    non_counting_entries: real.length - counting.length,
+    trials_with_artefact_stated_count: sum(artefactStated),
+    trials_with_unknown_count_grade: sum(unknownGrade),
+    entries_pending_reconciliation: real.filter((e) => PENDING_RECONCILIATION.has(e.reconciliation_status)).length,
+    reconciled_entries: real.filter((e) => e.reconciliation_status === 'RECONCILED').length,
+    experiments_conserved: perExperiment.filter((e) => e.conserved).length,
+    experiments_total: perExperiment.length,
+    missing_evidence_sources: evidence
+      .filter((e) => !e.fixture_flag)
+      .map((e) => ({
+        evidence_id: e.evidence_id,
+        trial_id: e.trial_id,
+        required_artefact: e.required_artefact,
+        artefact_location_hint: e.artefact_location_hint,
+        location_verification: e.location_verification,
+        recoverable_child_count_estimate: e.recoverable_child_count_estimate,
+        recovery_phase: e.recovery_phase,
+      })),
+  };
 }
 
 export function checkInvariants(collections) {
@@ -471,6 +695,8 @@ const COLLECTION_OF = {
   data_source: 'data_sources',
   experiment: 'experiments',
   result: 'results',
+  trial_ledger_entry: 'trial_ledger_entries',
+  trial_evidence: 'trial_evidence',
   failure_route: 'failure_routes',
   lesson_link: 'lesson_links',
   lineage_edge: 'lineage_edges',
@@ -481,6 +707,8 @@ export function emptyCollections() {
     data_sources: [],
     experiments: [],
     results: [],
+    trial_ledger_entries: [],
+    trial_evidence: [],
     failure_routes: [],
     lesson_links: [],
     lineage_edges: [],
@@ -549,6 +777,11 @@ export function buildCatalog(schema, manifests, options = {}) {
   rejections.push(...inv.rejections);
   collections.lineage_edges = inv.keptEdges;
 
+  const ledger = checkTrialLedger(collections);
+  errors.push(...ledger.errors);
+  rejections.push(...ledger.rejections);
+  collections.trial_ledger_entries = ledger.keptEntries;
+
   const coverage = computeCoverage(schema, collections.data_sources);
 
   const blockingGaps = collections.failure_routes
@@ -574,6 +807,8 @@ export function buildCatalog(schema, manifests, options = {}) {
     manifests: manifestSummaries,
     counts: Object.fromEntries(Object.entries(collections).map(([k, v]) => [k, v.length])),
     coverage,
+    trial_ledger: summarizeTrialLedger(collections.trial_ledger_entries, ledger.perExperiment, collections.trial_evidence),
+    trial_conservation_by_experiment: ledger.perExperiment,
     blocking_gaps_by_priority: blockingGaps,
     records: collections,
     rejected_records: rejections,
@@ -639,6 +874,37 @@ export function catalogToCsv(schema, catalog) {
       fixture_flag: r.fixture_flag,
       retained_or_evidence_path: r.evidence_paths.join('|'),
       source_of_record: r.source_of_record,
+    });
+  }
+  for (const t of catalog.records.trial_ledger_entries) {
+    push({
+      record_type: 'trial_ledger_entry',
+      id: t.trial_id,
+      family_id: t.family_id,
+      title_or_mechanism: `${t.parent_experiment_id} ${t.kind} x${t.exact_trial_count}${t.counts_toward_lower_bound ? '' : ' (not counted)'}`,
+      type_or_segment: t.split,
+      verdict_or_status: t.representation,
+      evidence_grade: t.evidence_grade,
+      verification_status: t.verification_grade,
+      fixture_flag: t.fixture_flag,
+      retained_or_evidence_path: t.evidence_path,
+      source_of_record: t.source_of_record,
+    });
+  }
+  for (const e of catalog.records.trial_evidence) {
+    push({
+      record_type: 'trial_evidence',
+      id: e.evidence_id,
+      family_id: e.trial_id,
+      title_or_mechanism: e.required_artefact,
+      type_or_segment: e.recovery_phase,
+      verdict_or_status:
+        e.recoverable_child_count_estimate === null ? 'UNKNOWN_CHILD_COUNT' : `CHILDREN_${e.recoverable_child_count_estimate}`,
+      evidence_grade: '',
+      verification_status: e.location_verification,
+      fixture_flag: e.fixture_flag,
+      retained_or_evidence_path: e.artefact_location_hint,
+      source_of_record: e.source_of_record,
     });
   }
   for (const f of catalog.records.failure_routes) {
@@ -747,6 +1013,18 @@ function summarize(catalog) {
   lines.push('counts: ' + Object.entries(catalog.counts).map(([k, v]) => `${k}=${v}`).join(' '));
   const uncovered = catalog.coverage.evidence_types_without_raw_primary;
   lines.push(`evidence types with no available RAW_PRIMARY source (${uncovered.length}): ${uncovered.join(', ') || 'none'}`);
+  const t = catalog.trial_ledger;
+  lines.push(
+    `trial ledger: lower bound ${t.lower_bound_trials} trials = ` +
+      `${t.individual_trials} individually recorded (${t.individual_entries} entries) + ` +
+      `${t.aggregate_only_trials} aggregate-only (${t.aggregate_only_entries} entries); ` +
+      `${t.non_counting_entries} non-counting attack/replay entries`,
+  );
+  lines.push(
+    `trial conservation: ${t.experiments_conserved}/${t.experiments_total} experiments; ` +
+      `${t.entries_pending_reconciliation} entries pending reconciliation; ` +
+      `${t.missing_evidence_sources.length} missing-evidence sources named`,
+  );
   lines.push(`rejected records: ${catalog.rejected_records.length}`);
   for (const r of catalog.rejected_records) lines.push(`  REJECTED ${r.record_type}[${r.id}] ${r.reason}: ${r.detail}`);
   lines.push(`errors: ${catalog.errors.length}`);
