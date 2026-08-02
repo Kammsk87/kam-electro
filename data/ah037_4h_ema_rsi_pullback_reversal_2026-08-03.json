@@ -1,0 +1,233 @@
+{
+  "label": "DISCOVERY_NOT_PROOF",
+  "task": "TASK-AH-037",
+  "generated_at": "2026-08-02T19:56:23.873Z",
+  "archive_path": "/opt/botalin-edge/data/bars_xs/bars.json",
+  "data": {
+    "source_symbols": 109,
+    "eligible_symbols": 87,
+    "max_4h_bars": 2190,
+    "chronology": {
+      "start": "2025-03-20T00:00:00.000Z",
+      "end": "2026-03-19T20:00:00.000Z",
+      "expected_4h_bars_by_split": [
+        1204,
+        438,
+        328,
+        220
+      ]
+    },
+    "aggregation": "UTC complete 4h blocks from closed 1h bars"
+  },
+  "rule": "fixed EMA20/EMA50 slopes + EMA-zone touch + RSI + mechanical reversal; next-4h-open entry; 0.5% stop; 2R target; 6-bar timeout; one position/symbol",
+  "costs": {
+    "conservative_roundtrip_bps": 11,
+    "double_roundtrip_bps": 22
+  },
+  "train": {
+    "n": 6,
+    "symbols": 6,
+    "days": 6,
+    "ideal_mean_bps": -155.86633271113308,
+    "ideal_median_bps": -102.07450364231997,
+    "net_mean_bps": -166.86633271113308,
+    "net_median_bps": -113.07450364231997,
+    "win_rate_pct": 0,
+    "p5_bps": -402.0995429151853,
+    "p95_bps": -83.14328511512412,
+    "net_total_bps": -1001.1979962667986,
+    "max_drawdown_bps": -1001.1979962667986,
+    "exits": {
+      "STOP": 6,
+      "TARGET": 0,
+      "TIMEOUT": 0,
+      "AMBIGUOUS_ADVERSE": 0
+    }
+  },
+  "validation": {
+    "n": 8,
+    "symbols": 8,
+    "days": 5,
+    "ideal_mean_bps": 53.411151590267416,
+    "ideal_median_bps": -30.426622845841248,
+    "net_mean_bps": 42.411151590267416,
+    "net_median_bps": -41.42662284584125,
+    "win_rate_pct": 50,
+    "p5_bps": -207.5428033866387,
+    "p95_bps": 255.35480388628883,
+    "net_total_bps": 339.2892127221393,
+    "max_drawdown_bps": -577.3685277903717,
+    "exits": {
+      "STOP": 4,
+      "TARGET": 2,
+      "TIMEOUT": 2,
+      "AMBIGUOUS_ADVERSE": 0
+    }
+  },
+  "holdout": {
+    "n": 1,
+    "symbols": 1,
+    "days": 1,
+    "ideal_mean_bps": -107.86285437363695,
+    "ideal_median_bps": -107.86285437363695,
+    "net_mean_bps": -118.86285437363695,
+    "net_median_bps": -118.86285437363695,
+    "win_rate_pct": 0,
+    "p5_bps": -118.86285437363695,
+    "p95_bps": -118.86285437363695,
+    "net_total_bps": -118.86285437363695,
+    "max_drawdown_bps": -118.86285437363695,
+    "exits": {
+      "STOP": 1,
+      "TARGET": 0,
+      "TIMEOUT": 0,
+      "AMBIGUOUS_ADVERSE": 0
+    }
+  },
+  "forward": {
+    "n": 2,
+    "symbols": 2,
+    "days": 2,
+    "ideal_mean_bps": -120.02126523175797,
+    "ideal_median_bps": -120.02126523175797,
+    "net_mean_bps": -131.02126523175795,
+    "net_median_bps": -131.02126523175795,
+    "win_rate_pct": 0,
+    "p5_bps": -134.73669525679315,
+    "p95_bps": -134.73669525679315,
+    "net_total_bps": -262.0425304635159,
+    "max_drawdown_bps": -262.0425304635159,
+    "exits": {
+      "STOP": 2,
+      "TARGET": 0,
+      "TIMEOUT": 0,
+      "AMBIGUOUS_ADVERSE": 0
+    }
+  },
+  "combined_oos": {
+    "n": 3,
+    "symbols": 2,
+    "days": 3,
+    "ideal_mean_bps": -115.9684616123843,
+    "ideal_median_bps": -116.30583520672276,
+    "net_mean_bps": -126.96846161238427,
+    "net_median_bps": -127.30583520672276,
+    "win_rate_pct": 0,
+    "p5_bps": -134.73669525679315,
+    "p95_bps": -127.30583520672276,
+    "net_total_bps": -380.90538483715284,
+    "max_drawdown_bps": -380.90538483715284,
+    "exits": {
+      "STOP": 3,
+      "TARGET": 0,
+      "TIMEOUT": 0,
+      "AMBIGUOUS_ADVERSE": 0
+    }
+  },
+  "null": {
+    "samples": 1000,
+    "observed_net_median_bps": -127.30583520672276,
+    "null_median_bps": -19.158566328279907,
+    "p_value": 0.811
+  },
+  "remove_best_symbol": {
+    "removed": "WUSDT",
+    "stats": {
+      "n": 2,
+      "symbols": 1,
+      "days": 2,
+      "ideal_mean_bps": -115.79977481521506,
+      "ideal_median_bps": -115.79977481521506,
+      "net_mean_bps": -126.79977481521505,
+      "net_median_bps": -126.79977481521505,
+      "win_rate_pct": 0,
+      "p5_bps": -134.73669525679315,
+      "p95_bps": -134.73669525679315,
+      "net_total_bps": -253.5995496304301,
+      "max_drawdown_bps": -253.5995496304301,
+      "exits": {
+        "STOP": 2,
+        "TARGET": 0,
+        "TIMEOUT": 0,
+        "AMBIGUOUS_ADVERSE": 0
+      }
+    },
+    "removed_net_pnl_bps": -127.30583520672276
+  },
+  "remove_best_day": {
+    "removed": "2026-01-11",
+    "stats": {
+      "n": 2,
+      "symbols": 2,
+      "days": 2,
+      "ideal_mean_bps": -120.02126523175797,
+      "ideal_median_bps": -120.02126523175797,
+      "net_mean_bps": -131.02126523175795,
+      "net_median_bps": -131.02126523175795,
+      "win_rate_pct": 0,
+      "p5_bps": -134.73669525679315,
+      "p95_bps": -134.73669525679315,
+      "net_total_bps": -262.0425304635159,
+      "max_drawdown_bps": -262.0425304635159,
+      "exits": {
+        "STOP": 2,
+        "TARGET": 0,
+        "TIMEOUT": 0,
+        "AMBIGUOUS_ADVERSE": 0
+      }
+    },
+    "removed_net_pnl_bps": -118.86285437363695
+  },
+  "symbol_net_pnl_bps": {
+    "EIGENUSDT": -253.59954963043012,
+    "WUSDT": -127.30583520672276
+  },
+  "max_symbol_pnl_share": 0.6657809517154781,
+  "robustness_neighbours": [
+    {
+      "n": 3,
+      "symbols": 2,
+      "days": 3,
+      "ideal_mean_bps": -115.9684616123843,
+      "ideal_median_bps": -116.30583520672276,
+      "net_mean_bps": -126.96846161238427,
+      "net_median_bps": -127.30583520672276,
+      "win_rate_pct": 0,
+      "p5_bps": -134.73669525679315,
+      "p95_bps": -127.30583520672276,
+      "net_total_bps": -380.90538483715284,
+      "max_drawdown_bps": -380.90538483715284,
+      "exits": {
+        "STOP": 3,
+        "TARGET": 0,
+        "TIMEOUT": 0,
+        "AMBIGUOUS_ADVERSE": 0
+      }
+    },
+    {
+      "n": 3,
+      "symbols": 2,
+      "days": 3,
+      "ideal_mean_bps": -115.9684616123843,
+      "ideal_median_bps": -116.30583520672276,
+      "net_mean_bps": -126.96846161238427,
+      "net_median_bps": -127.30583520672276,
+      "win_rate_pct": 0,
+      "p5_bps": -134.73669525679315,
+      "p95_bps": -127.30583520672276,
+      "net_total_bps": -380.90538483715284,
+      "max_drawdown_bps": -380.90538483715284,
+      "exits": {
+        "STOP": 3,
+        "TARGET": 0,
+        "TIMEOUT": 0,
+        "AMBIGUOUS_ADVERSE": 0
+      }
+    }
+  ],
+  "event_overlap": {
+    "status": "UNAVAILABLE",
+    "note": "Prior rejected-family event ledgers were not retained in the AH-005A archive; no duplicate claim is made."
+  },
+  "verdict": "DATA_INADEQUATE"
+}
