@@ -47,51 +47,202 @@
     {
       "member": "CS_RELATIVE_STRENGTH_24H",
       "verdict": "DATA_INADEQUATE",
-      "executable": false,
-      "missing_inputs": [
+      "executable": true,
+      "label": "DISCOVERY_NOT_PROOF",
+      "universe": {
+        "universe_id": "AH-005A-e0ef986fe15e818750ffdd98d707cdb4fbfa2e5e07b804cdb8908bc60b113a0f",
+        "frozen_at": "2026-07-11T20:35:21.192Z",
+        "symbols": 109
+      },
+      "panel": {
+        "dates": 365,
+        "symbols": 109,
+        "start": "2025-03-20",
+        "end": "2026-03-19"
+      },
+      "rule": "Daily 7-day return minus universe median; long top quintile, short bottom quintile; equal notional, gross 1.0, net 0; entry next open, exit one day later (24h hold); exclude <30d history or any single-day move >25%.",
+      "costs": {
+        "gross_roundtrip_bps": 11,
+        "double_bps": 22,
+        "both_legs": true
+      },
+      "chronology": {
+        "splits": {
+          "train": 0.55,
+          "validation": 0.2,
+          "holdout": 0.15,
+          "forward": 0.1
+        },
+        "purge_days": 2,
+        "embargo_days": 7
+      },
+      "train": {
+        "n": 169,
+        "days": 169,
+        "symbols": 96,
+        "net_mean_bps": -9.643251939798247,
+        "net_median_bps": -10.662386220439116,
+        "win_rate_pct": 44.37869822485207,
+        "p5_bps": -205.46434956587302,
+        "p95_bps": 154.76303982218266,
+        "net_total_bps": -1629.7095778259038,
+        "max_drawdown_bps": -2179.584734772193
+      },
+      "validation": {
+        "n": 64,
+        "days": 64,
+        "symbols": 104,
+        "net_mean_bps": 2.685972122449569,
+        "net_median_bps": 8.064196787266964,
+        "win_rate_pct": 51.5625,
+        "p5_bps": -161.2294581657203,
+        "p95_bps": 166.87908787756163,
+        "net_total_bps": 171.90221583677243,
+        "max_drawdown_bps": -854.2761445014004
+      },
+      "holdout": {
+        "n": 45,
+        "days": 45,
+        "symbols": 105,
+        "net_mean_bps": 0.13604559480213949,
+        "net_median_bps": 7.94327256190315,
+        "win_rate_pct": 53.333333333333336,
+        "p5_bps": -198.13736649609723,
+        "p95_bps": 132.01842402550798,
+        "net_total_bps": 6.122051766096277,
+        "max_drawdown_bps": -675.1821013378886
+      },
+      "forward": {
+        "n": 29,
+        "days": 29,
+        "symbols": 106,
+        "net_mean_bps": -14.737222373419609,
+        "net_median_bps": -16.94608148898834,
+        "win_rate_pct": 44.827586206896555,
+        "p5_bps": -179.36992183850208,
+        "p95_bps": 132.9598038097092,
+        "net_total_bps": -427.37944882916867,
+        "max_drawdown_bps": -491.53152111137206
+      },
+      "combined_oos": {
+        "n": 74,
+        "days": 74,
+        "symbols": 109,
+        "net_mean_bps": -5.692667527879356,
+        "net_median_bps": 1.2956031602049443,
+        "win_rate_pct": 50,
+        "p5_bps": -190.90854423385292,
+        "p95_bps": 132.9598038097092,
+        "net_total_bps": -421.25739706307235,
+        "max_drawdown_bps": -675.1821013378886
+      },
+      "double_cost_oos": {
+        "n": 74,
+        "days": 74,
+        "symbols": 109,
+        "net_mean_bps": -16.69266752787935,
+        "net_median_bps": -9.704396839795056,
+        "win_rate_pct": 45.945945945945944,
+        "p5_bps": -201.90854423385292,
+        "p95_bps": 121.9598038097092,
+        "net_total_bps": -1235.257397063072,
+        "max_drawdown_bps": -1235.257397063072
+      },
+      "null": {
+        "samples": 1000,
+        "observed_net_median_bps": 1.2956031602049443,
+        "null_median_bps": -11.038605359664826,
+        "p_value": 0.05
+      },
+      "remove_best_symbol": {
+        "removed": "RENDERUSDT",
+        "removed_gross_bps": 274.9699948399042,
+        "stats": {
+          "n": 74,
+          "days": 74,
+          "symbols": 108,
+          "net_mean_bps": -8.13672659790194,
+          "net_median_bps": 4.857814236406628,
+          "win_rate_pct": 51.351351351351354,
+          "p5_bps": -209.46891077276302,
+          "p95_bps": 138.30764098589282,
+          "net_total_bps": -602.1177682447436,
+          "max_drawdown_bps": -768.3040954394145
+        }
+      },
+      "remove_best_day": {
+        "removed": "2026-02-04",
+        "removed_net_bps": 359.7237115346344,
+        "stats": {
+          "n": 73,
+          "days": 73,
+          "symbols": 109,
+          "net_mean_bps": -10.698371350653519,
+          "net_median_bps": -1.413781485946478,
+          "win_rate_pct": 49.31506849315068,
+          "p5_bps": -190.90854423385292,
+          "p95_bps": 132.01842402550798,
+          "net_total_bps": -780.9811085977069,
+          "max_drawdown_bps": -845.5000712713089
+        }
+      },
+      "concentration": {
+        "max_symbol_abs_share": 0.02976066396608778,
+        "symbols": 109
+      },
+      "neighbours": [
         {
-          "dataset": "universe",
-          "reason": "DATASET_NOT_SUPPLIED",
-          "required_fields": [
-            "universe_id",
-            "frozen_at",
-            "symbols"
-          ],
-          "missing_fields": [
-            "universe_id",
-            "frozen_at",
-            "symbols"
-          ]
+          "lookback_days": 6,
+          "segment": "validation",
+          "stats": {
+            "n": 64,
+            "days": 64,
+            "symbols": 104,
+            "net_mean_bps": -0.05958070116351144,
+            "net_median_bps": 12.687660664361669,
+            "win_rate_pct": 54.6875,
+            "p5_bps": -130.75438505917037,
+            "p95_bps": 129.68608526541192,
+            "net_total_bps": -3.813164874464732,
+            "max_drawdown_bps": -751.8757131345889
+          }
         },
         {
-          "dataset": "daily_bars",
-          "reason": "DATASET_NOT_SUPPLIED",
-          "required_fields": [
-            "ts",
-            "o",
-            "c"
-          ],
-          "missing_fields": [
-            "ts",
-            "o",
-            "c"
-          ]
+          "lookback_days": 8,
+          "segment": "validation",
+          "stats": {
+            "n": 64,
+            "days": 64,
+            "symbols": 103,
+            "net_mean_bps": 2.5875148056620088,
+            "net_median_bps": 9.557416103887757,
+            "win_rate_pct": 54.6875,
+            "p5_bps": -150.0342108356653,
+            "p95_bps": 176.96652871672885,
+            "net_total_bps": 165.60094756236856,
+            "max_drawdown_bps": -640.7724535263982
+          }
         }
       ],
-      "required_inputs": {
-        "universe": [
-          "universe_id",
-          "frozen_at",
-          "symbols"
+      "overlap": {
+        "status": "UNAVAILABLE",
+        "method": "exact trade-timestamp and daily-return correlation against each blocked family",
+        "blocked_families": [
+          "FAILED_BREAKOUT",
+          "RAW_MOMENTUM",
+          "TREND_CONTINUATION",
+          "WALLET_FOLLOW",
+          "PAIRS_RELATIVE_VALUE",
+          "HMM_REGIME"
         ],
-        "daily_bars": [
-          "ts",
-          "o",
-          "c"
-        ]
-      },
-      "substitution_refused": true,
-      "note": "The frozen AH-005A liquid universe and its daily bars are required. No candle series was substituted for the missing inputs."
+        "declared_adjacency": [
+          "RAW_MOMENTUM",
+          "PAIRS_RELATIVE_VALUE"
+        ],
+        "measurable": false,
+        "reason": "Per-trade timestamp ledgers for the rejected families were not retained alongside the AH-005A archive, so exact overlap cannot be computed. Declared adjacency cannot be cleared by assertion.",
+        "blocking": true
+      }
     },
     {
       "member": "FUNDING_PERSISTENCE_CARRY",
