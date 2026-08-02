@@ -1,0 +1,28 @@
+{
+  "protocol_version": "2026-08-02.v0",
+  "repository_root": "/Users/aleksandr/Documents/New project KAM",
+  "current_branch": "task/BOTALIN-RESEARCH-WAREHOUSE-FOUNDATION-V0",
+  "tasks": [
+    {
+      "task_id": "TASK-023",
+      "task_path": "tasks/ready/TASK-023-BOTALIN-CLAUDE-CLI-DISPATCH-PROTOCOL-V0.md",
+      "task_digest": "f723fd1039f5136a66aaeb46654c97f5606075bcd9baf4f4714b1a23609b8309",
+      "task_commit": "87c83684",
+      "branch": "task/BOTALIN-RESEARCH-WAREHOUSE-FOUNDATION-V0",
+      "committed": true,
+      "dirty": false,
+      "safety_profile": "RESEARCH_PROTOCOL_DRY_RUN_ONLY",
+      "required_tests": ["syntax", "deterministic_tests", "static_scan", "git_diff_check"],
+      "completion_evidence": ["result_path", "result_digest", "result_commit", "changed_paths", "tests", "independent_validator"],
+      "allowlisted_deliverables": [
+        "scripts/analysis/build_claude_dispatch_envelope.mjs",
+        "scripts/analysis/check_claude_dispatch_status.mjs",
+        "scripts/test_claude_dispatch_protocol.mjs",
+        "reference/BOTALIN_CLAUDE_CLI_DISPATCH_PROTOCOL_2026-08-02.md",
+        "data/claude_dispatch_protocol_fixture_2026-08-02.json",
+        "tasks/results/TASK-023-BOTALIN-CLAUDE-CLI-DISPATCH-PROTOCOL-V0-RESULT.md"
+      ]
+    }
+  ],
+  "run": null
+}
