@@ -1,0 +1,492 @@
+{
+  "label": "DISCOVERY_NOT_PROOF",
+  "task": "TASK-AH-038",
+  "generated_at": "2026-08-02T20:25:30.503Z",
+  "data": {
+    "source_symbols": 109,
+    "eligible_symbols": 87,
+    "chronology": {
+      "start": "2025-03-20T00:00:00.000Z",
+      "end": "2026-03-19T20:00:00.000Z",
+      "expected_4h_bars_by_split": [
+        1204,
+        438,
+        328,
+        220
+      ]
+    }
+  },
+  "costs": {
+    "conservative_roundtrip_bps": 11,
+    "double_roundtrip_bps": 22
+  },
+  "overlap": {
+    "status": "UNAVAILABLE",
+    "note": "AH-027/028/032/033 and failed-breakout event ledgers are not retained with this archive."
+  },
+  "forms": {
+    "confirmation": {
+      "entry_form": "confirmation",
+      "train": {
+        "n": 20,
+        "symbols": 19,
+        "days": 14,
+        "ideal_mean_bps": 164.93280736501828,
+        "ideal_median_bps": 247.1221097778178,
+        "net_mean_bps": 153.93280736501828,
+        "net_median_bps": 236.1221097778178,
+        "win_rate_pct": 65,
+        "p5_bps": -1104.4871425138183,
+        "p95_bps": 806.9639470667919,
+        "net_total_bps": 3078.6561473003653,
+        "max_drawdown_bps": -1712.1462780981556,
+        "exits": {
+          "STOP": 3,
+          "TARGET": 1,
+          "TIMEOUT": 16,
+          "AMBIGUOUS_ADVERSE": 0
+        }
+      },
+      "validation": {
+        "n": 3,
+        "symbols": 3,
+        "days": 3,
+        "ideal_mean_bps": -20.481361761071884,
+        "ideal_median_bps": -58.43990852883968,
+        "net_mean_bps": -31.481361761071884,
+        "net_median_bps": -69.43990852883968,
+        "win_rate_pct": 33.333333333333336,
+        "p5_bps": -470.1836734693871,
+        "p95_bps": -69.43990852883968,
+        "net_total_bps": -94.44408528321566,
+        "max_drawdown_bps": -470.1836734693871,
+        "exits": {
+          "STOP": 1,
+          "TARGET": 0,
+          "TIMEOUT": 2,
+          "AMBIGUOUS_ADVERSE": 0
+        }
+      },
+      "holdout": {
+        "n": 11,
+        "symbols": 11,
+        "days": 6,
+        "ideal_mean_bps": 113.30086291327926,
+        "ideal_median_bps": 7.739189319918423,
+        "net_mean_bps": 102.30086291327926,
+        "net_median_bps": -3.260810680081577,
+        "win_rate_pct": 45.45454545454545,
+        "p5_bps": -482.9435154217759,
+        "p95_bps": 656.9838178568065,
+        "net_total_bps": 1125.309492046072,
+        "max_drawdown_bps": -725.8595838922331,
+        "exits": {
+          "STOP": 3,
+          "TARGET": 0,
+          "TIMEOUT": 8,
+          "AMBIGUOUS_ADVERSE": 0
+        }
+      },
+      "forward": {
+        "n": 7,
+        "symbols": 7,
+        "days": 4,
+        "ideal_mean_bps": -169.74297032357794,
+        "ideal_median_bps": -451.7516902274118,
+        "net_mean_bps": -180.74297032357794,
+        "net_median_bps": -462.7516902274118,
+        "win_rate_pct": 42.857142857142854,
+        "p5_bps": -560.8609455701244,
+        "p95_bps": 95.20792819745694,
+        "net_total_bps": -1265.2007922650455,
+        "max_drawdown_bps": -1433.0615611735516,
+        "exits": {
+          "STOP": 4,
+          "TARGET": 0,
+          "TIMEOUT": 3,
+          "AMBIGUOUS_ADVERSE": 0
+        }
+      },
+      "combined_oos": {
+        "n": 18,
+        "symbols": 17,
+        "days": 10,
+        "ideal_mean_bps": 3.2282610989459215,
+        "ideal_median_bps": -31.160764985066507,
+        "net_mean_bps": -7.7717389010540785,
+        "net_median_bps": -42.16076498506651,
+        "win_rate_pct": 44.44444444444444,
+        "p5_bps": -560.8609455701244,
+        "p95_bps": 656.9838178568065,
+        "net_total_bps": -139.8913002189734,
+        "max_drawdown_bps": -1991.0603761572784,
+        "exits": {
+          "STOP": 7,
+          "TARGET": 0,
+          "TIMEOUT": 11,
+          "AMBIGUOUS_ADVERSE": 0
+        }
+      },
+      "missed_retests": 0,
+      "null": {
+        "samples": 1000,
+        "observed_net_median_bps": -42.16076498506651,
+        "null_median_bps": 30.32114092750287,
+        "p_value": 0.743
+      },
+      "remove_best_symbol": {
+        "removed": [
+          "B3USDT"
+        ],
+        "stats": {
+          "n": 17,
+          "symbols": 16,
+          "days": 10,
+          "ideal_mean_bps": -45.40769564180423,
+          "ideal_median_bps": -70.06071929005144,
+          "net_mean_bps": -56.40769564180423,
+          "net_median_bps": -81.06071929005144,
+          "win_rate_pct": 41.1764705882353,
+          "p5_bps": -560.8609455701244,
+          "p95_bps": 649.8996539792398,
+          "net_total_bps": -958.930825910672,
+          "max_drawdown_bps": -1991.0603761572786,
+          "exits": {
+            "STOP": 7,
+            "TARGET": 0,
+            "TIMEOUT": 10,
+            "AMBIGUOUS_ADVERSE": 0
+          }
+        }
+      },
+      "remove_best_three_symbols": {
+        "removed": [
+          "B3USDT",
+          "SANDUSDT",
+          "EIGENUSDT"
+        ],
+        "stats": {
+          "n": 15,
+          "symbols": 14,
+          "days": 10,
+          "ideal_mean_bps": -127.23643606472034,
+          "ideal_median_bps": -218.0196548022135,
+          "net_mean_bps": -138.23643606472035,
+          "net_median_bps": -229.0196548022135,
+          "win_rate_pct": 33.333333333333336,
+          "p5_bps": -560.8609455701244,
+          "p95_bps": 412.48008385744225,
+          "net_total_bps": -2073.5465409708054,
+          "max_drawdown_bps": -2321.40979364385,
+          "exits": {
+            "STOP": 7,
+            "TARGET": 0,
+            "TIMEOUT": 8,
+            "AMBIGUOUS_ADVERSE": 0
+          }
+        }
+      },
+      "remove_best_day": {
+        "removed": [
+          "2026-01-31"
+        ],
+        "stats": {
+          "n": 13,
+          "symbols": 12,
+          "days": 9,
+          "ideal_mean_bps": -179.98198570370508,
+          "ideal_median_bps": -231.91606847045728,
+          "net_mean_bps": -190.98198570370505,
+          "net_median_bps": -242.91606847045728,
+          "win_rate_pct": 30.76923076923077,
+          "p5_bps": -560.8609455701244,
+          "p95_bps": 247.86325267304466,
+          "net_total_bps": -2482.7658141481656,
+          "max_drawdown_bps": -2730.6290668212105,
+          "exits": {
+            "STOP": 7,
+            "TARGET": 0,
+            "TIMEOUT": 6,
+            "AMBIGUOUS_ADVERSE": 0
+          }
+        }
+      },
+      "max_symbol_abs_pnl_share": 0.16268513317320843,
+      "neighbours": [
+        {
+          "n": 23,
+          "symbols": 21,
+          "days": 12,
+          "ideal_mean_bps": 27.828076437754024,
+          "ideal_median_bps": 7.739189319918423,
+          "net_mean_bps": 16.828076437754024,
+          "net_median_bps": -3.260810680081577,
+          "win_rate_pct": 47.82608695652174,
+          "p5_bps": -553.4083769633503,
+          "p95_bps": 656.9838178568065,
+          "net_total_bps": 387.04575806834254,
+          "max_drawdown_bps": -1990.7061515031648,
+          "exits": {
+            "STOP": 9,
+            "TARGET": 0,
+            "TIMEOUT": 14,
+            "AMBIGUOUS_ADVERSE": 0
+          }
+        },
+        {
+          "n": 9,
+          "symbols": 8,
+          "days": 7,
+          "ideal_mean_bps": 56.75416416381327,
+          "ideal_median_bps": 83.65284071104922,
+          "net_mean_bps": 45.75416416381327,
+          "net_median_bps": 72.65284071104922,
+          "win_rate_pct": 55.55555555555556,
+          "p5_bps": -560.8609455701244,
+          "p95_bps": 457.6318972033266,
+          "net_total_bps": 411.7874774743195,
+          "max_drawdown_bps": -1047.065271671982,
+          "exits": {
+            "STOP": 3,
+            "TARGET": 0,
+            "TIMEOUT": 6,
+            "AMBIGUOUS_ADVERSE": 0
+          }
+        }
+      ],
+      "verdict": "DATA_INADEQUATE"
+    },
+    "retest": {
+      "entry_form": "retest",
+      "train": {
+        "n": 8,
+        "symbols": 8,
+        "days": 8,
+        "ideal_mean_bps": -138.98605030057186,
+        "ideal_median_bps": -163.72616809551283,
+        "net_mean_bps": -149.98605030057186,
+        "net_median_bps": -174.72616809551283,
+        "win_rate_pct": 37.5,
+        "p5_bps": -618.4342701722585,
+        "p95_bps": 125.98630136986188,
+        "net_total_bps": -1199.888402404575,
+        "max_drawdown_bps": -1793.5968779515351,
+        "exits": {
+          "STOP": 3,
+          "TARGET": 1,
+          "TIMEOUT": 4,
+          "AMBIGUOUS_ADVERSE": 0
+        }
+      },
+      "validation": {
+        "n": 2,
+        "symbols": 2,
+        "days": 2,
+        "ideal_mean_bps": -287.90771171640415,
+        "ideal_median_bps": -287.90771171640415,
+        "net_mean_bps": -298.9077117164042,
+        "net_median_bps": -298.9077117164042,
+        "win_rate_pct": 0,
+        "p5_bps": -516.4466230936819,
+        "p95_bps": -516.4466230936819,
+        "net_total_bps": -597.8154234328084,
+        "max_drawdown_bps": -597.8154234328084,
+        "exits": {
+          "STOP": 1,
+          "TARGET": 0,
+          "TIMEOUT": 1,
+          "AMBIGUOUS_ADVERSE": 0
+        }
+      },
+      "holdout": {
+        "n": 4,
+        "symbols": 4,
+        "days": 4,
+        "ideal_mean_bps": 63.50130441695968,
+        "ideal_median_bps": 11.876271389255237,
+        "net_mean_bps": 52.50130441695967,
+        "net_median_bps": 0.876271389255237,
+        "win_rate_pct": 50,
+        "p5_bps": -81.22471910112365,
+        "p95_bps": 29.14598540146151,
+        "net_total_bps": 210.00521766783868,
+        "max_drawdown_bps": -81.22471910112364,
+        "exits": {
+          "STOP": 0,
+          "TARGET": 0,
+          "TIMEOUT": 4,
+          "AMBIGUOUS_ADVERSE": 0
+        }
+      },
+      "forward": {
+        "n": 5,
+        "symbols": 5,
+        "days": 3,
+        "ideal_mean_bps": -257.67884967689076,
+        "ideal_median_bps": -541.4895583071519,
+        "net_mean_bps": -268.67884967689076,
+        "net_median_bps": -552.4895583071519,
+        "win_rate_pct": 20,
+        "p5_bps": -675.2570281124497,
+        "p95_bps": -13.978406552494087,
+        "net_total_bps": -1343.394248384454,
+        "max_drawdown_bps": -1343.394248384454,
+        "exits": {
+          "STOP": 3,
+          "TARGET": 0,
+          "TIMEOUT": 2,
+          "AMBIGUOUS_ADVERSE": 0
+        }
+      },
+      "combined_oos": {
+        "n": 9,
+        "symbols": 8,
+        "days": 7,
+        "ideal_mean_bps": -114.93211452406837,
+        "ideal_median_bps": -16.393442622951035,
+        "net_mean_bps": -125.93211452406837,
+        "net_median_bps": -27.393442622951035,
+        "win_rate_pct": 33.333333333333336,
+        "p5_bps": -675.2570281124497,
+        "p95_bps": 289.47739399045184,
+        "net_total_bps": -1133.3890307166153,
+        "max_drawdown_bps": -1422.8664247070672,
+        "exits": {
+          "STOP": 3,
+          "TARGET": 0,
+          "TIMEOUT": 6,
+          "AMBIGUOUS_ADVERSE": 0
+        }
+      },
+      "missed_retests": 22,
+      "null": {
+        "samples": 1000,
+        "observed_net_median_bps": -27.393442622951035,
+        "null_median_bps": 35.96312938533319,
+        "p_value": 0.647
+      },
+      "remove_best_symbol": {
+        "removed": [
+          "THETAUSDT"
+        ],
+        "stats": {
+          "n": 7,
+          "symbols": 7,
+          "days": 5,
+          "ideal_mean_bps": -232.1730035996176,
+          "ideal_median_bps": -70.22471910112365,
+          "net_mean_bps": -243.1730035996176,
+          "net_median_bps": -81.22471910112365,
+          "win_rate_pct": 14.285714285714286,
+          "p5_bps": -675.2570281124497,
+          "p95_bps": -13.978406552494087,
+          "net_total_bps": -1702.2110251973231,
+          "max_drawdown_bps": -1991.688419187775,
+          "exits": {
+            "STOP": 3,
+            "TARGET": 0,
+            "TIMEOUT": 4,
+            "AMBIGUOUS_ADVERSE": 0
+          }
+        }
+      },
+      "remove_best_three_symbols": {
+        "removed": [
+          "THETAUSDT",
+          "ANKRUSDT",
+          "MNTUSDT"
+        ],
+        "stats": {
+          "n": 5,
+          "symbols": 5,
+          "days": 3,
+          "ideal_mean_bps": -384.5420025270561,
+          "ideal_median_bps": -541.4895583071519,
+          "net_mean_bps": -395.5420025270561,
+          "net_median_bps": -552.4895583071519,
+          "win_rate_pct": 0,
+          "p5_bps": -675.2570281124497,
+          "p95_bps": -81.22471910112365,
+          "net_total_bps": -1977.7100126352807,
+          "max_drawdown_bps": -1977.7100126352807,
+          "exits": {
+            "STOP": 3,
+            "TARGET": 0,
+            "TIMEOUT": 2,
+            "AMBIGUOUS_ADVERSE": 0
+          }
+        }
+      },
+      "remove_best_day": {
+        "removed": [
+          "2026-02-18"
+        ],
+        "stats": {
+          "n": 8,
+          "symbols": 8,
+          "days": 6,
+          "ideal_mean_bps": -198.1331299744827,
+          "ideal_median_bps": -43.30908086203735,
+          "net_mean_bps": -209.1331299744827,
+          "net_median_bps": -54.30908086203735,
+          "win_rate_pct": 25,
+          "p5_bps": -675.2570281124497,
+          "p95_bps": 29.14598540146151,
+          "net_total_bps": -1673.0650397958616,
+          "max_drawdown_bps": -1962.5424337863135,
+          "exits": {
+            "STOP": 3,
+            "TARGET": 0,
+            "TIMEOUT": 5,
+            "AMBIGUOUS_ADVERSE": 0
+          }
+        }
+      },
+      "max_symbol_abs_pnl_share": 0.236933304169861,
+      "neighbours": [
+        {
+          "n": 12,
+          "symbols": 10,
+          "days": 8,
+          "ideal_mean_bps": -154.73587002744256,
+          "ideal_median_bps": -43.30908086203735,
+          "net_mean_bps": -165.73587002744256,
+          "net_median_bps": -54.30908086203735,
+          "win_rate_pct": 33.333333333333336,
+          "p5_bps": -675.2570281124497,
+          "p95_bps": 289.47739399045184,
+          "net_total_bps": -1988.8304403293107,
+          "max_drawdown_bps": -2278.3078343197626,
+          "exits": {
+            "STOP": 5,
+            "TARGET": 0,
+            "TIMEOUT": 7,
+            "AMBIGUOUS_ADVERSE": 0
+          }
+        },
+        {
+          "n": 4,
+          "symbols": 3,
+          "days": 4,
+          "ideal_mean_bps": -19.10336004605901,
+          "ideal_median_bps": 18.58378942448371,
+          "net_mean_bps": -30.10336004605901,
+          "net_median_bps": 7.583789424483711,
+          "win_rate_pct": 50,
+          "p5_bps": -675.2570281124497,
+          "p95_bps": 29.14598540146151,
+          "net_total_bps": -120.41344018423604,
+          "max_drawdown_bps": -689.2354346649438,
+          "exits": {
+            "STOP": 1,
+            "TARGET": 0,
+            "TIMEOUT": 3,
+            "AMBIGUOUS_ADVERSE": 0
+          }
+        }
+      ],
+      "verdict": "DATA_INADEQUATE"
+    }
+  },
+  "overall_verdict": "DATA_INADEQUATE"
+}
