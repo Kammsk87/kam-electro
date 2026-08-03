@@ -1,0 +1,4 @@
+horizon_s,n,faded_mean_bps,faded_median_bps,sd_bps,t_stat,share_beyond_cost_pct,mirror_continuation_mean_bps,clears_cost,mirror_clears_cost
+60,3050,-7.5636,-4.5701,27.3630,-15.2657,10.3279,7.5636,false,false
+300,3050,-6.7979,-5.1079,52.3113,-7.1768,25.7377,6.7979,false,false
+900,3050,-8.9369,-5.1744,93.9129,-5.2555,32.1311,8.9369,false,false
