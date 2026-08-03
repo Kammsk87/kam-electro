@@ -1,0 +1,4 @@
+threshold_pct,n,pairs,mean_bps,median_bps,sd_bps,t_stat,ci_low,ci_high,clears_cost,n_needed,underpowered
+1.5,170,10,1.0208,18.6051,402.3158,0.0331,-59.4574,61.4989,false,3010,true
+2.5,150,10,-8.5094,13.7376,407.5824,-0.2557,-73.7361,56.7174,false,3090,true
+4.0,125,10,-2.9690,30.8555,418.3193,-0.0794,-76.3036,70.3656,false,3254,true

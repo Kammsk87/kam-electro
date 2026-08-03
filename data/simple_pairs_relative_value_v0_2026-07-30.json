@@ -1,0 +1,144 @@
+{
+  "task": "TASK-AH-009",
+  "stage": 0,
+  "label": "DISCOVERY_NOT_PROOF",
+  "promising_count": 0,
+  "frozen": {
+    "task": "TASK-AH-009",
+    "stage": 0,
+    "reference_days": 60,
+    "hold_days": 10,
+    "decision_interval_days": 7,
+    "train_fraction": 0.55,
+    "max_pairs": 10,
+    "thresholds": [
+      0.015,
+      0.025,
+      0.04
+    ],
+    "cost_bps_both_legs": 22,
+    "double_cost_bps": 44,
+    "min_history_days": 360,
+    "min_events": 5,
+    "exit_rule": "FIXED_10_TRADING_DAYS",
+    "unspecified_exits_in_contract": [
+      "convergence",
+      "fixed_adverse_gap_stop"
+    ]
+  },
+  "selection_is_in_sample": true,
+  "selection_note": "Pairs were selected on the same train segment they are measured on. Every figure is an upper bound.",
+  "sealed_segments_untouched": true,
+  "symbols": 86,
+  "candidate_pairs": 3655,
+  "train_days": 200,
+  "selected_pairs": [
+    {
+      "a": "GALAUSDT",
+      "b": "VETUSDT",
+      "dispersion": 0.039139946899306874
+    },
+    {
+      "a": "ANKRUSDT",
+      "b": "SANDUSDT",
+      "dispersion": 0.04058168241186495
+    },
+    {
+      "a": "SANDUSDT",
+      "b": "VETUSDT",
+      "dispersion": 0.04289665246389751
+    },
+    {
+      "a": "FILUSDT",
+      "b": "SANDUSDT",
+      "dispersion": 0.04398086803085046
+    },
+    {
+      "a": "ATOMUSDT",
+      "b": "FILUSDT",
+      "dispersion": 0.044127894649285196
+    },
+    {
+      "a": "EGLDUSDT",
+      "b": "SANDUSDT",
+      "dispersion": 0.04666491231281392
+    },
+    {
+      "a": "EGLDUSDT",
+      "b": "GALAUSDT",
+      "dispersion": 0.047455142789431186
+    },
+    {
+      "a": "EGLDUSDT",
+      "b": "VETUSDT",
+      "dispersion": 0.049457685047338835
+    },
+    {
+      "a": "AGLDUSDT",
+      "b": "EGLDUSDT",
+      "dispersion": 0.04957818835180424
+    },
+    {
+      "a": "CHZUSDT",
+      "b": "FILUSDT",
+      "dispersion": 0.05036448495397499
+    }
+  ],
+  "by_threshold": [
+    {
+      "threshold": 0.015,
+      "n": 170,
+      "pairs": 10,
+      "mean_bps": 1.0207633214654632,
+      "median_bps": 18.605123107896908,
+      "sd_bps": 402.3157987724603,
+      "std_err_bps": 30.856213211864095,
+      "t_stat": 0.0330812894782884,
+      "ci_low": -59.45741457378816,
+      "ci_high": 61.49894121671909,
+      "clears_cost": false,
+      "clears_double_cost": false,
+      "median_positive_mean_not": false,
+      "n_needed_to_resolve_cost_floor": 3010,
+      "underpowered": true
+    },
+    {
+      "threshold": 0.025,
+      "n": 150,
+      "pairs": 10,
+      "mean_bps": -8.509375534137984,
+      "median_bps": 13.737616026467009,
+      "sd_bps": 407.58237814862434,
+      "std_err_bps": 33.27896182047433,
+      "t_stat": -0.2556983472033293,
+      "ci_low": -73.73614070226768,
+      "ci_high": 56.7173896339917,
+      "clears_cost": false,
+      "clears_double_cost": false,
+      "median_positive_mean_not": true,
+      "n_needed_to_resolve_cost_floor": 3090,
+      "underpowered": true
+    },
+    {
+      "threshold": 0.04,
+      "n": 125,
+      "pairs": 10,
+      "mean_bps": -2.969010323358298,
+      "median_bps": 30.85554725128759,
+      "sd_bps": 418.3193474284113,
+      "std_err_bps": 37.415619886131175,
+      "t_stat": -0.07935216180819762,
+      "ci_low": -76.30362530017541,
+      "ci_high": 70.3656046534588,
+      "clears_cost": false,
+      "clears_double_cost": false,
+      "median_positive_mean_not": true,
+      "n_needed_to_resolve_cost_floor": 3254,
+      "underpowered": true
+    }
+  ],
+  "cost_floor_bps": 22,
+  "double_cost_bps": 44,
+  "verdict": "STAGE_0_INFEASIBLE",
+  "closure_reason": "no frozen threshold clears the 22 bps two-leg cost floor on train, under in-sample pair selection"
+}
