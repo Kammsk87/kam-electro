@@ -1,8 +1,7 @@
 # Botalin Research Pipeline — Standing Protocol
 
 **Date:** 2026-08-03
-**Status:** DRAFT, operator-directed. Binding only once Codex accepts it; until then it is a
-recommendation, not a rule.
+**Status:** ACCEPTED by Codex, 2026-08-03. Binding for new Botalin research tasks.
 **Scope:** every strategy-research task from hypothesis to any live order.
 
 ## 0. Why this exists
@@ -46,8 +45,9 @@ Two checks, both minutes of work:
 2. **Execution contour.** If the plan depends on maker fills, simulate them pessimistically
    before assuming the spread is earned.
 
-**Kill condition:** the horizon's move distribution cannot pay the round trip, or the
-execution contour is negative before any signal is applied.
+**Kill condition:** the proposed unfiltered horizon/venue/size/execution contour cannot pay
+the round trip, or the declared execution contour is negative before any signal is applied.
+This closes that named contour, not every conceivable signal or maker approach.
 
 **Evidence.** Measured on AAVEUSDT, 2026-07-15:
 
@@ -58,15 +58,17 @@ execution contour is negative before any signal is applied.
 | 5 min | 19.5 bps | 48.1% |
 | 15 min | 35.5 bps | 71.6% |
 
-At 60 seconds the cost floor exceeds one standard deviation of the move. No signal quality
-rescues that. This check alone would have closed TASK-AH-019 and TASK-AH-046 before either
-was written.
+At 60 seconds the cost floor exceeds one standard deviation of the move. That closes an
+unfiltered taker route at this horizon. An exceptional signal can proceed only if its Stage 1
+protocol pre-declares a gross edge large enough to cover the cost floor; it is not rescued by
+assertion alone. This check would have rejected the generic 60-second route in TASK-AH-019
+and TASK-AH-046 before either was written.
 
 Maker contour, same day, 8,638 placements per side, pessimistic last-in-queue assumption:
 fill rate 28%, half-spread captured +0.72 bps, forward move conditional on fill −2.11 bps
 (buy) and −1.50 bps (sell), **total −1.07 bps before fees, t = −9.07**. Adverse selection
-exceeded the captured spread threefold. That closed the maker contour for the whole class in
-one run, with no backtest.
+exceeded the captured spread threefold. That closed the tested AAVEUSDT/day/last-in-queue
+maker contour, not the whole maker class, with no backtest.
 
 **What it does not prove:** nothing about any specific signal. Passing Stage 0 means the idea
 is not arithmetically dead, not that it works.
@@ -78,10 +80,11 @@ is not arithmetically dead, not that it works.
 **Input:** a frozen rule — entry, exit, stop, target, timeout, universe, timeframe — declared
 before any result is seen.
 
-**Ideal fill has a precise definition:** the executable-side quote at the first tick with
-`ingest_ts` strictly greater than the decision time `t`. **Not a candle close.** A backtest
-priced on the close of the signal bar is a leak, and it passes garbage to the expensive
-stages downstream.
+**Ideal fill has a precise definition:** when quote ticks exist, it is the executable-side
+quote at the first tick with `ingest_ts` strictly greater than the decision time `t`.
+**Not a candle close.** Without quote ticks, a task is `DATA_INADEQUATE` for tick-level fill
+claims. A next-bar open may be used only as an explicitly labelled `BAR_RESOLUTION_PROXY`;
+it cannot be described as tick-level ideal fill or unlock a tick-level execution replay.
 
 **The statistical attacks belong inside this stage, not after it:**
 
@@ -114,10 +117,12 @@ deliberately optimistic.
 
 **Input:** a rule that survived Stage 1 unchanged.
 
-Replay against recorded books at declared size tiers, with queue position, latency band,
-partial fills, no-fills, and spread crossing. A tier the book cannot absorb is `UNSUPPORTED`,
-never an assumed fill. Report ideal and executable outcomes side by side; the gap between them
-is the number that matters.
+Replay against recorded books at declared size tiers, with the recorded resolution stated
+explicitly. Model queue position only where the book data supports it; otherwise declare the
+queue assumption and mark the result as a lower-resolution execution estimate. Include latency
+band, partial fills, no-fills, and spread crossing. A tier the book cannot absorb is
+`UNSUPPORTED`, never an assumed fill. Report ideal and executable outcomes side by side; the
+gap between them is the number that matters.
 
 **Kill condition:** expectancy does not survive the real book at the intended clip. Route to
 execution redesign, a venue or size restriction, or reject.
@@ -201,4 +206,4 @@ single session.
 1. It cannot create edge. It only stops us paying for the discovery that there is none.
 2. It cannot clear the overlap gate — that needs retained per-trade ledgers which do not exist.
 3. It cannot shorten Stage 3. A forward cohort takes the time it takes.
-4. It cannot substitute for Codex acceptance. Until then this is a recommendation.
+4. It cannot replace human operator GO for paper, live, or any production-state change.
