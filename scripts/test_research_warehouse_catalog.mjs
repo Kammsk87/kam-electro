@@ -1444,18 +1444,34 @@ test('a data constraint is scoped to named existing sources', () => {
     'a constraint may not name a source that does not exist');
 });
 
-test('the seed carries the three laws and the one constraint, correctly typed', () => {
+test('the seed laws are correctly typed and none overclaims its status', () => {
   const laws = seedCatalog.records.market_laws;
-  assert(laws.length === 3, `expected three laws, got ${laws.length}`);
+  assert(laws.length === 4, `expected four seed laws, got ${laws.length}`);
   const identity = laws.filter((l) => l.subtype === 'mechanical_identity');
   const empirical = laws.filter((l) => l.subtype === 'empirical_market_law');
   assert(identity.length === 1 && identity[0].law_id === 'LAW.BOOK.LEVEL_SIZE_IDENTITY', 'one identity');
   assert(identity[0].n === null && identity[0].t_stat === null, 'the identity carries no measurement');
-  assert(empirical.length === 2, 'two empirical laws');
+  assert(empirical.length === 3, `expected three empirical laws, got ${empirical.length}`);
+
   for (const l of empirical) {
-    assert(l.status === 'observed', `${l.law_id} must be observed, not replicated, on a single symbol-day`);
-    assert(l.null_test.status === 'NOT_RUN', `${l.law_id} must admit its null was not run`);
+    assert(l.status !== 'proven', `${l.law_id} may never claim proof`);
+    assert(l.status !== 'replicated',
+      `${l.law_id}: every seed law rests on a single archive, so none may claim replication yet`);
+    for (const check of ['null_test', 'oos', 'remove_best']) {
+      assert(['PASS', 'FAIL', 'NOT_RUN'].includes(l[check].status),
+        `${l.law_id}.${check} must declare an explicit status`);
+    }
+    assert(l.n !== null && l.ci_low !== null, `${l.law_id} must carry precision`);
   }
+
+  // The guard law is the only one whose checks all pass, and it still holds status observed.
+  const guard = laws.find((l) => l.law_id === 'LAW.EXEC.FLOW_DEPTH_AGREEMENT_PREDICTS_ADVERSE');
+  assert(guard, 'the guard law must be present');
+  assert(['null_test', 'oos', 'remove_best'].every((c) => guard[c].status === 'PASS'), 'its three checks pass');
+  assert(guard.status === 'observed',
+    'all checks passing does not make it replicated: the producing task gated DATA_INADEQUATE on sample span');
+  assert(guard.review_criterion.includes('non-overlapping'), 'promotion requires a second independent archive span');
+
   assert(seedCatalog.records.data_constraints.length === 1, 'one constraint');
   const dc = seedCatalog.records.data_constraints[0];
   assert(dc.scope_source_ids.length === 1 && dc.scope_source_ids[0] === 'EDGE.DATA.DISPERSION',
@@ -1465,9 +1481,10 @@ test('the seed carries the three laws and the one constraint, correctly typed', 
 
 test('the catalogue summary separates identities from empirical laws', () => {
   const s = seedCatalog.law_catalogue;
-  assert(s.identities === 1 && s.empirical === 2, `unexpected split ${JSON.stringify(s)}`);
+  assert(s.identities === 1 && s.empirical === 3, `unexpected split ${JSON.stringify(s)}`);
   assert(s.constraints === 1 && s.constraints_confirmed === 1, 'constraint counts');
-  assert(s.by_status.proven === 1 && s.by_status.observed === 2, 'status breakdown');
+  assert(s.by_status.proven === 1 && s.by_status.observed === 3, 'status breakdown');
+  assert(s.by_status.replicated === undefined, 'nothing in the seed claims replication');
 });
 
 test('query "laws" hides precision on an identity and shows it on an empirical law', () => {

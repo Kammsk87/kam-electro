@@ -4249,6 +4249,97 @@
       "fixture_flag": false,
       "source_of_record": "horizon probe, 2026-08-03, AAVEUSDT 2026-07-15",
       "notes": "t_stat and the interval are zero-width because this is a dispersion table rather than a directional effect; the meaningful uncertainty is the per-horizon n."
+    },
+    {
+      "record_type": "market_law",
+      "law_id": "LAW.EXEC.FLOW_DEPTH_AGREEMENT_PREDICTS_ADVERSE",
+      "subtype": "empirical_market_law",
+      "title": "States where aggressive flow and depth change agree are followed by adverse outcomes",
+      "statement": "When aggressive flow over an interval runs against an intended direction AND depth on the side that direction relies on falls over the same interval, the next 60 seconds are systematically adverse to that direction. Such states carry a mean forward move of -0.620 bps against a near-zero +0.095 bps in all other states, a separation of +0.715 bps.",
+      "condition": "for an intended long: aggressive sell notional exceeds aggressive buy notional in the interval between two adjacent book snapshots, and bid-side depth fell over the same interval; exact mirror for an intended short. Both intents evaluated at every snapshot, never a selected subset.",
+      "horizon": "60s primary; +0.676 bps at 300s",
+      "effect": {
+        "prevented_adverse_bps": 0.7145,
+        "allow_mean_bps": 0.0949,
+        "veto_mean_bps": -0.6196,
+        "veto_rate": 0.1328,
+        "by_split": {
+          "train": 0.8517,
+          "validation": 0.6793,
+          "holdout": 0.7004,
+          "forward": 0.737
+        },
+        "at_300s_bps": 0.676,
+        "symbols": 10,
+        "states_total": 1559363,
+        "days_covered": 26
+      },
+      "n": 779540,
+      "t_stat": 20.1016,
+      "ci_low": 0.6448,
+      "ci_high": 0.7842,
+      "segment": "UNSPECIFIED",
+      "data_source_ids": [
+        "EDGE.DATA.OB",
+        "EDGE.DATA.TICKS"
+      ],
+      "transform_version": "ah047_execution_policy_guard.mjs:guardState @ frozen predicate",
+      "null_test": {
+        "status": "PASS",
+        "detail": "random guard vetoing at the identical 13.3 percent rate: control centre 0.000 bps, sd 0.036, observed +0.715, p=0.000 two-sided. Roughly twenty standard deviations above the control."
+      },
+      "oos": {
+        "status": "PASS",
+        "detail": "positive in both out-of-sample segments: holdout +0.700 (t=14.8), forward +0.737 (t=13.9)",
+        "caveat": "the segments span only 4 and 3 days; the producing task gated DATA_INADEQUATE on that"
+      },
+      "remove_best": {
+        "status": "PASS",
+        "detail": "remove-best-symbol ADAUSDT +0.658; remove-best-day 2026-08-01 +0.684; excluding AAVEUSDT, the symbol the predicate was derived from, +0.729 t=18.7"
+      },
+      "mechanism_claim": "Aggressive flow consuming one side of the book while that side is not replenishing is a joint signature of informed liquidity demand and liquidity withdrawal. An entry taken into that state is stepping in front of flow that is still arriving against a book that is thinning, so the immediate expected move is adverse. The measured object is the cost of poor entry timing, not a directional forecast.",
+      "exploitability_class": "EXECUTION_POLICY",
+      "temporal_stability": "Stable across all four chronological splits over 26 days and 10 symbols, and across both horizons. Persistence beyond this archive span, across venues, and across volatility regimes is untested.",
+      "status": "observed",
+      "review_criterion": "Promote to replicated only on a SECOND, non-overlapping archive span of at least 10 days per out-of-sample segment. All three checks already PASS, but every split here comes from one 26-day archive, so this is one measurement rather than an independent replication. Mark broken if the ALLOW mean turns materially positive, which would mean the predicate is picking direction rather than suppressing bad states.",
+      "tested_variants": [
+        {
+          "variant": "60s horizon, combined OOS",
+          "result": "+0.715 bps, t=20.1"
+        },
+        {
+          "variant": "300s horizon, combined OOS",
+          "result": "+0.676 bps, t=8.4"
+        },
+        {
+          "variant": "random guard at the identical veto rate",
+          "result": "centre 0.000 bps sd 0.036 — the control the effect had to beat, and did"
+        },
+        {
+          "variant": "remove best symbol (ADAUSDT)",
+          "result": "+0.658 bps, survives"
+        },
+        {
+          "variant": "remove best day (2026-08-01)",
+          "result": "+0.684 bps, survives"
+        },
+        {
+          "variant": "exclude AAVEUSDT, source of the predicate",
+          "result": "+0.729 bps t=18.7 — slightly stronger without it"
+        },
+        {
+          "variant": "flow condition alone, no depth condition",
+          "result": "NOT TESTED — searching predicates would be a parameter search, out of scope by contract"
+        }
+      ],
+      "task_id": "TASK-AH-047",
+      "evidence_paths": [
+        "reference/AH047_EXECUTION_POLICY_GUARD_PROTOCOL_2026-08-03.md",
+        "tasks/results/TASK-AH-047-EXECUTION-POLICY-ADVERSE-SELECTION-GUARD-V0-RESULT.md"
+      ],
+      "fixture_flag": false,
+      "source_of_record": "data/ah047_execution_policy_guard_2026-08-03.json",
+      "notes": "segment is UNSPECIFIED because the headline figure pools holdout and forward. Status is deliberately observed rather than replicated even though INV-15 would permit replicated: the producing task returned DATA_INADEQUATE on sample span, and a law must not claim more than the task that produced it."
     }
   ],
   "data_constraints": [
