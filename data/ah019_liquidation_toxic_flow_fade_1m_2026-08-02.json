@@ -1,0 +1,155 @@
+{
+  "task": "TASK-AH-019",
+  "label": "DISCOVERY_NOT_PROOF",
+  "verdict": "DATA_INADEQUATE",
+  "executable": false,
+  "promising_count": 0,
+  "frozen": {
+    "task": "TASK-AH-019",
+    "bucket_ms": 60000,
+    "depth_band_bps": 10,
+    "size_tiers_usd": [
+      7,
+      200,
+      1000
+    ],
+    "primary_exit_minutes": 5,
+    "exit_neighbour_minutes": [
+      3,
+      15
+    ],
+    "entry_label": "NEXT_MINUTE_BOOK_REFERENCE_ONLY",
+    "splits": {
+      "train": 0.55,
+      "validation": 0.2,
+      "holdout": 0.15,
+      "forward": 0.1
+    },
+    "q_signed_volume": 0.05,
+    "q_oi_change": 0.1,
+    "q_liquidation_notional": 0.95,
+    "bid_depth_recovery_ratio": 1.5,
+    "best_price_recovery_bps": 5,
+    "oi_lookback_minutes": 5,
+    "null_samples": 1000,
+    "null_seed": 19019,
+    "alpha": 0.05,
+    "max_symbol_share": 0.25,
+    "min_events_per_split": 100,
+    "min_symbols": 5,
+    "min_days": 30,
+    "max_staleness_ms": {
+      "book": 4000,
+      "trades": 60000,
+      "oi": 300000,
+      "liquidations": 60000
+    },
+    "purge_minutes": 15,
+    "embargo_minutes": 60,
+    "absorption_ratio": 0.5,
+    "cost_bps_roundtrip": 11,
+    "double_cost_bps_roundtrip": 22
+  },
+  "required_inputs": {
+    "trades": [
+      "ts",
+      "symbol",
+      "price",
+      "size",
+      "side"
+    ],
+    "book": [
+      "ts",
+      "symbol",
+      "bids",
+      "asks"
+    ],
+    "oi": [
+      "ts",
+      "symbol",
+      "open_interest"
+    ],
+    "liquidations": [
+      "ts",
+      "symbol",
+      "side",
+      "notional"
+    ]
+  },
+  "refused_substitutes": [
+    "candle_direction",
+    "close_to_close_return",
+    "later_price_move",
+    "ohlcv_volume_split",
+    "tick_rule_inference"
+  ],
+  "missing_inputs": [
+    {
+      "dataset": "trades",
+      "reason": "DATASET_NOT_SUPPLIED",
+      "required_fields": [
+        "ts",
+        "symbol",
+        "price",
+        "size",
+        "side"
+      ],
+      "missing_fields": [
+        "ts",
+        "symbol",
+        "price",
+        "size",
+        "side"
+      ]
+    },
+    {
+      "dataset": "book",
+      "reason": "DATASET_NOT_SUPPLIED",
+      "required_fields": [
+        "ts",
+        "symbol",
+        "bids",
+        "asks"
+      ],
+      "missing_fields": [
+        "ts",
+        "symbol",
+        "bids",
+        "asks"
+      ]
+    },
+    {
+      "dataset": "oi",
+      "reason": "DATASET_NOT_SUPPLIED",
+      "required_fields": [
+        "ts",
+        "symbol",
+        "open_interest"
+      ],
+      "missing_fields": [
+        "ts",
+        "symbol",
+        "open_interest"
+      ]
+    },
+    {
+      "dataset": "liquidations",
+      "reason": "DATASET_NOT_SUPPLIED",
+      "required_fields": [
+        "ts",
+        "symbol",
+        "side",
+        "notional"
+      ],
+      "missing_fields": [
+        "ts",
+        "symbol",
+        "side",
+        "notional"
+      ]
+    }
+  ],
+  "substitution_refused": true,
+  "coverage_inventory": [],
+  "note": "The decision-time inputs are incomplete. Aggressor-classified trades are the binding requirement: without them absorption and cancellation are mathematically indistinguishable, and CVD cannot be constructed from OHLCV."
+}
