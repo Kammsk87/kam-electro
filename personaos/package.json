@@ -1,0 +1,53 @@
+{
+  "name": "personaos",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "npm@10.8.2",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @personaos/web",
+    "dev:web": "npm run dev --workspace @personaos/web",
+    "dev:api": "npm run start:dev --workspace @personaos/api",
+    "dev:worker": "npm run dev --workspace @personaos/worker",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run test --workspaces --if-present",
+    "test:e2e": "npm run test:e2e --workspace @personaos/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:generate": "npm run prisma:generate --workspace @personaos/api",
+    "db:migrate": "npm run prisma:migrate --workspace @personaos/api",
+    "db:seed": "npm run prisma:seed --workspace @personaos/api",
+    "prepare": "node scripts/install-husky.mjs"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "@eslint/js": "^9.30.1",
+    "@types/node": "^22.15.34",
+    "eslint": "^9.30.1",
+    "eslint-config-prettier": "^10.1.5",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.2",
+    "next": "^16.2.9",
+    "prettier": "^3.6.2",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.35.1"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,mjs,cjs,json,md,css}": [
+      "prettier --write"
+    ]
+  },
+  "overrides": {
+    "multer": "^2.2.0",
+    "postcss": "^8.5.16",
+    "next": {
+      "postcss": "^8.5.16"
+    }
+  }
+}

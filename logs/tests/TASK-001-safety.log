@@ -38,6 +38,26 @@ PASS: safe command accepted: git status --short
 PASS: safe command accepted: bash -n orchestrator/run_next.sh
 PASS: safe command accepted: bash -n orchestrator/run_claude_task.sh
 PASS: safe command accepted: bash orchestrator/tests/test_safety_guards.sh
+== Orchestrator preflight (run_claude_task.sh) ==
+PASS: standalone CLI path present
+PASS: safe-mode flag present in launch
+PASS: safe settings path present
+PASS: --settings flag present in launch
+PASS: VS Code extension source is explicitly guarded
+PASS: --dangerously-skip-permissions absent
+== Acceptance preflight (review_cycle.sh) ==
+PASS: acceptance_gate guard function present
+PASS: accept emits explicit ACCEPT_BLOCKED markers
+PASS: accept is not a bare prepare_review && mv
+PASS: accept gates the mv on acceptance_gate
+PASS: missing result report blocks ACCEPT
+PASS: current HEAD full hash is resolved
+PASS: current HEAD short hash is resolved
+PASS: stale/wrong commit hash blocks ACCEPT
+PASS: new uncommitted leftovers block ACCEPT
+PASS: leftover check compares against task baseline
+PASS: review/test logs excluded from leftover check
+PASS: prepare_review persists guard result for accept
 == Summary ==
-passed=34 failed=0
+passed=52 failed=0
 RESULT: OK

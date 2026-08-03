@@ -1,0 +1,3 @@
+[2026-07-11T13:34:06Z] DRY RUN: task=tasks/ready/TASK-002-ORCHESTRATOR-PREFLIGHT.md task_id=TASK-002-ORCHESTRATOR-PREFLIGHT branch=task/TASK-002-ORCHESTRATOR-PREFLIGHT result=tasks/results/TASK-002-ORCHESTRATOR-PREFLIGHT-RESULT.md
+[2026-07-11T13:34:06Z] DRY RUN: claude found at /Users/aleksandr/.local/bin/claude
+[2026-07-11T13:34:06Z] DRY RUN: no files moved, no branch created, Claude not launched

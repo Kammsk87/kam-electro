@@ -1,0 +1,268 @@
+diff --git a/share/strategy-lab-7q4m2v/server-autobot.mjs b/share/strategy-lab-7q4m2v/server-autobot.mjs
+index 2015a4d..3075e46 100644
+--- a/share/strategy-lab-7q4m2v/server-autobot.mjs
++++ b/share/strategy-lab-7q4m2v/server-autobot.mjs
+@@ -13,6 +13,10 @@ const supabaseTradesTable = process.env.BOTALIN_TRADES_TABLE || "crypto_strategy
+ const supabaseSettingsTable = process.env.BOTALIN_SETTINGS_TABLE || "crypto_strategy_settings";
+ const supabaseRejectedTable = process.env.BOTALIN_REJECTED_TABLE || "rejected_signals";
+ const remoteBackend = process.env.BOTALIN_REMOTE_BACKEND || "supabase";
++const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN || "";
++const pullbackRsiMin = Number(process.env.BOTALIN_PULLBACK_RSI_MIN ?? 48);
++const pullbackRsiMax = Number(process.env.BOTALIN_PULLBACK_RSI_MAX ?? 68);
++const telegramChatId = process.env.TELEGRAM_CHAT_ID || "";
+ const localJournalPath = process.env.BOTALIN_LOCAL_JOURNAL_PATH || resolve(process.cwd(), ".botalin", "server-journal.jsonl");
+ const firestoreFallbackCachePath = process.env.BOTALIN_FIRESTORE_CACHE_PATH || resolve(process.cwd(), ".botalin", "firestore-fallback-cache.json");
+ // Each strategy is a separate short-lived process spawned ~20s apart within one runner
+@@ -269,6 +273,13 @@ const BOOTSTRAP_LEARNING_POLICY = {
+     "AVAX/USDT|1h|LONG|pullback", "AVAX/USDT|1h|SHORT|pullback",
+     "TON/USDT|1h|LONG|pullback",  "TON/USDT|1h|SHORT|pullback",
+     "ETH/USDT|1h|LONG|pullback",  "ETH/USDT|1h|SHORT|pullback",
++    "BNB/USDT|1h|LONG|pullback",  "BNB/USDT|1h|SHORT|pullback",
++    "DOGE/USDT|1h|LONG|pullback", "DOGE/USDT|1h|SHORT|pullback",
++    // breakout 1h — подтверждено бектестом 365 дней (PF 1.07–1.36)
++    "SOL/USDT|1h|LONG|breakout",  "SOL/USDT|1h|SHORT|breakout",
++    "BNB/USDT|1h|LONG|breakout",  "BNB/USDT|1h|SHORT|breakout",
++    "ETH/USDT|1h|LONG|breakout",  "ETH/USDT|1h|SHORT|breakout",
++    "DOGE/USDT|1h|LONG|breakout", "DOGE/USDT|1h|SHORT|breakout",
+     // vwap-reversion 15m — хорошая точность (WR 69–86%, pnl +0.04..+0.12%)
+     "BTC/USDT|15m|LONG|vwap-reversion",  "BTC/USDT|15m|SHORT|vwap-reversion",
+     "ADA/USDT|15m|LONG|vwap-reversion",  "ADA/USDT|15m|SHORT|vwap-reversion",
+@@ -277,14 +288,13 @@ const BOOTSTRAP_LEARNING_POLICY = {
+     "DOT/USDT|15m|LONG|vwap-reversion",  "DOT/USDT|15m|SHORT|vwap-reversion",
+   ],
+   blockedPatterns: [
+-    // breakout 1h — WR=0% на всех тестовых активах
++    // breakout 1h — WR=0% на всех тестовых активах (300-свечной бектест 2026-06-14)
+     "DOT/USDT|1h|LONG|breakout",  "DOT/USDT|1h|SHORT|breakout",
+     "ADA/USDT|1h|LONG|breakout",  "ADA/USDT|1h|SHORT|breakout",
+     "APT/USDT|1h|LONG|breakout",  "APT/USDT|1h|SHORT|breakout",
+     "SUI/USDT|1h|LONG|breakout",  "SUI/USDT|1h|SHORT|breakout",
+     "TON/USDT|1h|LONG|breakout",  "TON/USDT|1h|SHORT|breakout",
+     "TRX/USDT|1h|LONG|breakout",  "TRX/USDT|1h|SHORT|breakout",
+-    "DOGE/USDT|1h|LONG|breakout", "DOGE/USDT|1h|SHORT|breakout",
+     "ARB/USDT|1h|LONG|breakout",  "ARB/USDT|1h|SHORT|breakout",
+     "ARB/USDT|15m|LONG|breakout", "ARB/USDT|15m|SHORT|breakout",
+     // trend + pullback 1h на слабых активах (WR 17–19%)
+@@ -450,6 +460,17 @@ async function main() {
+   const enteredSet = new Set(entryCandidates.map((c) => `${c.symbol}|${c.interval}|${c.side}|${c.strategyId}`));
+   const rejected = candidates.filter((c) => !enteredSet.has(`${c.symbol}|${c.interval}|${c.side}|${c.strategyId}`));
+   await saveRejectedSignals([...rejected, ...gateRejections], entryCandidates.length).catch((err) => log(`rejected signals skipped: ${err.message}`));
++  for (const trade of newTrades) {
++    const label = trade.serverStrategyLabel || trade.serverStrategyId || trade.mode || "—";
++    const tgt = Number(trade.target);
++    const entry = Number(trade.entry);
++    const tgtPct = entry > 0 ? ((tgt - entry) / entry * 100 * (trade.side === "SHORT" ? -1 : 1)) : 0;
++    sendTelegramAlert(
++      `📊 <b>${trade.asset}</b> ${trade.side} ${trade.timeframe} · ${label}\n` +
++      `Вход: ${entry.toFixed(4)} | Цель: ${tgt.toFixed(4)} (${tgtPct >= 0 ? "+" : ""}${tgtPct.toFixed(2)}%)\n` +
++      `Объём: ${Number(trade.amount).toFixed(0)} USDT | Скор: ${trade.score || "—"}`
++    ).catch(() => {});
++  }
+   log(`server-autobot done: profile ${config.profileId}, strategies ${enabledStrategies.map((strategy) => strategy.id).join("/")}, updated ${changedTrades.length}, new ${newTrades.length}, rejected ${rejected.length}, best ${best ? `${best.symbol} ${best.interval} ${best.side} ${best.score}` : "none"}`);
+ }
+ 
+@@ -2593,6 +2614,14 @@ function closeTrade(trade, status, exitPrice, time) {
+   trade.result = status === "target" ? "server: T1 50% + T2 остаток" : "server: стоп сработал";
+   updateOutcome(trade, status);
+   appendPoint(trade, exitPrice, trade.pnl, trade.pnlPct, time);
++  const emoji = status === "target" ? "✅" : "❌";
++  const sign = trade.pnl >= 0 ? "+" : "";
++  const label = trade.serverStrategyLabel || trade.serverStrategyId || trade.mode || "—";
++  sendTelegramAlert(
++    `${emoji} <b>${trade.asset}</b> ${trade.side} ${trade.timeframe} · ${label}\n` +
++    `PNL: <b>${sign}${trade.pnl.toFixed(2)} USDT</b> (${sign}${trade.pnlPct.toFixed(2)}%)\n` +
++    `Вход: ${Number(trade.entry).toFixed(4)} → Выход: ${Number(exitPrice).toFixed(4)}`
++  ).catch(() => {});
+ }
+ 
+ function updateOutcome(trade, eventType) {
+@@ -3164,6 +3193,19 @@ function log(message) {
+   console.log(`[${new Date().toISOString()}] ${message}`);
+ }
+ 
++async function sendTelegramAlert(text) {
++  if (!telegramBotToken || !telegramChatId) return;
++  try {
++    await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
++      method: "POST",
++      headers: { "Content-Type": "application/json" },
++      body: JSON.stringify({ chat_id: telegramChatId, text, parse_mode: "HTML" })
++    });
++  } catch (e) {
++    log(`telegram alert failed: ${e.message}`);
++  }
++}
++
+ function wait(ms) {
+   return new Promise((resolve) => setTimeout(resolve, ms));
+ }
+diff --git a/share/strategy-lab-7q4m2v/server-runner.mjs b/share/strategy-lab-7q4m2v/server-runner.mjs
+index 38d38a8..9630b89 100644
+--- a/share/strategy-lab-7q4m2v/server-runner.mjs
++++ b/share/strategy-lab-7q4m2v/server-runner.mjs
+@@ -8,16 +8,18 @@ const runnerDir = dirname(fileURLToPath(import.meta.url));
+ const botScript = join(runnerDir, "server-autobot.mjs");
+ const healthScript = join(runnerDir, "server-health.mjs");
+ 
++const userPrefix = process.env.BOTALIN_USER_PREFIX || "server";
++
+ const strategyMap = {
+-  all: { strategy: "all", userLogin: "server-vps", label: "all strategies" },
+-  trend: { strategy: "trend", userLogin: "server-trend", label: "trend EMA" },
+-  pullback: { strategy: "pullback", userLogin: "server-pullback", label: "pullback" },
+-  scalping: { strategy: "scalping", userLogin: "server-scalping", label: "scalping" },
+-  "rsi-reversal": { strategy: "rsi-reversal", userLogin: "server-rsi", label: "RSI reversal" },
+-  breakout: { strategy: "breakout", userLogin: "server-breakout", label: "breakout" },
+-  "vwap-reversion": { strategy: "vwap-reversion", userLogin: "server-vwap", label: "VWAP reversion" },
+-  momentum: { strategy: "momentum", userLogin: "server-momentum", label: "momentum (риск)" },
+-  "donchian-breakout": { strategy: "donchian-breakout", userLogin: "server-donchian", label: "Donchian breakout" }
++  all: { strategy: "all", userLogin: `${userPrefix}-vps`, label: "all strategies" },
++  trend: { strategy: "trend", userLogin: `${userPrefix}-trend`, label: "trend EMA" },
++  pullback: { strategy: "pullback", userLogin: `${userPrefix}-pullback`, label: "pullback" },
++  scalping: { strategy: "scalping", userLogin: `${userPrefix}-scalping`, label: "scalping" },
++  "rsi-reversal": { strategy: "rsi-reversal", userLogin: `${userPrefix}-rsi`, label: "RSI reversal" },
++  breakout: { strategy: "breakout", userLogin: `${userPrefix}-breakout`, label: "breakout" },
++  "vwap-reversion": { strategy: "vwap-reversion", userLogin: `${userPrefix}-vwap`, label: "VWAP reversion" },
++  momentum: { strategy: "momentum", userLogin: `${userPrefix}-momentum`, label: "momentum (риск)" },
++  "donchian-breakout": { strategy: "donchian-breakout", userLogin: `${userPrefix}-donchian`, label: "Donchian breakout" }
+ };
+ 
+ const defaultStrategies = "trend,pullback,scalping,rsi-reversal,breakout,vwap-reversion,momentum,donchian-breakout";
+diff --git a/share/strategy-lab-7q4m2v/tools/hypothesis_mining/label_outcomes.py b/share/strategy-lab-7q4m2v/tools/hypothesis_mining/label_outcomes.py
+index ec51adb..2b4e731 100644
+--- a/share/strategy-lab-7q4m2v/tools/hypothesis_mining/label_outcomes.py
++++ b/share/strategy-lab-7q4m2v/tools/hypothesis_mining/label_outcomes.py
+@@ -34,8 +34,8 @@ if not SUPABASE_URL or not SUPABASE_KEY:
+ 
+ TF_MS = {"1m": 60_000, "3m": 180_000, "5m": 300_000, "15m": 900_000,
+          "30m": 1_800_000, "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000}
+-TF_BYBIT = {"1m": "1", "3m": "3", "5m": "5", "15m": "15", "30m": "30",
+-            "1h": "60", "4h": "240", "1d": "D"}
++TF_OKX = {"1m": "1m", "3m": "3m", "5m": "5m", "15m": "15m", "30m": "30m",
++          "1h": "1H", "4h": "4H", "1d": "1D"}
+ FORWARD_BARS = 20
+ 
+ # Те же значения, что config.feePct/config.slippagePct в server-autobot.mjs (Bybit spot
+@@ -43,14 +43,6 @@ FORWARD_BARS = 20
+ FEE_PCT = 0.1
+ SLIPPAGE_PCT_FALLBACK = 0.03
+ 
+-# Bybit linear perps quote some low-unit-price coins per 1000 units (price is 1000x "real"
+-# per-token price) and name the ticker accordingly. Since price ratios (entry/stop/target)
+-# are unaffected by a constant scale factor, only the symbol name needs mapping.
+-BYBIT_SYMBOL_OVERRIDES = {
+-    "PEPEUSDT": "1000PEPEUSDT",
+-    "BONKUSDT": "1000BONKUSDT",
+-}
+-
+ # Зеркалит rr1/rr2 и calculateAtrStopModel из server-autobot.mjs (evaluateCandidate) —
+ # держать в синхроне, если там поменяются константы.
+ RR = {
+@@ -69,6 +61,16 @@ ENTRY_OFFSET = {
+ }
+ ENTRY_OFFSET_DEFAULT = (1.0003, 0.9997)
+ 
++# OKX blocks plain Python UA from some IPs — browser-like headers bypass it.
++OKX_BROWSER_HEADERS = {
++    "Accept": "application/json",
++    "Accept-Language": "en-US,en;q=0.9",
++    "Cache-Control": "no-cache",
++    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
++    "Referer": "https://www.okx.com/",
++    "Origin": "https://www.okx.com",
++}
++
+ 
+ def parse_dt(v):
+     v = v.replace("Z", "+00:00")
+@@ -95,33 +97,34 @@ def fetch_rejected_signals():
+     return http_get(url, headers)
+ 
+ 
+-def fetch_bybit_klines(bybit_symbol, bybit_interval, start_ms, end_ms):
+-    candles = []
+-    cursor = start_ms
+-    while cursor < end_ms:
+-        url = (f"https://api.bybit.com/v5/market/kline?category=linear&symbol={bybit_symbol}"
+-               f"&interval={bybit_interval}&start={cursor}&end={end_ms}&limit=1000")
++def fetch_okx_klines(asset, okx_interval, start_ms):
++    """Fetch OKX candles from start_ms to now, paginating backward."""
++    okx_symbol = asset.replace("/", "-")
++    seen = {}
++    after_ts = None
++    for _ in range(30):
++        params = f"instId={okx_symbol}&bar={okx_interval}&limit=300"
++        if after_ts is not None:
++            params += f"&after={after_ts}"
++        url = f"https://www.okx.com/api/v5/market/candles?{params}"
+         try:
+-            data = http_get(url)
++            data = http_get(url, OKX_BROWSER_HEADERS)
+         except Exception as e:
+-            print(f"  bybit fetch failed {bybit_symbol} {bybit_interval}: {e}")
++            print(f"  okx fetch failed {asset} {okx_interval}: {e}")
+             break
+-        rows = (data.get("result") or {}).get("list") or []
++        rows = data.get("data") or []
+         if not rows:
+             break
+-        rows.sort(key=lambda r: int(r[0]))
+         for r in rows:
+-            candles.append({"t": int(r[0]), "o": float(r[1]), "h": float(r[2]), "l": float(r[3]), "c": float(r[4])})
+-        last_t = int(rows[-1][0])
+-        if last_t <= cursor:
++            ts = int(r[0])
++            seen[ts] = {"t": ts, "o": float(r[1]), "h": float(r[2]), "l": float(r[3]), "c": float(r[4])}
++        oldest_ts = int(rows[-1][0])
++        if oldest_ts <= start_ms:
+             break
+-        cursor = last_t + 1
+-        if len(rows) < 1000:
++        if len(rows) < 300:
+             break
++        after_ts = oldest_ts
+         time.sleep(0.05)
+-    seen = {}
+-    for c in candles:
+-        seen[c["t"]] = c
+     return sorted(seen.values(), key=lambda c: c["t"])
+ 
+ 
+@@ -249,16 +252,13 @@ def main():
+     skipped_too_recent = 0
+ 
+     for gi, ((asset, timeframe), group_rows) in enumerate(groups.items(), 1):
+-        bybit_symbol = asset.replace("/", "")
+-        bybit_symbol = BYBIT_SYMBOL_OVERRIDES.get(bybit_symbol, bybit_symbol)
+-        bybit_interval = TF_BYBIT.get(timeframe)
++        okx_interval = TF_OKX.get(timeframe)
+         tf_ms = TF_MS.get(timeframe)
+-        if not bybit_interval or not tf_ms:
++        if not okx_interval or not tf_ms:
+             continue
+         min_recorded = min(int(parse_dt(r["recorded_at"]).timestamp() * 1000) for r in group_rows)
+         start_ms = min_recorded - tf_ms * 2
+-        end_ms = now_ms
+-        candles = fetch_bybit_klines(bybit_symbol, bybit_interval, start_ms, end_ms)
++        candles = fetch_okx_klines(asset, okx_interval, start_ms)
+         if not candles:
+             skipped_no_data += len(group_rows)
+             print(f"[{gi}/{len(groups)}] {asset} {timeframe}: no candle data, skip {len(group_rows)} rows")
+@@ -273,7 +273,7 @@ def main():
+                 continue
+             merged_features = dict(row["features"])
+             merged_features["hypotheticalOutcome"] = label
+-            updates.append({"id": row["id"], "features": merged_features})
++            updates.append({"id": row["id"], "features": merged_features, "strategy": row.get("strategy", "?")})
+             labeled_here += 1
+         print(f"[{gi}/{len(groups)}] {asset} {timeframe}: {len(candles)} candles, labeled {labeled_here}/{len(group_rows)}")
+ 
+@@ -283,7 +283,7 @@ def main():
+         from collections import Counter
+         by_strategy = defaultdict(lambda: Counter())
+         for u in updates:
+-            strat = u["features"].get("strategy", "?")
++            strat = u.get("strategy", u["features"].get("strategy", "?"))
+             by_strategy[strat][u["features"]["hypotheticalOutcome"]["outcome"]] += 1
+         print("\nГипотетический результат по стратегиям (net of cost):")
+         for strat, c in sorted(by_strategy.items()):

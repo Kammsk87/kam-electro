@@ -3,3 +3,13 @@ node_modules/
 .vercel/
 fit-coach-mvp/assets/index-*.css
 fit-coach-mvp/assets/index-*.js
+
+# Scratch: 115MB of generated PDFs, not source
+tmp/
+
+# CRM database contains personal data (names, phones, emails, telegram profiles)
+cashflow-crm-mvp/data/
+
+# Embedded git repositories, not submodules
+magic-mcp/
+ui-ux-pro-max-skill/

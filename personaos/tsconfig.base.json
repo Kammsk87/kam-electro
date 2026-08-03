@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "baseUrl": ".",
+    "paths": {
+      "@personaos/ui": ["packages/ui/src"],
+      "@personaos/types": ["packages/types/src"],
+      "@personaos/config": ["packages/config/src"],
+      "@personaos/shared": ["packages/shared/src"],
+      "@personaos/ai": ["packages/ai/src"],
+      "@personaos/memory": ["packages/memory/src"],
+      "@personaos/planner": ["packages/planner/src"],
+      "@personaos/analytics": ["packages/analytics/src"],
+      "@personaos/social": ["packages/social/src"]
+    }
+  }
+}

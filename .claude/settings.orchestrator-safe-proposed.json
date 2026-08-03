@@ -1,0 +1,47 @@
+{
+  "model": "opus",
+  "permissions": {
+    "allow": [
+      "Bash(git status --short)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git branch --show-current)",
+      "Bash(git switch *)",
+      "Bash(git add orchestrator/tests/test_safety_guards.sh tasks/results/TASK-001-RESULT.md logs/tests/TASK-001-safety.log)",
+      "Bash(git commit -m *)",
+      "Bash(bash -n orchestrator/run_claude_task.sh)",
+      "Bash(bash -n orchestrator/review_cycle.sh)",
+      "Bash(bash -n orchestrator/run_next.sh)",
+      "Bash(bash -n orchestrator/tests/test_safety_guards.sh)",
+      "Bash(bash orchestrator/tests/test_safety_guards.sh)",
+      "Read(./**)",
+      "Edit(orchestrator/tests/test_safety_guards.sh)",
+      "Edit(tasks/results/TASK-001-RESULT.md)",
+      "Edit(logs/tests/TASK-001-safety.log)"
+    ],
+    "deny": [
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Read(**/id_rsa)",
+      "Read(**/id_ed25519)",
+      "Bash(sudo *)",
+      "Bash(systemctl *)",
+      "Bash(service *)",
+      "Bash(journalctl *)",
+      "Bash(ssh *)",
+      "Bash(scp *)",
+      "Bash(git reset *)",
+      "Bash(git clean *)",
+      "Bash(rm -rf *)",
+      "Bash(*BOTALIN_REAL_TRADING=true*)",
+      "Bash(*deploy*)",
+      "Bash(*API_KEY*)",
+      "Bash(*API_SECRET*)",
+      "Bash(*PRIVATE_KEY*)",
+      "Bash(*TOKEN*)"
+    ]
+  }
+}

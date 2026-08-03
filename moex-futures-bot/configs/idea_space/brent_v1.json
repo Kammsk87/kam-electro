@@ -1,0 +1,75 @@
+{
+  "name": "brent_idea_space_v1",
+  "description": "Research-only automatic idea space for Brent futures. Generates fixed long/flat ideas; never opens paper or live automatically.",
+  "dataset": "moex_iss_continuous",
+  "continuous_method": "sticky_volume_leader_last_trade_return_stitched",
+  "symbol": "BR_last_trade_return_stitched@MOEX_ISS",
+  "timeframe": "TIME_FRAME_D",
+  "use_moex_iss_costs": true,
+  "exclude_last_bars": 252,
+  "windows": [
+    {"name": "strict_252_63", "train_bars": 252, "test_bars": 63, "min_bars": 360},
+    {"name": "short_80_20", "train_bars": 80, "test_bars": 20, "min_bars": 180}
+  ],
+  "broker_fees_rub_per_contract": [0.45, 2.0, 5.0],
+  "cost_bps": [0, 10, 25, 50],
+  "roll_windows": [0, 1, 2],
+  "families": {
+    "atr_breakout": {
+      "lookback": [10, 20, 40],
+      "atr_period": [10, 14, 20],
+      "atr_mult": [0.25, 0.5, 1.0]
+    },
+    "trend_volatility": {
+      "fast": [5, 10],
+      "slow": [20, 50],
+      "vol_period": [20, 40],
+      "max_vol_pct": [45.0, 65.0]
+    },
+    "roll_aware_breakout": {
+      "lookback": [10, 20, 40],
+      "roll_cooldown": [1, 2, 3]
+    },
+    "mean_reversion_sma": {
+      "lookback": [5, 10, 20],
+      "threshold_pct": [1.0, 2.0, 3.0]
+    },
+    "breakout_high_low": {
+      "lookback": [10, 20, 40, 60]
+    },
+    "momentum_sma": {
+      "fast": [3, 5, 10],
+      "slow": [10, 20, 50]
+    }
+  },
+  "constraints": {
+    "momentum_sma": ["fast < slow"],
+    "trend_volatility": ["fast < slow"]
+  },
+  "gates": {
+    "strict_window_prefix": "strict",
+    "short_window_prefix": "short",
+    "robust_min_cost_bps": 25,
+    "robust_min_broker_fee_rub": 2.0,
+    "robust_min_roll_window": 1,
+    "holdout_allowed_status": "holdout_eligible"
+  },
+  "holdout_policy": {
+    "ledger": "data/reports/holdout_ledger_BR_20260722.json",
+    "quarantine_spent_families": true,
+    "same_family_same_holdout_route": "quarantined_after_holdout_fail"
+  },
+  "routing": {
+    "paper_candidate": "manual_paper_review_required",
+    "live_candidate": "manual_live_review_required",
+    "auto_live_allowed": false,
+    "auto_paper_allowed": false
+  },
+  "safety": {
+    "mode": "research_only",
+    "paper_allowed": false,
+    "live_allowed": false,
+    "real_orders_allowed": false,
+    "holdout_policy": "excluded_from_autopilot; use only after a frozen idea reaches holdout_eligible"
+  }
+}

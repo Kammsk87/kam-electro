@@ -1,0 +1,3 @@
+[2026-07-11T12:51:53Z] DRY RUN: task=tasks/ready/TASK-001.md task_id=TASK-001 branch=task/TASK-001 result=tasks/results/TASK-001-RESULT.md
+[2026-07-11T12:51:53Z] DRY RUN: claude not found in PATH; real run would stop before moving task
+[2026-07-11T12:51:53Z] DRY RUN: no files moved, no branch created, Claude not launched

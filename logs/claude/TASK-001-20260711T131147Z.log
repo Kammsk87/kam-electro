@@ -1,0 +1,6 @@
+[2026-07-11T13:11:47Z] Starting TASK-001
+[2026-07-11T13:11:47Z] Using Claude CLI: /Users/aleksandr/.local/bin/claude
+[2026-07-11T13:11:47Z] Moving task to in_progress
+[2026-07-11T13:11:47Z] Launching Claude Code with claude -p
+Execution error[2026-07-11T13:15:54Z] Moving task to review
+[2026-07-11T13:15:54Z] Claude completed TASK-001; task is waiting for Codex review

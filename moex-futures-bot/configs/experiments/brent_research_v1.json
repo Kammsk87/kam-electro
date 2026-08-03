@@ -1,0 +1,39 @@
+{
+  "name": "brent_research_v1",
+  "description": "Research-only Brent strategy factory on MOEX ISS last-trade return-stitched chain.",
+  "dataset": "moex_iss_continuous",
+  "continuous_method": "sticky_volume_leader_last_trade_return_stitched",
+  "symbol": "BR_last_trade_return_stitched@MOEX_ISS",
+  "timeframe": "TIME_FRAME_D",
+  "use_moex_iss_costs": true,
+  "exclude_last_bars": 252,
+  "strategies": [
+    "momentum_sma",
+    "breakout_high_low",
+    "mean_reversion_sma",
+    "atr_breakout",
+    "trend_volatility",
+    "roll_aware_breakout"
+  ],
+  "windows": [
+    {"name": "strict_252_63", "train_bars": 252, "test_bars": 63, "min_bars": 360},
+    {"name": "short_80_20", "train_bars": 80, "test_bars": 20, "min_bars": 180}
+  ],
+  "broker_fees_rub_per_contract": [0.45, 2.0, 5.0],
+  "cost_bps": [0, 10, 25, 50],
+  "roll_windows": [0, 1, 2],
+  "gates": {
+    "strict_window_prefix": "strict",
+    "short_window_prefix": "short",
+    "robust_min_cost_bps": 25,
+    "robust_min_broker_fee_rub": 2.0,
+    "robust_min_roll_window": 1,
+    "holdout_allowed_status": "holdout_eligible"
+  },
+  "safety": {
+    "mode": "research_only",
+    "paper_allowed": false,
+    "live_allowed": false,
+    "holdout_policy": "excluded_from_factory; use only after a frozen candidate reaches holdout_eligible"
+  }
+}

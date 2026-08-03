@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CRM Кэшфлоу</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">K</div>
+          <div>
+            <h1>Кэшфлоу CRM</h1>
+            <p>Лиды, записи и возвраты</p>
+          </div>
+        </div>
+
+        <label class="search">
+          <span>Поиск</span>
+          <input id="searchInput" type="search" placeholder="Имя, телефон, Telegram" />
+        </label>
+
+        <div class="filter-block">
+          <label>
+            <span>Статус</span>
+            <select id="statusFilterSelect"></select>
+          </label>
+        </div>
+
+        <div class="filter-block">
+          <label>
+            <span>Сегмент</span>
+            <select id="segmentFilterSelect">
+              <option value="all">Все клиенты</option>
+              <option value="withPhone">Есть телефон</option>
+              <option value="paid">Платили в UDS</option>
+              <option value="recentVisitors">Недавно посетили</option>
+              <option value="visitedLastMonth">Были за месяц</option>
+              <option value="visitedLastHalfYear">Были за полгода</option>
+              <option value="telegramReady">Telegram готов</option>
+              <option value="telegramPhoneFound">Telegram найден по номеру</option>
+              <option value="telegramPhoneMissing">Telegram не найден по номеру</option>
+              <option value="telegramPhoneUnchecked">Telegram не проверяли</option>
+              <option value="telegramUsernameOnly">Есть Telegram username</option>
+              <option value="instagramExists">Есть Instagram</option>
+              <option value="instagramNotMessaged">Instagram: не писали</option>
+              <option value="instagramMessaged">Instagram: написали</option>
+              <option value="instagramReplied">Instagram: ответили</option>
+              <option value="instagramDue">Instagram: написать сегодня</option>
+              <option value="messageSent">Сообщение отправлено</option>
+              <option value="replied">Ответили</option>
+              <option value="followupDue">Написать сегодня</option>
+              <option value="notBooked">Не записаны</option>
+              <option value="noContact">Нет Telegram/Instagram</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="sidebar-actions">
+          <button id="resetDemoBtn" class="danger-button">Сбросить демо-данные</button>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <h2>Операционная панель</h2>
+            <p><span id="todayLine"></span> · <span id="syncStatus">Подключение...</span></p>
+          </div>
+          <div class="topbar-actions">
+            <button id="openInstructionBtn" class="secondary-button">Инструкция</button>
+            <button id="botRunBtn" class="secondary-button">Запустить бота</button>
+            <button id="exportBtn" class="primary-button">Экспорт JSON</button>
+            <button id="openAddClientBtn" class="primary-button">Новый клиент</button>
+          </div>
+        </header>
+
+        <section id="kpiGrid" class="kpi-grid"></section>
+
+        <section class="panel assistant-panel">
+          <div class="panel-head">
+            <div>
+              <h3>Помощник менеджера</h3>
+              <p id="assistantFocus">Собираю рекомендации по базе</p>
+            </div>
+            <div class="topbar-actions">
+              <button class="secondary-button" data-assistant-segment="followupDue">План на сегодня</button>
+              <button class="secondary-button" data-assistant-segment="recentVisitors">Кого позвать</button>
+              <button class="secondary-button" data-assistant-segment="instagramDue">Instagram</button>
+            </div>
+          </div>
+          <div id="assistantCards" class="assistant-cards"></div>
+          <div id="assistantTips" class="assistant-tips"></div>
+        </section>
+
+        <section class="panel invite-panel">
+          <div class="panel-head">
+            <div>
+              <h3>Приглашение на игру</h3>
+              <p id="inviteSummary">Выберите гостей из текущей выборки</p>
+            </div>
+            <div class="topbar-actions">
+              <button id="selectInviteTopBtn" class="secondary-button">Выбрать 15</button>
+              <button id="clearInviteBtn" class="secondary-button">Снять выбор</button>
+              <button id="createInvitesBtn" class="primary-button">Поставить приглашение</button>
+            </div>
+          </div>
+          <div class="invite-controls">
+            <label>
+              <span class="meta">Игра для приглашения</span>
+              <select id="inviteGameSelect"></select>
+            </label>
+            <label>
+              <span class="meta">Менеджер</span>
+              <input id="managerNameInput" value="Менеджер" />
+            </label>
+          </div>
+          <div id="inviteList" class="invite-list"></div>
+        </section>
+
+        <section class="split-layout">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h3>Клиенты</h3>
+                <p id="clientCount"></p>
+              </div>
+            </div>
+            <div id="clientList" class="client-list"></div>
+          </div>
+
+          <div class="panel detail-panel">
+            <div id="clientDetail" class="empty-state">Выберите клиента из списка</div>
+          </div>
+        </section>
+
+        <section class="lower-grid">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h3>Игры</h3>
+                <p>Ближайшие даты и загрузка мест</p>
+              </div>
+              <button id="addGameBtn" class="icon-button" title="Добавить игру">+</button>
+            </div>
+            <div id="gamesList" class="table-list"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h3>Задачи бота</h3>
+                <p>Очередь сообщений и ручных касаний</p>
+              </div>
+            </div>
+            <div id="tasksList" class="task-list"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="clientDialog">
+      <form method="dialog" id="clientForm" class="dialog-card">
+        <h3>Новый клиент</h3>
+        <label>Имя<input name="name" required /></label>
+        <label>Телефон<input name="phone" /></label>
+        <label>Telegram<input name="telegram" placeholder="@username" /></label>
+        <label>Telegram chat_id<input name="telegramChatId" placeholder="например 123456789" /></label>
+        <label>Instagram<input name="instagram" placeholder="@username" /></label>
+        <label>Источник
+          <select name="source">
+            <option>Telegram</option>
+            <option>Instagram</option>
+            <option>Рекомендация</option>
+            <option>Офлайн</option>
+            <option>UDS</option>
+          </select>
+        </label>
+        <menu>
+          <button value="cancel" class="secondary-button">Отмена</button>
+          <button value="default" class="primary-button">Добавить</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="gameDialog">
+      <form method="dialog" id="gameForm" class="dialog-card">
+        <h3>Новая игра</h3>
+        <label>Дата<input name="date" type="date" required /></label>
+        <label>Время<input name="time" type="time" required /></label>
+        <label>Место<input name="place" placeholder="Адрес или зал" /></label>
+        <label>Количество столов<input name="tables" type="number" min="3" max="7" value="3" required /></label>
+        <menu>
+          <button value="cancel" class="secondary-button">Отмена</button>
+          <button value="default" class="primary-button">Создать</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="instructionDialog" class="wide-dialog">
+      <div class="dialog-card instruction-card">
+        <div class="dialog-head">
+          <div>
+            <h3>Инструкция по CRM</h3>
+            <p class="meta">Обновляется вместе с изменениями кабинета</p>
+          </div>
+          <button id="closeInstructionBtn" class="secondary-button">Закрыть</button>
+        </div>
+        <div id="instructionContent" class="instruction-content">Загружаю инструкцию...</div>
+      </div>
+    </dialog>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

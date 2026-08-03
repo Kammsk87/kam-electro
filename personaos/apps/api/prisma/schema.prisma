@@ -1,0 +1,873 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  EDITOR
+  ANALYST
+  VIEWER
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum SocialPlatform {
+  TELEGRAM
+  INSTAGRAM
+  THREADS
+  VK
+}
+
+enum PlatformPriority {
+  PRIMARY
+  SECONDARY
+  LOW
+}
+
+enum PreferredPostLength {
+  SHORT
+  MEDIUM
+  LONG
+  MIXED
+}
+
+enum CaptureSourceType {
+  PHOTO
+  VIDEO
+  VOICE
+  TEXT
+  LINK
+  LOCATION
+  MIXED
+}
+
+enum CaptureStatus {
+  NEW
+  REVIEWED
+  ARCHIVED
+  DELETED
+}
+
+enum CaptureEmotion {
+  UNKNOWN
+  HAPPY
+  SAD
+  SURPRISED
+  EXCITED
+  ANGRY
+  THOUGHTFUL
+}
+
+enum CaptureImportance {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum InterviewStatus {
+  NEW
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum InterviewMessageRole {
+  ASSISTANT
+  USER
+  SYSTEM
+}
+
+enum PersonaSignalSourceType {
+  CAPTURE
+  REFLECTION
+  AUTHOR_PROFILE
+  MANUAL
+}
+
+enum PersonaSignalType {
+  VALUE
+  BELIEF
+  THEME
+  TONE
+  HUMOR
+  STYLE
+  TOPIC
+  EMOTION
+  DECISION_PATTERN
+  FORBIDDEN_TOPIC
+}
+
+enum StoryStatus {
+  DRAFT
+  READY
+  ARCHIVED
+}
+
+enum DraftStatus {
+  DRAFT
+  READY
+  PUBLISHED
+  ARCHIVED
+}
+
+enum DraftPlatform {
+  TELEGRAM
+  INSTAGRAM
+  THREADS
+  VK
+}
+
+enum PublicationStatus {
+  PLANNED
+  READY
+  PUBLISHED
+  CANCELLED
+  FAILED
+}
+
+enum PublicationPlatform {
+  TELEGRAM
+  INSTAGRAM
+  THREADS
+  VK
+}
+
+enum MemorySourceType {
+  CAPTURE
+  REFLECTION
+  STORY
+}
+
+enum MemoryImportance {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum MemoryRelation {
+  RELATED
+  SIMILAR
+  FOLLOWUP
+  CONTRADICTION
+}
+
+enum PlannerTaskCategory {
+  CAPTURE
+  REFLECTION
+  STORY
+  WRITING
+  PUBLISHING
+}
+
+enum PlannerTaskStatus {
+  TODO
+  DONE
+  SKIPPED
+}
+
+enum PlannerTaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum WeeklyGoalStatus {
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum SocialConnectionStatus {
+  CONNECTED
+  DISCONNECTED
+  EXPIRED
+  ERROR
+}
+
+enum SocialIntegrationJobType {
+  PUBLISH
+  SCHEDULE
+  DRAFT_SYNC
+  STATUS_SYNC
+}
+
+enum IntegrationJobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum AiProviderKind {
+  OPENAI
+  ANTHROPIC
+  LOCAL
+}
+
+enum AiPlannerRecommendationType {
+  DAILY_TASK
+  WEEKLY_THEME
+  IDEA_OF_DAY
+  FOLLOW_UP
+}
+
+enum ResearchSource {
+  TELEGRAM
+  INSTAGRAM
+  THREADS
+  VK
+  MANUAL
+}
+
+enum ResearchItemType {
+  TREND
+  COMPETITOR
+  TOPIC
+  FORMAT
+}
+
+enum AiJobType {
+  MEMORY_EMBED
+  MEMORY_SEARCH
+  PLANNER_RECOMMEND
+  RESEARCH_SCAN
+  WRITING_REWRITE
+  PUBLISHING_SYNC
+}
+
+enum AiJobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum AiJobPriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum FeedbackStatus {
+  NEW
+  REVIEWED
+  PLANNED
+  RESOLVED
+}
+
+enum ExportJobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+model User {
+  id                 String              @id @default(cuid())
+  email              String              @unique
+  name               String?
+  image              String?
+  role               UserRole            @default(USER)
+  onboardingDone     Boolean             @default(false)
+  emailVerified      DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  accounts           Account[]
+  sessions           Session[]
+  memberships        WorkspaceMember[]
+  ownedWorkspaces    Workspace[]         @relation("WorkspaceOwner")
+  passwordCredential PasswordCredential?
+  personaProfiles    PersonaProfile[]
+}
+
+model PasswordCredential {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                String    @id @default(cuid())
+  userId            String
+  providerId        String
+  providerAccountId String
+  accessToken       String?
+  refreshToken      String?
+  expiresAt         DateTime?
+  scope             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Workspace {
+  id                       String                    @id @default(cuid())
+  ownerId                  String
+  name                     String
+  slug                     String                    @unique
+  description              String?
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  owner                    User                      @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members                  WorkspaceMember[]
+  authorProfile            AuthorProfile?
+  socialAccounts           SocialAccount[]
+  captures                 Capture[]
+  interviews               InterviewSession[]
+  stories                  Story[]
+  drafts                   Draft[]
+  publications             Publication[]
+  memoryItems              MemoryItem[]
+  plannerTasks             PlannerTask[]
+  weeklyGoals              WeeklyGoal[]
+  plannerStreak            PlannerStreak?
+  completionLogs           CompletionHistory[]
+  personaProfile           PersonaProfile?
+  personaSignals           PersonaSignal[]
+  personaVersions          PersonaVersion[]
+  socialConnections        SocialConnection[]
+  socialIntegrationJobs    SocialIntegrationJob[]
+  memoryEmbeddings         MemoryEmbedding[]
+  aiPlannerRecommendations AiPlannerRecommendation[]
+  researchItems            ResearchItem[]
+  aiJobs                   AiJob[]
+  featureFlags             FeatureFlag[]
+  feedback                 UserFeedback[]
+  exportJobs               ExportJob[]
+
+  @@index([ownerId])
+}
+
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole @default(OWNER)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+model AuthorProfile {
+  id                  String              @id @default(cuid())
+  workspaceId         String              @unique
+  displayName         String
+  bio                 String?
+  positioning         String?
+  mainTopics          String[]            @default([])
+  forbiddenTopics     String[]            @default([])
+  toneOfVoice         String[]            @default([])
+  sarcasmLevel        Int                 @default(2)
+  depthLevel          Int                 @default(4)
+  personalLevel       Int                 @default(3)
+  expertiseLevel      Int                 @default(4)
+  preferredPostLength PreferredPostLength @default(MIXED)
+  contentGoals        String[]            @default([])
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  workspace           Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model SocialAccount {
+  id                String           @id @default(cuid())
+  workspaceId       String
+  platform          SocialPlatform
+  accountName       String?
+  accountUrl        String?
+  priority          PlatformPriority @default(LOW)
+  isActive          Boolean          @default(true)
+  publishingEnabled Boolean          @default(false)
+  analyticsEnabled  Boolean          @default(false)
+  notes             String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  workspace         Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, platform])
+  @@index([workspaceId])
+}
+
+model SocialConnection {
+  id             String                 @id @default(cuid())
+  workspaceId    String
+  platform       SocialPlatform
+  status         SocialConnectionStatus @default(DISCONNECTED)
+  accountName    String?
+  externalUserId String?
+  accessToken    String?
+  refreshToken   String?
+  scopes         String[]               @default([])
+  expiresAt      DateTime?
+  lastSyncAt     DateTime?
+  errorMessage   String?
+  metadata       Json?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  workspace      Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, platform])
+  @@index([workspaceId, status])
+}
+
+model SocialIntegrationJob {
+  id            String                   @id @default(cuid())
+  workspaceId   String
+  publicationId String?
+  platform      SocialPlatform
+  type          SocialIntegrationJobType
+  status        IntegrationJobStatus     @default(QUEUED)
+  attempts      Int                      @default(0)
+  scheduledFor  DateTime?
+  payload       Json?
+  result        Json?
+  errorMessage  String?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  workspace     Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, status, scheduledFor])
+  @@index([publicationId])
+}
+
+model Capture {
+  id          String             @id @default(cuid())
+  workspaceId String
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  sourceType  CaptureSourceType
+  title       String?
+  description String?
+  transcript  String?
+  media       Json?
+  location    Json?
+  tags        String[]           @default([])
+  status      CaptureStatus      @default(NEW)
+  emotion     CaptureEmotion     @default(UNKNOWN)
+  importance  CaptureImportance  @default(MEDIUM)
+  context     Json?
+  isFavorite  Boolean            @default(false)
+  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  interviews  InterviewSession[]
+
+  @@index([workspaceId, status, createdAt])
+  @@index([workspaceId, isFavorite])
+  @@index([workspaceId, sourceType])
+}
+
+model InterviewSession {
+  id          String             @id @default(cuid())
+  captureId   String
+  workspaceId String
+  status      InterviewStatus    @default(NEW)
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  currentStep Int                @default(0)
+  summary     String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  capture     Capture            @relation(fields: [captureId], references: [id], onDelete: Cascade)
+  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  messages    InterviewMessage[]
+  story       Story?
+
+  @@index([workspaceId, status, updatedAt])
+  @@index([captureId])
+}
+
+model InterviewMessage {
+  id          String               @id @default(cuid())
+  interviewId String
+  role        InterviewMessageRole
+  content     String
+  createdAt   DateTime             @default(now())
+  metadata    Json?
+  interview   InterviewSession     @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+
+  @@index([interviewId, createdAt])
+}
+
+model Story {
+  id           String           @id @default(cuid())
+  workspaceId  String
+  reflectionId String           @unique
+  title        String?
+  hook         String?
+  context      String?
+  conflict     String?
+  insight      String?
+  takeaway     String?
+  status       StoryStatus      @default(DRAFT)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  workspace    Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  reflection   InterviewSession @relation(fields: [reflectionId], references: [id], onDelete: Cascade)
+  drafts       Draft[]
+
+  @@index([workspaceId, status, updatedAt])
+}
+
+model Draft {
+  id           String         @id @default(cuid())
+  workspaceId  String
+  storyId      String
+  platform     DraftPlatform
+  title        String?
+  content      String
+  status       DraftStatus    @default(DRAFT)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  workspace    Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  story        Story          @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  versions     DraftVersion[]
+  publications Publication[]
+
+  @@unique([storyId, platform])
+  @@index([workspaceId, status, updatedAt])
+  @@index([workspaceId, platform])
+}
+
+model DraftVersion {
+  id        String   @id @default(cuid())
+  draftId   String
+  title     String?
+  content   String
+  reason    String?
+  createdAt DateTime @default(now())
+  draft     Draft    @relation(fields: [draftId], references: [id], onDelete: Cascade)
+
+  @@index([draftId, createdAt])
+}
+
+model Publication {
+  id          String              @id @default(cuid())
+  workspaceId String
+  draftId     String
+  platform    PublicationPlatform
+  status      PublicationStatus   @default(PLANNED)
+  scheduledAt DateTime?
+  publishedAt DateTime?
+  externalUrl String?
+  notes       String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  workspace   Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  draft       Draft               @relation(fields: [draftId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, status, scheduledAt])
+  @@index([workspaceId, platform])
+  @@index([draftId])
+}
+
+model MemoryItem {
+  id          String           @id @default(cuid())
+  workspaceId String
+  sourceType  MemorySourceType
+  sourceId    String
+  title       String?
+  summary     String?
+  tags        String[]         @default([])
+  importance  MemoryImportance @default(MEDIUM)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  linksFrom   MemoryLink[]     @relation("MemoryLinksFrom")
+  linksTo     MemoryLink[]     @relation("MemoryLinksTo")
+  embedding   MemoryEmbedding?
+
+  @@unique([workspaceId, sourceType, sourceId])
+  @@index([workspaceId, updatedAt])
+  @@index([workspaceId, importance])
+}
+
+model MemoryEmbedding {
+  id           String         @id @default(cuid())
+  workspaceId  String
+  memoryItemId String         @unique
+  provider     AiProviderKind @default(LOCAL)
+  model        String         @default("local-hash-v1")
+  vector       Float[]        @default([])
+  textHash     String
+  dimensions   Int            @default(64)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  workspace    Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  memoryItem   MemoryItem     @relation(fields: [memoryItemId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, provider])
+}
+
+model MemoryLink {
+  id           String         @id @default(cuid())
+  fromMemoryId String
+  toMemoryId   String
+  relation     MemoryRelation @default(RELATED)
+  createdAt    DateTime       @default(now())
+  fromMemory   MemoryItem     @relation("MemoryLinksFrom", fields: [fromMemoryId], references: [id], onDelete: Cascade)
+  toMemory     MemoryItem     @relation("MemoryLinksTo", fields: [toMemoryId], references: [id], onDelete: Cascade)
+
+  @@unique([fromMemoryId, toMemoryId, relation])
+  @@index([toMemoryId])
+}
+
+model PlannerTask {
+  id          String              @id @default(cuid())
+  workspaceId String
+  title       String
+  description String?
+  category    PlannerTaskCategory
+  status      PlannerTaskStatus   @default(TODO)
+  priority    PlannerTaskPriority @default(MEDIUM)
+  dueDate     DateTime
+  completedAt DateTime?
+  sourceType  String?
+  sourceId    String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  workspace   Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  completions CompletionHistory[]
+
+  @@index([workspaceId, dueDate, status])
+  @@index([workspaceId, category])
+}
+
+model WeeklyGoal {
+  id             String           @id @default(cuid())
+  workspaceId    String
+  title          String
+  description    String?
+  weekStart      DateTime
+  targetCount    Int              @default(1)
+  completedCount Int              @default(0)
+  status         WeeklyGoalStatus @default(ACTIVE)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  workspace      Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, weekStart, status])
+}
+
+model PlannerStreak {
+  id              String    @id @default(cuid())
+  workspaceId     String    @unique
+  current         Int       @default(0)
+  longest         Int       @default(0)
+  lastCompletedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model CompletionHistory {
+  id          String              @id @default(cuid())
+  workspaceId String
+  taskId      String?
+  title       String
+  category    PlannerTaskCategory
+  completedAt DateTime            @default(now())
+  workspace   Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  task        PlannerTask?        @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, completedAt])
+  @@index([taskId])
+}
+
+model AiPlannerRecommendation {
+  id          String                      @id @default(cuid())
+  workspaceId String
+  type        AiPlannerRecommendationType
+  title       String
+  reason      String?
+  source      Json?
+  status      PlannerTaskStatus           @default(TODO)
+  dueDate     DateTime?
+  createdAt   DateTime                    @default(now())
+  updatedAt   DateTime                    @updatedAt
+  workspace   Workspace                   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, status, dueDate])
+}
+
+model ResearchItem {
+  id          String           @id @default(cuid())
+  workspaceId String
+  source      ResearchSource
+  type        ResearchItemType
+  title       String
+  summary     String?
+  url         String?
+  relevance   Float            @default(0.5)
+  tags        String[]         @default([])
+  metadata    Json?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, type, relevance])
+  @@index([workspaceId, source])
+}
+
+model AiJob {
+  id          String        @id @default(cuid())
+  workspaceId String
+  type        AiJobType
+  status      AiJobStatus   @default(QUEUED)
+  priority    AiJobPriority @default(NORMAL)
+  attempts    Int           @default(0)
+  maxAttempts Int           @default(3)
+  payload     Json?
+  result      Json?
+  error       String?
+  runAfter    DateTime?
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, status, priority])
+  @@index([runAfter])
+}
+
+model FeatureFlag {
+  id          String     @id @default(cuid())
+  workspaceId String?
+  key         String
+  enabled     Boolean    @default(false)
+  description String?
+  metadata    Json?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, key])
+  @@index([key])
+}
+
+model UserFeedback {
+  id          String         @id @default(cuid())
+  workspaceId String
+  userId      String
+  title       String
+  message     String
+  status      FeedbackStatus @default(NEW)
+  metadata    Json?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, status])
+  @@index([userId])
+}
+
+model ExportJob {
+  id          String          @id @default(cuid())
+  workspaceId String
+  userId      String
+  status      ExportJobStatus @default(QUEUED)
+  format      String          @default("json")
+  downloadUrl String?
+  error       String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, status])
+  @@index([userId])
+}
+
+model PersonaProfile {
+  id                String    @id @default(cuid())
+  workspaceId       String    @unique
+  userId            String
+  summary           String?
+  values            String[]  @default([])
+  beliefs           String[]  @default([])
+  themes            String[]  @default([])
+  tone              String[]  @default([])
+  humorStyle        String?
+  sarcasmLevel      Int       @default(2)
+  emotionalityLevel Int       @default(3)
+  riskAttitude      String?
+  businessAttitude  String?
+  peopleAttitude    String?
+  moneyAttitude     String?
+  familyAttitude    String?
+  forbiddenTopics   String[]  @default([])
+  preferredFormats  String[]  @default([])
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PersonaSignal {
+  id          String                  @id @default(cuid())
+  workspaceId String
+  sourceType  PersonaSignalSourceType
+  sourceId    String?
+  signalType  PersonaSignalType
+  value       String
+  confidence  Float                   @default(0.5)
+  weight      Float                   @default(1)
+  createdAt   DateTime                @default(now())
+  workspace   Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, signalType])
+  @@index([workspaceId, sourceType])
+  @@index([workspaceId, createdAt])
+}
+
+model PersonaVersion {
+  id          String    @id @default(cuid())
+  workspaceId String
+  version     Int
+  snapshot    Json
+  reason      String?
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, version])
+  @@index([workspaceId, createdAt])
+}
