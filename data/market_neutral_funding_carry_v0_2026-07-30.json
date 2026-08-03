@@ -1,0 +1,611 @@
+{
+  "task": "TASK-AH-010",
+  "stage": 0,
+  "label": "DISCOVERY_NOT_PROOF",
+  "promising_count": 0,
+  "frozen": {
+    "task": "TASK-AH-010",
+    "stage": 0,
+    "structure": "SHORT_PERP_LONG_SPOT",
+    "annualised_thresholds": [
+      0.1,
+      0.2,
+      0.5
+    ],
+    "hold_hours": [
+      24,
+      72,
+      168
+    ],
+    "primary_hold_hours": 72,
+    "cost_bps_both_legs": 22,
+    "double_cost_bps": 44,
+    "train_fraction": 0.55,
+    "max_symbol_share": 0.25,
+    "min_events": 20,
+    "hours_per_year": 8760
+  },
+  "gate_order": [
+    "HEDGEABILITY",
+    "ECONOMICS",
+    "CONCENTRATION",
+    "INDEPENDENCE"
+  ],
+  "sealed_segments_untouched": true,
+  "oracle_is_not_tradeable": true,
+  "oracle_note": "oraclePx is an index. It measures basis but cannot be a hedge leg. Only assets with a real spot quote are carryable.",
+  "total_assets": 232,
+  "hedgeable_assets": [
+    "AAVE",
+    "ADA",
+    "ARB",
+    "BTC",
+    "DOGE",
+    "ENA",
+    "ETH",
+    "HYPE",
+    "LINK",
+    "NEAR",
+    "SOL",
+    "SUI",
+    "UNI",
+    "WLD",
+    "XLM",
+    "XRP"
+  ],
+  "unhedgeable_assets_count": 216,
+  "train_hours": 301,
+  "by_threshold": [
+    {
+      "annualised_threshold": 0.1,
+      "per_hour_threshold": 0.000011415525114155251,
+      "holds": [
+        {
+          "hold_hours": 24,
+          "all_assets": {
+            "hold_hours": 24,
+            "n": 37908,
+            "assets": 177,
+            "days": 13,
+            "funding_mean_bps": 2.1056009037669856,
+            "basis_mean_bps": 1.240484328946577,
+            "gross_mean_bps": 3.3460852327135795,
+            "net_mean_bps": -18.653914767286416,
+            "net_median_bps": -19.17170931887992,
+            "net_sd_bps": 11.519866918645896,
+            "loss_rate_pct": 97.42798353909465,
+            "clears_cost": false,
+            "concentration": {
+              "top_asset": "CASHCAT",
+              "top_asset_net_bps": 12085.252410147341,
+              "total_net_bps": -707132.6009982933,
+              "top_share": -0.017090503808035448,
+              "without_best_mean_bps": -19.11898169515765,
+              "without_best_n": 37618,
+              "breaches_share_cap": false
+            },
+            "independence": {
+              "claimed_n": 37908,
+              "non_overlapping_per_asset": 12,
+              "effective_n": 2124,
+              "inflation_factor": 17.847457627118644,
+              "overlapping": true
+            },
+            "naive_t": -315.2738585831304,
+            "overlap_adjusted_t": -74.62765278855554
+          },
+          "hedgeable_only": {
+            "hold_hours": 24,
+            "n": 3508,
+            "assets": 16,
+            "days": 13,
+            "funding_mean_bps": 2.336453903363751,
+            "basis_mean_bps": 0.7574497212237412,
+            "gross_mean_bps": 3.0939036245874876,
+            "net_mean_bps": -18.906096375412538,
+            "net_median_bps": -19.001234386214126,
+            "net_sd_bps": 3.4215109340835017,
+            "loss_rate_pct": 100,
+            "clears_cost": false,
+            "concentration": {
+              "top_asset": "SOL",
+              "top_asset_net_bps": -2170.4430378177817,
+              "total_net_bps": -66322.5860849471,
+              "top_share": 0.03272554895609531,
+              "without_best_mean_bps": -18.89050148619829,
+              "without_best_n": 3396,
+              "breaches_share_cap": false
+            },
+            "independence": {
+              "claimed_n": 3508,
+              "non_overlapping_per_asset": 12,
+              "effective_n": 192,
+              "inflation_factor": 18.270833333333332,
+              "overlapping": true
+            },
+            "naive_t": -327.2756752265682,
+            "overlap_adjusted_t": -76.56575150774401
+          },
+          "hedgeable_share_of_events": 0.09253983328057402
+        },
+        {
+          "hold_hours": 72,
+          "all_assets": {
+            "hold_hours": 72,
+            "n": 37908,
+            "assets": 177,
+            "days": 13,
+            "funding_mean_bps": 4.951287562282411,
+            "basis_mean_bps": 1.6082639400991645,
+            "gross_mean_bps": 6.559551502381528,
+            "net_mean_bps": -15.44044849761832,
+            "net_median_bps": -15.504519987000396,
+            "net_sd_bps": 24.42797301113838,
+            "loss_rate_pct": 93.63986493616123,
+            "clears_cost": false,
+            "concentration": {
+              "top_asset": "CASHCAT",
+              "top_asset_net_bps": 44075.890576557395,
+              "total_net_bps": -585316.5216477213,
+              "top_share": -0.07530265923893555,
+              "without_best_mean_bps": -16.73115030634996,
+              "without_best_n": 37618,
+              "breaches_share_cap": false
+            },
+            "independence": {
+              "claimed_n": 37908,
+              "non_overlapping_per_asset": 4,
+              "effective_n": 708,
+              "inflation_factor": 53.54237288135593,
+              "overlapping": true
+            },
+            "naive_t": -123.06595199047945,
+            "overlap_adjusted_t": -16.8185716006724
+          },
+          "hedgeable_only": {
+            "hold_hours": 72,
+            "n": 3508,
+            "assets": 16,
+            "days": 13,
+            "funding_mean_bps": 6.311772859464049,
+            "basis_mean_bps": 1.2573025760512244,
+            "gross_mean_bps": 7.569075435515294,
+            "net_mean_bps": -14.430924564484684,
+            "net_median_bps": -14.19253304058146,
+            "net_sd_bps": 5.089501713855832,
+            "loss_rate_pct": 99.42987457240594,
+            "clears_cost": false,
+            "concentration": {
+              "top_asset": "SOL",
+              "top_asset_net_bps": -1966.6805318014322,
+              "total_net_bps": -50623.68337221228,
+              "top_share": 0.03884902086917203,
+              "without_best_mean_bps": -14.327739352300016,
+              "without_best_n": 3396,
+              "breaches_share_cap": false
+            },
+            "independence": {
+              "claimed_n": 3508,
+              "non_overlapping_per_asset": 4,
+              "effective_n": 64,
+              "inflation_factor": 54.8125,
+              "overlapping": true
+            },
+            "naive_t": -167.93788673242204,
+            "overlap_adjusted_t": -22.68343798796247
+          },
+          "hedgeable_share_of_events": 0.09253983328057402
+        },
+        {
+          "hold_hours": 168,
+          "all_assets": {
+            "hold_hours": 168,
+            "n": 37908,
+            "assets": 177,
+            "days": 13,
+            "funding_mean_bps": 8.6795572554078,
+            "basis_mean_bps": 2.6319090304592625,
+            "gross_mean_bps": 11.31146628586704,
+            "net_mean_bps": -10.688533714132895,
+            "net_median_bps": -8.17124418374414,
+            "net_sd_bps": 50.453822035262746,
+            "loss_rate_pct": 74.48032077661708,
+            "clears_cost": false,
+            "concentration": {
+              "top_asset": "CASHCAT",
+              "top_asset_net_bps": 90956.72551056497,
+              "total_net_bps": -405180.93603535165,
+              "top_share": -0.2244842178424433,
+              "without_best_mean_bps": -13.18883676819382,
+              "without_best_n": 37618,
+              "breaches_share_cap": false
+            },
+            "independence": {
+              "claimed_n": 37908,
+              "non_overlapping_per_asset": 1,
+              "effective_n": 177,
+              "inflation_factor": 214.16949152542372,
+              "overlapping": true
+            },
+            "naive_t": -41.24672739957023,
+            "overlap_adjusted_t": -2.818452329189939
+          },
+          "hedgeable_only": {
+            "hold_hours": 168,
+            "n": 3508,
+            "assets": 16,
+            "days": 13,
+            "funding_mean_bps": 12.500837025655587,
+            "basis_mean_bps": 2.376491864480951,
+            "gross_mean_bps": 14.87732889013655,
+            "net_mean_bps": -7.122671109863434,
+            "net_median_bps": -5.813882892572597,
+            "net_sd_bps": 9.546281030940367,
+            "loss_rate_pct": 78.02166476624858,
+            "clears_cost": false,
+            "concentration": {
+              "top_asset": "NEAR",
+              "top_asset_net_bps": 5.615878754950312,
+              "total_net_bps": -24986.330253400913,
+              "top_share": -0.00022475804561920132,
+              "without_best_mean_bps": -7.711183626089436,
+              "without_best_n": 3241,
+              "breaches_share_cap": false
+            },
+            "independence": {
+              "claimed_n": 3508,
+              "non_overlapping_per_asset": 1,
+              "effective_n": 16,
+              "inflation_factor": 219.25,
+              "overlapping": true
+            },
+            "naive_t": -44.19147202651029,
+            "overlap_adjusted_t": -2.9844799610563353
+          },
+          "hedgeable_share_of_events": 0.09253983328057402
+        }
+      ]
+    },
+    {
+      "annualised_threshold": 0.2,
+      "per_hour_threshold": 0.000022831050228310503,
+      "holds": [
+        {
+          "hold_hours": 24,
+          "all_assets": {
+            "hold_hours": 24,
+            "n": 991,
+            "assets": 50,
+            "days": 13,
+            "funding_mean_bps": 20.306675761856713,
+            "basis_mean_bps": 8.756149703222418,
+            "gross_mean_bps": 29.062825465079136,
+            "net_mean_bps": 7.062825465079135,
+            "net_median_bps": -4.831580643474847,
+            "net_sd_bps": 33.480684763100136,
+            "loss_rate_pct": 62.865792129162465,
+            "clears_cost": true,
+            "concentration": {
+              "top_asset": "CASHCAT",
+              "top_asset_net_bps": 10577.09505478398,
+              "total_net_bps": 6999.260035893437,
+              "top_share": 1.51117332411466,
+              "without_best_mean_bps": -4.477891137535111,
+              "without_best_n": 799,
+              "breaches_share_cap": true
+            },
+            "independence": {
+              "claimed_n": 991,
+              "non_overlapping_per_asset": 12,
+              "effective_n": 600,
+              "inflation_factor": 1.6516666666666666,
+              "overlapping": true
+            },
+            "naive_t": 6.64080869716739,
+            "overlap_adjusted_t": 5.167253493825271
+          },
+          "hedgeable_only": {
+            "hold_hours": 24,
+            "n": 29,
+            "assets": 2,
+            "days": 4,
+            "funding_mean_bps": 4.89507544827586,
+            "basis_mean_bps": 8.104739217131298,
+            "gross_mean_bps": 12.999814665407158,
+            "net_mean_bps": -9.00018533459284,
+            "net_median_bps": -8.646757708897798,
+            "net_sd_bps": 4.477190180058648,
+            "loss_rate_pct": 100,
+            "clears_cost": false,
+            "concentration": {
+              "top_asset": "NEAR",
+              "top_asset_net_bps": -88.70167058876267,
+              "total_net_bps": -261.0053747031924,
+              "top_share": 0.33984614565746624,
+              "without_best_mean_bps": -10.13551200673116,
+              "without_best_n": 17,
+              "breaches_share_cap": true
+            },
+            "independence": {
+              "claimed_n": 29,
+              "non_overlapping_per_asset": 12,
+              "effective_n": 24,
+              "inflation_factor": 1.2083333333333333,
+              "overlapping": true
+            },
+            "naive_t": -10.825423842259601,
+            "overlap_adjusted_t": -9.848079162875301
+          },
+          "hedgeable_share_of_events": 0.029263370332996974
+        },
+        {
+          "hold_hours": 72,
+          "all_assets": {
+            "hold_hours": 72,
+            "n": 991,
+            "assets": 50,
+            "days": 13,
+            "funding_mean_bps": 55.98562332492435,
+            "basis_mean_bps": 10.869546894587565,
+            "gross_mean_bps": 66.85517021951182,
+            "net_mean_bps": 44.85517021951191,
+            "net_median_bps": 10.611162298721695,
+            "net_sd_bps": 76.7760814502695,
+            "loss_rate_pct": 25.731584258324926,
+            "clears_cost": true,
+            "concentration": {
+              "top_asset": "CASHCAT",
+              "top_asset_net_bps": 33369.098446596225,
+              "total_net_bps": 44451.473687536265,
+              "top_share": 0.7506859880767592,
+              "without_best_mean_bps": 13.870306934843628,
+              "without_best_n": 799,
+              "breaches_share_cap": true
+            },
+            "independence": {
+              "claimed_n": 991,
+              "non_overlapping_per_asset": 4,
+              "effective_n": 200,
+              "inflation_factor": 4.955,
+              "overlapping": true
+            },
+            "naive_t": 18.391764352083356,
+            "overlap_adjusted_t": 8.262311499718358
+          },
+          "hedgeable_only": {
+            "hold_hours": 72,
+            "n": 29,
+            "assets": 2,
+            "days": 4,
+            "funding_mean_bps": 10.323863172413793,
+            "basis_mean_bps": 10.196068376068032,
+            "gross_mean_bps": 20.519931548481825,
+            "net_mean_bps": -1.4800684515181728,
+            "net_median_bps": -1.333383755634479,
+            "net_sd_bps": 3.879038280376521,
+            "loss_rate_pct": 75.86206896551724,
+            "clears_cost": false,
+            "concentration": {
+              "top_asset": "NEAR",
+              "top_asset_net_bps": -1.9052741464325624,
+              "total_net_bps": -42.92198509402701,
+              "top_share": 0.04438923647773455,
+              "without_best_mean_bps": -2.4127477027996735,
+              "without_best_n": 17,
+              "breaches_share_cap": false
+            },
+            "independence": {
+              "claimed_n": 29,
+              "non_overlapping_per_asset": 4,
+              "effective_n": 8,
+              "inflation_factor": 3.625,
+              "overlapping": true
+            },
+            "naive_t": -2.054739335156051,
+            "overlap_adjusted_t": -1.079201970223596
+          },
+          "hedgeable_share_of_events": 0.029263370332996974
+        },
+        {
+          "hold_hours": 168,
+          "all_assets": {
+            "hold_hours": 168,
+            "n": 991,
+            "assets": 50,
+            "days": 13,
+            "funding_mean_bps": 110.69773237840555,
+            "basis_mean_bps": 14.76246613256979,
+            "gross_mean_bps": 125.46019851097545,
+            "net_mean_bps": 103.46019851097539,
+            "net_median_bps": 40.07725689118103,
+            "net_sd_bps": 144.71469259434664,
+            "loss_rate_pct": 5.751765893037336,
+            "clears_cost": true,
+            "concentration": {
+              "top_asset": "CASHCAT",
+              "top_asset_net_bps": 65292.39683397116,
+              "total_net_bps": 102529.05672437658,
+              "top_share": 0.6368184680513861,
+              "without_best_mean_bps": 46.604079962960554,
+              "without_best_n": 799,
+              "breaches_share_cap": true
+            },
+            "independence": {
+              "claimed_n": 991,
+              "non_overlapping_per_asset": 1,
+              "effective_n": 50,
+              "inflation_factor": 19.82,
+              "overlapping": true
+            },
+            "naive_t": 22.50595821390862,
+            "overlap_adjusted_t": 5.055285447420768
+          },
+          "hedgeable_only": {
+            "hold_hours": 168,
+            "n": 29,
+            "assets": 2,
+            "days": 4,
+            "funding_mean_bps": 17.682177689655123,
+            "basis_mean_bps": 13.540950082718654,
+            "gross_mean_bps": 31.223127772373772,
+            "net_mean_bps": 9.223127772373777,
+            "net_median_bps": 11.071734123721868,
+            "net_sd_bps": 6.071153082676183,
+            "loss_rate_pct": 13.793103448275861,
+            "clears_cost": true,
+            "concentration": {
+              "top_asset": "NEAR",
+              "top_asset_net_bps": 171.26624840629438,
+              "total_net_bps": 267.4707053988395,
+              "top_share": 0.6403177804122898,
+              "without_best_mean_bps": 5.6590857054438315,
+              "without_best_n": 17,
+              "breaches_share_cap": true
+            },
+            "independence": {
+              "claimed_n": 29,
+              "non_overlapping_per_asset": 1,
+              "effective_n": 2,
+              "inflation_factor": 14.5,
+              "overlapping": true
+            },
+            "naive_t": 8.18099336569492,
+            "overlap_adjusted_t": 2.1484341121969117
+          },
+          "hedgeable_share_of_events": 0.029263370332996974
+        }
+      ]
+    },
+    {
+      "annualised_threshold": 0.5,
+      "per_hour_threshold": 0.000057077625570776254,
+      "holds": [
+        {
+          "hold_hours": 24,
+          "all_assets": {
+            "hold_hours": 24,
+            "n": 567,
+            "assets": 35,
+            "days": 13,
+            "funding_mean_bps": 29.35992674074075,
+            "basis_mean_bps": 11.083789879979522,
+            "gross_mean_bps": 40.44371662072028,
+            "net_mean_bps": 18.443716620720277,
+            "net_median_bps": 2.9450591307673406,
+            "net_sd_bps": 38.9350600812999,
+            "loss_rate_pct": 44.44444444444444,
+            "clears_cost": true,
+            "concentration": {
+              "top_asset": "CASHCAT",
+              "top_asset_net_bps": 10218.482430631297,
+              "total_net_bps": 10457.587323948397,
+              "top_share": 0.9771357497757118,
+              "without_best_mean_bps": 0.6194427288007776,
+              "without_best_n": 386,
+              "breaches_share_cap": true
+            },
+            "independence": {
+              "claimed_n": 567,
+              "non_overlapping_per_asset": 12,
+              "effective_n": 420,
+              "inflation_factor": 1.35,
+              "overlapping": true
+            },
+            "naive_t": 11.279740828819277,
+            "overlap_adjusted_t": 9.7080551954562
+          },
+          "hedgeable_only": {
+            "hold_hours": 24,
+            "n": 5,
+            "insufficient": true
+          },
+          "hedgeable_share_of_events": 0.008818342151675485
+        },
+        {
+          "hold_hours": 72,
+          "all_assets": {
+            "hold_hours": 72,
+            "n": 567,
+            "assets": 35,
+            "days": 13,
+            "funding_mean_bps": 79.62496755026466,
+            "basis_mean_bps": 14.096762370247232,
+            "gross_mean_bps": 93.72172992051175,
+            "net_mean_bps": 71.72172992051176,
+            "net_median_bps": 29.959466639599093,
+            "net_sd_bps": 88.10178200112156,
+            "loss_rate_pct": 11.99294532627866,
+            "clears_cost": true,
+            "concentration": {
+              "top_asset": "CASHCAT",
+              "top_asset_net_bps": 31825.56090069427,
+              "total_net_bps": 40666.2208649302,
+              "top_share": 0.7826043390262518,
+              "without_best_mean_bps": 22.903264156051552,
+              "without_best_n": 386,
+              "breaches_share_cap": true
+            },
+            "independence": {
+              "claimed_n": 567,
+              "non_overlapping_per_asset": 4,
+              "effective_n": 140,
+              "inflation_factor": 4.05,
+              "overlapping": true
+            },
+            "naive_t": 19.384633431130702,
+            "overlap_adjusted_t": 9.632301793538497
+          },
+          "hedgeable_only": {
+            "hold_hours": 72,
+            "n": 5,
+            "insufficient": true
+          },
+          "hedgeable_share_of_events": 0.008818342151675485
+        },
+        {
+          "hold_hours": 168,
+          "all_assets": {
+            "hold_hours": 168,
+            "n": 567,
+            "assets": 35,
+            "days": 13,
+            "funding_mean_bps": 154.66226227336855,
+            "basis_mean_bps": 18.868779737269364,
+            "gross_mean_bps": 173.53104201063786,
+            "net_mean_bps": 151.53104201063778,
+            "net_median_bps": 68.36735313445973,
+            "net_sd_bps": 163.12384901677555,
+            "loss_rate_pct": 2.821869488536155,
+            "clears_cost": true,
+            "concentration": {
+              "top_asset": "CASHCAT",
+              "top_asset_net_bps": 62179.110552624275,
+              "total_net_bps": 85918.10082003167,
+              "top_share": 0.7237021065312853,
+              "without_best_mean_bps": 61.49997478602959,
+              "without_best_n": 386,
+              "breaches_share_cap": true
+            },
+            "independence": {
+              "claimed_n": 567,
+              "non_overlapping_per_asset": 1,
+              "effective_n": 35,
+              "inflation_factor": 16.2,
+              "overlapping": true
+            },
+            "naive_t": 22.119518999509317,
+            "overlap_adjusted_t": 5.495638679166775
+          },
+          "hedgeable_only": {
+            "hold_hours": 168,
+            "n": 5,
+            "insufficient": true
+          },
+          "hedgeable_share_of_events": 0.008818342151675485
+        }
+      ]
+    }
+  ],
+  "verdict": "STAGE_0_INFEASIBLE",
+  "closure_reason": "on assets with a tradeable spot leg, no frozen threshold and hold clears the 22 bps two-leg floor with a positive median and concentration inside the cap"
+}
