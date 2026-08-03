@@ -4458,6 +4458,118 @@
       "fixture_flag": false,
       "source_of_record": "data/ah047_execution_policy_guard_2026-08-03.json",
       "notes": "segment is UNSPECIFIED because the headline figure pools holdout and forward. Status is deliberately observed rather than replicated even though INV-15 would permit replicated: the producing task returned DATA_INADEQUATE on sample span, and a law must not claim more than the task that produced it."
+    },
+    {
+      "record_type": "market_law",
+      "law_id": "LAW.BASIS.LIQUID_PERP_BELOW_COST",
+      "subtype": "empirical_market_law",
+      "title": "Perp-spot basis dispersion on liquid symbols is an order of magnitude below the two-leg cost floor",
+      "statement": "On liquid Bybit perpetuals the perp-spot basis is confined to a band far narrower than the 22 bps two-leg round trip. Basis standard deviation is 1.4-1.7 bps on XRP, BTC, SOL and ETH, so reaching the cost floor requires 13-15 standard deviations. Across the six most liquid symbols the basis exceeded 22 bps in 0.016 percent of 158,826 observations. Dispersion rises monotonically with illiquidity: only the two microcaps in the sample, TAC and VANRY, cross the floor with any regularity, at 41 and 57 percent. A separate and less certain observation is that the mean basis is negative on 17 of 18 symbols at roughly -5 to -8 bps; see notes, this may not be a market fact.",
+      "condition": "15-minute aligned perp and spot closes for the 18 Bybit symbols carrying both legs in axisA; 2025-07-01 to 2026-07-10; basis defined as 1e4*(perp-spot)/spot",
+      "horizon": "15m observation interval; mean-reversion half-life measured at 0.09-1.42h, median 0.20h",
+      "effect": {
+        "pooled_mean_bps": -6.69,
+        "pooled_sd_bps": 13.2,
+        "majors_share_beyond_22bps_pct": 0.016,
+        "majors_n": 158826,
+        "sd_bps_by_symbol": {
+          "XRP": 1.4,
+          "BTC": 1.6,
+          "ETH": 1.6,
+          "SOL": 1.7,
+          "HYPE": 3.1,
+          "SUI": 3.1,
+          "AAVE": 3.5,
+          "DOGE": 3.6,
+          "ADA": 4.1,
+          "LINK": 4.1,
+          "UNI": 4.1,
+          "XLM": 4.5,
+          "ENA": 4.6,
+          "NEAR": 4.7,
+          "ARB": 5.1,
+          "WLD": 6.7,
+          "TAC": 23.6,
+          "VANRY": 30.6
+        },
+        "sigmas_to_reach_22bps": {
+          "BTC": 13.7,
+          "ETH": 13.5,
+          "SOL": 13.1,
+          "XRP": 15.2,
+          "TAC": 0.9,
+          "VANRY": 0.7
+        },
+        "share_beyond_22bps_pct": {
+          "BTC": 0,
+          "XRP": 0,
+          "SOL": 0,
+          "HYPE": 0,
+          "ETH": 0.01,
+          "SUI": 0.02,
+          "DOGE": 0.02,
+          "ADA": 0.04,
+          "LINK": 0.05,
+          "AAVE": 0.06,
+          "ENA": 0.16,
+          "XLM": 0.19,
+          "NEAR": 0.2,
+          "UNI": 0.29,
+          "ARB": 1.01,
+          "WLD": 2.63,
+          "TAC": 41.18,
+          "VANRY": 57.15
+        },
+        "halflife_hours_median": 0.2,
+        "cost_floor_bps_two_leg": 22
+      },
+      "n": 534051,
+      "t_stat": -219,
+      "ci_low": -6.75,
+      "ci_high": -6.63,
+      "segment": "UNSPECIFIED",
+      "data_source_ids": [
+        "EDGE.DATA.AXISA"
+      ],
+      "transform_version": "axisA/aligned.json row order [ts, PERP, SPOT, funding], verified against backfill_axisA.mjs:19; exploratory descriptive measurement 2026-08-03",
+      "null_test": {
+        "status": "NOT_RUN",
+        "reason": "descriptive dispersion measurement; no trading rule was formed, so there is no rule to match a null against"
+      },
+      "oos": {
+        "status": "NOT_RUN",
+        "reason": "descriptive; measured on the full archive rather than split, because the claim is about the width of the distribution and not about a forecast"
+      },
+      "remove_best": {
+        "status": "NOT_RUN",
+        "reason": "the claim is per-symbol and reported per-symbol, so there is no pooled contribution for a best symbol to dominate"
+      },
+      "mechanism_claim": "Arbitrage between a perpetual and its spot leg is cheap and heavily contested on liquid symbols, so the basis is compressed to a band narrower than the cost of crossing it. The compression is itself the evidence of competition: dispersion scales inversely with liquidity, and only where the arbitrage is expensive or impossible does the basis widen past the floor.",
+      "exploitability_class": "KNOWLEDGE_ONLY",
+      "temporal_stability": "Measured over 375 continuous days spanning several regimes. The ordering of symbols by dispersion was stable; no sub-period was examined separately.",
+      "status": "observed",
+      "review_criterion": "Promote to replicated only after (a) the alignment artifact in the notes is excluded, and (b) the dispersion result is reproduced on an independently constructed perp-spot join. Mark broken if any liquid symbol shows a sustained period with more than 1 percent of observations beyond 22 bps.",
+      "tested_variants": [
+        {
+          "variant": "pooled across all 18 symbols",
+          "result": "mean -6.69 bps, sd 13.2, 6.8 percent beyond 22 bps -- dominated by the two microcaps"
+        },
+        {
+          "variant": "six most liquid symbols only",
+          "result": "0.016 percent beyond 22 bps over n=158,826"
+        },
+        {
+          "variant": "autocorrelation-adjusted precision",
+          "result": "naive n=534,051 t=-370; AR(1)-adjusted effective n=187,716 t=-219"
+        }
+      ],
+      "task_id": "TASK-AH-010",
+      "evidence_paths": [
+        "reference/BOTALIN_RESEARCH_PIPELINE_PROTOCOL_2026-08-03.md"
+      ],
+      "fixture_flag": false,
+      "source_of_record": "exploratory descriptive measurement over axisA/aligned.json, 534,051 rows, 18 symbols, 375 days",
+      "notes": "UNRESOLVED, recorded deliberately. The persistent negative mean of -5 to -8 bps may be an artifact of our own join rather than a property of the market. Two candidate explanations were considered. A timing lag between the spot and perp bar is the obvious one, but it is weakened by the evidence: a lag artifact scales with volatility, yet the mean sits in a narrow -5 to -8 band while the standard deviation varies twentyfold across symbols. A constant definitional offset -- perp mark price against spot last trade, or an index versus a venue price -- fits the observed near-constancy better. Neither was tested. The decision-relevant part of this law is the DISPERSION, which is robust to any additive offset: shifting every observation by 8 bps cannot move BTC from 13.7 sigma to within reach of the floor. The mean is recorded for completeness and must not be cited as evidence of backwardation until the review criterion is met. The t-statistic is reported with autocorrelation adjustment but cannot distinguish a real effect from a systematic offset, and so carries no weight on this question."
     }
   ],
   "data_constraints": [
