@@ -777,6 +777,55 @@
       ],
       "source_of_record": "read-only inspection, 2026-08-03",
       "notes": "Carries its own poll timestamp and a measured latency field. Supplies the borrow cost leg of a carry trade."
+    },
+    {
+      "record_type": "data_source",
+      "source_id": "EDGE.DATA.AXISA",
+      "title": "Bybit perp-versus-spot basis at 15m for eighteen liquid symbols",
+      "evidence_type": "FUNDING",
+      "owner_system": "botalin-edge",
+      "host_scope": "SERVER_RESIDENT",
+      "retained_path": "/opt/botalin-edge/data/axisA/",
+      "path_kind": "DIRECTORY",
+      "run_id": null,
+      "time_span_start": null,
+      "time_span_end": "2026-07-11T20:40:09Z",
+      "symbols": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ARBUSDT",
+        "BTCUSDT",
+        "DOGEUSDT",
+        "ENAUSDT",
+        "ETHUSDT",
+        "HYPEUSDT",
+        "LINKUSDT",
+        "NEARUSDT",
+        "SOLUSDT",
+        "SUIUSDT",
+        "TACUSDT",
+        "UNIUSDT",
+        "VANRYUSDT",
+        "WLDUSDT",
+        "XLMUSDT",
+        "XRPUSDT"
+      ],
+      "timeframes": [
+        "15m"
+      ],
+      "schema_fingerprint": "verified:manifest{generated_at,tf:15m,basis:(perp-spot)/spot,files:{SYMBOL:{rows,spot,funding}}}",
+      "write_ownership": "SERVER_COLLECTOR",
+      "read_only_status": "APPEND_ONLY_BY_OWNER",
+      "verification_status": "VERIFIED_READ_ONLY",
+      "evidence_grade": "RAW_PRIMARY",
+      "fixture_flag": false,
+      "known_gaps": [
+        "Eighteen symbols only. This set defines which perps are hedgeable at all, and it is the binding constraint on any carry structure.",
+        "Backfill generated 2026-07-11; not confirmed to be updating since.",
+        "Row counts differ by symbol: 35,957 for majors, 20,000 for ARBUSDT."
+      ],
+      "source_of_record": "read-only inspection of /opt/botalin-edge/data/axisA_manifest.json, 2026-08-03",
+      "notes": "Holds REAL spot, not an index, so it is the only source that can define a tradeable hedge leg. Used by TASK-AH-010 as gate 1. The perp-spot basis itself over a long window on liquid majors has never been examined and is an untested object in its own right."
     }
   ],
   "experiments": [
