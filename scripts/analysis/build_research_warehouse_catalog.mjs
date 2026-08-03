@@ -182,6 +182,26 @@ function checkField(schema, spec, value, path, errors) {
     case 'object':
       if (typeof value !== 'object' || Array.isArray(value)) errors.push(`${path}: expected object`);
       break;
+    case 'number':
+      if (typeof value !== 'number' || !Number.isFinite(value)) errors.push(`${path}: expected a finite number`);
+      break;
+    case 'object_array': {
+      if (!Array.isArray(value)) { errors.push(`${path}: expected array`); break; }
+      value.forEach((v, i) => {
+        if (typeof v !== 'object' || v === null || Array.isArray(v)) errors.push(`${path}[${i}]: expected object`);
+      });
+      break;
+    }
+    case 'check_result': {
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        errors.push(`${path}: expected an object with an explicit status`);
+        break;
+      }
+      if (!schema.enums.check_status.includes(value.status)) {
+        errors.push(`${path}.status: '${value.status}' not in check_status (PASS, FAIL, NOT_RUN)`);
+      }
+      break;
+    }
     case 'gate_map': {
       if (typeof value !== 'object' || Array.isArray(value)) { errors.push(`${path}: expected object`); break; }
       const statuses = schema.enums.gate_status;
@@ -472,6 +492,99 @@ export function checkTrialLedger(collections) {
   return { errors, rejections, keptEntries: kept, perExperiment };
 }
 
+// Fields a mechanical identity must NOT carry. An identity is true by construction; giving
+// it a sample size or a t-statistic invites someone to test arithmetic for significance.
+const MEASUREMENT_ONLY_FIELDS = ['n', 't_stat', 'ci_low', 'ci_high', 'null_test', 'oos', 'remove_best'];
+
+/**
+ * Market-law and data-constraint invariants (INV-14 .. INV-17).
+ * The central rule: an identity and an empirical law are different kinds of object and are
+ * never allowed to look alike.
+ */
+export function checkLawCatalogue(collections) {
+  const errors = [];
+  const rejections = [];
+  const sourceIds = new Set(collections.data_sources.map((s) => s.source_id));
+  const keptLaws = [];
+  const keptConstraints = [];
+
+  for (const law of collections.market_laws) {
+    const label = `market_law[${law.law_id}]`;
+    const problems = [];
+
+    if (law.subtype === 'mechanical_identity') {
+      for (const f of MEASUREMENT_ONLY_FIELDS) {
+        if (law[f] !== null && law[f] !== undefined) {
+          problems.push({ reason: 'IDENTITY_CARRIES_MEASUREMENT', detail: `${f} must be null on a mechanical identity` });
+        }
+      }
+      if (law.status !== 'proven') {
+        problems.push({ reason: 'IDENTITY_BAD_STATUS', detail: `a mechanical identity is 'proven', not '${law.status}'` });
+      }
+    } else {
+      if (law.status === 'proven') {
+        problems.push({ reason: 'EMPIRICAL_CLAIMS_PROOF', detail: "an empirical law may never hold status 'proven'" });
+      }
+      for (const f of ['n', 't_stat', 'ci_low', 'ci_high']) {
+        if (law[f] === null || law[f] === undefined) {
+          problems.push({ reason: 'EMPIRICAL_MISSING_PRECISION', detail: `${f} is required on an empirical law` });
+        }
+      }
+      for (const f of ['null_test', 'oos', 'remove_best']) {
+        if (!law[f] || typeof law[f].status !== 'string') {
+          problems.push({ reason: 'CHECK_NOT_DECLARED', detail: `${f} must be declared explicitly, even as NOT_RUN` });
+        }
+      }
+      // INV-15 — replication is earned, not asserted.
+      if (law.status === 'replicated') {
+        const allPass = ['null_test', 'oos', 'remove_best'].every((f) => law[f]?.status === 'PASS');
+        if (!allPass) {
+          problems.push({
+            reason: 'REPLICATED_WITHOUT_CHECKS',
+            detail: 'status replicated requires null_test, oos and remove_best all PASS',
+          });
+        }
+      }
+    }
+
+    // INV-17 — provenance.
+    for (const sid of law.data_source_ids) {
+      if (!sourceIds.has(sid)) problems.push({ reason: 'UNKNOWN_DATA_SOURCE', detail: `unknown data_source '${sid}'` });
+    }
+    if (!Array.isArray(law.tested_variants) || law.tested_variants.length === 0) {
+      problems.push({ reason: 'NO_TESTED_VARIANTS', detail: 'tested variants, including negative ones, must be recorded' });
+    }
+
+    if (problems.length > 0) {
+      for (const p of problems) {
+        errors.push(`INV-LAW ${label}: ${p.detail}`);
+        rejections.push({ record_type: 'market_law', id: law.law_id, reason: p.reason, detail: p.detail });
+      }
+      continue;
+    }
+    keptLaws.push(law);
+  }
+
+  // INV-16 — a constraint is scoped to named sources, never to a whole evidence class.
+  for (const c of collections.data_constraints) {
+    const label = `data_constraint[${c.constraint_id}]`;
+    const problems = [];
+    for (const sid of c.scope_source_ids) {
+      if (!sourceIds.has(sid)) problems.push({ reason: 'UNKNOWN_SCOPE_SOURCE', detail: `unknown data_source '${sid}'` });
+    }
+    if (problems.length > 0) {
+      for (const p of problems) {
+        errors.push(`INV-16 ${label}: ${p.detail}`);
+        rejections.push({ record_type: 'data_constraint', id: c.constraint_id, reason: p.reason, detail: p.detail });
+      }
+      continue;
+    }
+    keptConstraints.push(c);
+  }
+
+  return { errors, rejections, keptLaws, keptConstraints };
+}
+
 /** Aggregates the ledger into the headline reconciliation figures. Pure. */
 export function summarizeTrialLedger(entries, perExperiment, evidence) {
   const real = entries.filter((e) => !e.fixture_flag);
@@ -697,6 +810,8 @@ const COLLECTION_OF = {
   result: 'results',
   trial_ledger_entry: 'trial_ledger_entries',
   trial_evidence: 'trial_evidence',
+  market_law: 'market_laws',
+  data_constraint: 'data_constraints',
   failure_route: 'failure_routes',
   lesson_link: 'lesson_links',
   lineage_edge: 'lineage_edges',
@@ -709,6 +824,8 @@ export function emptyCollections() {
     results: [],
     trial_ledger_entries: [],
     trial_evidence: [],
+    market_laws: [],
+    data_constraints: [],
     failure_routes: [],
     lesson_links: [],
     lineage_edges: [],
@@ -782,6 +899,12 @@ export function buildCatalog(schema, manifests, options = {}) {
   rejections.push(...ledger.rejections);
   collections.trial_ledger_entries = ledger.keptEntries;
 
+  const laws = checkLawCatalogue(collections);
+  errors.push(...laws.errors);
+  rejections.push(...laws.rejections);
+  collections.market_laws = laws.keptLaws;
+  collections.data_constraints = laws.keptConstraints;
+
   const coverage = computeCoverage(schema, collections.data_sources);
 
   const blockingGaps = collections.failure_routes
@@ -808,6 +931,14 @@ export function buildCatalog(schema, manifests, options = {}) {
     counts: Object.fromEntries(Object.entries(collections).map(([k, v]) => [k, v.length])),
     coverage,
     trial_ledger: summarizeTrialLedger(collections.trial_ledger_entries, ledger.perExperiment, collections.trial_evidence),
+    law_catalogue: {
+      identities: collections.market_laws.filter((l) => l.subtype === 'mechanical_identity').length,
+      empirical: collections.market_laws.filter((l) => l.subtype === 'empirical_market_law').length,
+      by_status: collections.market_laws.reduce((a, l) => ({ ...a, [l.status]: (a[l.status] ?? 0) + 1 }), {}),
+      by_exploitability: collections.market_laws.reduce((a, l) => ({ ...a, [l.exploitability_class]: (a[l.exploitability_class] ?? 0) + 1 }), {}),
+      constraints: collections.data_constraints.length,
+      constraints_confirmed: collections.data_constraints.filter((c) => c.status === 'confirmed').length,
+    },
     trial_conservation_by_experiment: ledger.perExperiment,
     blocking_gaps_by_priority: blockingGaps,
     records: collections,
@@ -905,6 +1036,36 @@ export function catalogToCsv(schema, catalog) {
       fixture_flag: e.fixture_flag,
       retained_or_evidence_path: e.artefact_location_hint,
       source_of_record: e.source_of_record,
+    });
+  }
+  for (const l of catalog.records.market_laws) {
+    push({
+      record_type: 'market_law',
+      id: l.law_id,
+      family_id: l.subtype,
+      title_or_mechanism: l.title,
+      type_or_segment: l.horizon,
+      verdict_or_status: l.status,
+      evidence_grade: l.exploitability_class,
+      verification_status: l.subtype === 'mechanical_identity' ? 'PROVEN_BY_CONSTRUCTION' : `n=${l.n} t=${l.t_stat}`,
+      fixture_flag: l.fixture_flag,
+      retained_or_evidence_path: l.evidence_paths.join('|'),
+      source_of_record: l.source_of_record,
+    });
+  }
+  for (const c of catalog.records.data_constraints) {
+    push({
+      record_type: 'data_constraint',
+      id: c.constraint_id,
+      family_id: c.constraint_kind,
+      title_or_mechanism: c.statement,
+      type_or_segment: c.scope_source_ids.join('|'),
+      verdict_or_status: c.status,
+      evidence_grade: '',
+      verification_status: '',
+      fixture_flag: c.fixture_flag,
+      retained_or_evidence_path: c.evidence_paths.join('|'),
+      source_of_record: c.source_of_record,
     });
   }
   for (const f of catalog.records.failure_routes) {

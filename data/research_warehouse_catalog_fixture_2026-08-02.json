@@ -255,8 +255,16 @@
       "run_id": "amel-1785062109514",
       "time_span_start": "2026-07-26T10:35:10Z",
       "time_span_end": null,
-      "symbols": ["AMEL_UNIVERSE_14"],
-      "timeframes": ["1m", "5m", "15m", "1h", "4h"],
+      "symbols": [
+        "AMEL_UNIVERSE_14"
+      ],
+      "timeframes": [
+        "1m",
+        "5m",
+        "15m",
+        "1h",
+        "4h"
+      ],
       "schema_fingerprint": "unverified:amel_regime_v1",
       "write_ownership": "SERVER_COLLECTOR",
       "read_only_status": "APPEND_ONLY_BY_OWNER",
@@ -4014,6 +4022,262 @@
       "blocking_reason": "Synthetic fixture. Exists only to exercise the aggregate/child machinery.",
       "fixture_flag": true,
       "source_of_record": "data/research_warehouse_catalog_fixture_2026-08-02.json"
+    }
+  ],
+  "market_laws": [
+    {
+      "record_type": "market_law",
+      "law_id": "LAW.BOOK.LEVEL_SIZE_IDENTITY",
+      "subtype": "mechanical_identity",
+      "title": "Resting size change decomposes into execution and cancellation",
+      "statement": "For a price level between two adjacent book snapshots: size_next = size_prev - traded_at_price - cancelled + added. Therefore net_passive_change = added - cancelled = size_next - size_prev + traded_at_price. A level that shrinks was either traded through or cancelled, and no sequence of book snapshots alone can tell which.",
+      "condition": "any price level observed in two adjacent order-book snapshots, with the aggressor-classified trade tape covering the interval between them",
+      "horizon": "one snapshot interval",
+      "effect": {
+        "kind": "identity",
+        "separates": [
+          "ABSORPTION",
+          "CONSUMPTION",
+          "PULL",
+          "PULL_UNDER_PRESSURE",
+          "REPLENISH",
+          "IDLE"
+        ],
+        "requires": "traded_at_price from an aggressor-classified tape"
+      },
+      "n": null,
+      "t_stat": null,
+      "ci_low": null,
+      "ci_high": null,
+      "segment": "UNSPECIFIED",
+      "data_source_ids": [
+        "EDGE.DATA.OB",
+        "EDGE.DATA.TICKS"
+      ],
+      "transform_version": "ah019_liquidation_toxic_flow_fade_1m.mjs:classifyLevel",
+      "null_test": null,
+      "oos": null,
+      "remove_best": null,
+      "mechanism_claim": "Accounting identity of a limit order book price level. Every unit leaving a level is either executed against an aggressor or withdrawn by its owner; every unit arriving is a new passive order. It is true by construction and cannot decay.",
+      "exploitability_class": "KNOWLEDGE_ONLY",
+      "temporal_stability": "permanent by construction; unaffected by regime, venue or sample",
+      "status": "proven",
+      "review_criterion": "Not reviewable as an empirical claim. It would only change if the definition of traded_at_price changed, for example if the tape stopped carrying aggressor side.",
+      "tested_variants": [
+        {
+          "variant": "prev=100 next=100 traded=50",
+          "result": "ABSORPTION, net_passive_change=+50"
+        },
+        {
+          "variant": "prev=100 next=50 traded=50",
+          "result": "CONSUMPTION, net_passive_change=0"
+        },
+        {
+          "variant": "prev=100 next=0 traded=0",
+          "result": "PULL, no execution occurred"
+        },
+        {
+          "variant": "prev=100 next=0 traded=50",
+          "result": "PULL_UNDER_PRESSURE, net_passive_change=-50"
+        },
+        {
+          "variant": "identical book delta 100->0 with and without tape volume",
+          "result": "classifies as PULL vs CONSUMPTION; this is the whole point"
+        }
+      ],
+      "task_id": "TASK-AH-019",
+      "evidence_paths": [
+        "scripts/analysis/ah019_liquidation_toxic_flow_fade_1m.mjs",
+        "scripts/test_ah019_liquidation_toxic_flow_fade_1m.mjs"
+      ],
+      "fixture_flag": false,
+      "source_of_record": "tasks/results/TASK-AH-019-LIQUIDATION-TOXIC-FLOW-FADE-1M-V0-RESULT.md"
+    },
+    {
+      "record_type": "market_law",
+      "law_id": "LAW.EXEC.BID_FILL_ADVERSE_SELECTION",
+      "subtype": "empirical_market_law",
+      "title": "A passive fill at the touch is followed by an adverse move exceeding the captured spread",
+      "statement": "A limit order resting at the touch and filled under a last-in-queue assumption is followed by a mid move against the filled side that is roughly threefold the half-spread it captured. Measured total is -1.07 bps before fees across both sides.",
+      "condition": "limit order placed at best bid or best ask at a book snapshot; filled only when cumulative aggressive volume at that exact price reaches the size displayed there at placement; 60s rest window before cancellation",
+      "horizon": "60s from fill (also measured at 300s)",
+      "effect": {
+        "buy_forward_bps": -2.11,
+        "sell_forward_bps": -1.5,
+        "half_spread_captured_bps": 0.72,
+        "total_both_sides_bps": -1.07,
+        "fill_rate_pct": 28.7,
+        "at_300s_total_bps": -1.14,
+        "fees_excluded": true
+      },
+      "n": 4965,
+      "t_stat": -9.07,
+      "ci_low": -1.3,
+      "ci_high": -0.84,
+      "segment": "UNSPECIFIED",
+      "data_source_ids": [
+        "EDGE.DATA.OB",
+        "EDGE.DATA.TICKS"
+      ],
+      "transform_version": "probe_maker.mjs @ pessimistic last-in-queue; AAVEUSDT 2026-07-15",
+      "null_test": {
+        "status": "NOT_RUN",
+        "reason": "exploratory probe; no matched null was constructed"
+      },
+      "oos": {
+        "status": "NOT_RUN",
+        "reason": "single symbol-day; no chronological splits"
+      },
+      "remove_best": {
+        "status": "NOT_RUN",
+        "reason": "single symbol, so remove-best-symbol is undefined"
+      },
+      "mechanism_claim": "Adverse selection. A passive order is filled precisely when someone wants to trade against it, which is disproportionately when the filler holds the better short-term view. The liquidity provider is compensated by the spread and taxed by the information in the flow that lifts them.",
+      "exploitability_class": "EXECUTION_POLICY",
+      "temporal_stability": "unknown; measured on one symbol-day. The sign held on both sides and at both horizons, and t is large, but persistence across symbols and regimes is untested.",
+      "status": "observed",
+      "review_criterion": "Promote to replicated only after the same measurement across at least 20 symbols with chronological splits, a matched null and remove-best-symbol, all PASS. Mark broken if the sign reverses on any out-of-sample segment.",
+      "tested_variants": [
+        {
+          "variant": "hold 60s after fill",
+          "result": "buy -2.11 bps t=-12.45; sell -1.50 bps t=-9.06"
+        },
+        {
+          "variant": "hold 300s after fill",
+          "result": "buy -3.32 bps t=-9.01; sell -0.48 bps t=-1.30; combined -1.14 bps"
+        },
+        {
+          "variant": "both sides pooled at 60s",
+          "result": "-1.07 bps, sd 8.30, t=-9.07"
+        }
+      ],
+      "task_id": "TASK-AH-019",
+      "evidence_paths": [
+        "reference/AH019_LIQUIDATION_TOXIC_FLOW_FADE_1M_PROTOCOL_2026-08-02.md"
+      ],
+      "fixture_flag": false,
+      "source_of_record": "maker-fill probe, 2026-08-03, AAVEUSDT 2026-07-15, 8638 placements per side",
+      "notes": "Fees are not deducted. Maker fees would make the total more negative."
+    },
+    {
+      "record_type": "market_law",
+      "law_id": "LAW.COST.HORIZON_VS_ROUNDTRIP",
+      "subtype": "empirical_market_law",
+      "title": "Below roughly five minutes the round-trip cost exceeds one standard deviation of the move",
+      "statement": "Mid-move dispersion scales with horizon while the round-trip cost is a constant, so the share of moves able to pay 11 bps rises from 1.6 percent at 10 seconds to 48.1 percent at 5 minutes. At 60 seconds the 11 bps floor exceeds the 8.6 bps standard deviation of the move, which closes an unfiltered taker route at that horizon regardless of signal quality.",
+      "condition": "mid-to-mid move measured on the recorded book, against the frozen 11 bps round-trip taker cost",
+      "horizon": "10s, 1m, 5m, 15m, 1h",
+      "effect": {
+        "sd_bps": {
+          "10s": 3.6,
+          "1m": 8.6,
+          "5m": 19.5,
+          "15m": 35.5,
+          "1h": 57.6
+        },
+        "share_beyond_11bps_pct": {
+          "10s": 1.6,
+          "1m": 16.2,
+          "5m": 48.1,
+          "15m": 71.6,
+          "1h": 95.7
+        },
+        "n_by_horizon": {
+          "10s": 8637,
+          "1m": 1439,
+          "5m": 287,
+          "15m": 95,
+          "1h": 23
+        }
+      },
+      "n": 8637,
+      "t_stat": 0,
+      "ci_low": 0,
+      "ci_high": 0,
+      "segment": "UNSPECIFIED",
+      "data_source_ids": [
+        "EDGE.DATA.OB"
+      ],
+      "transform_version": "probe_horizon.mjs; AAVEUSDT 2026-07-15",
+      "null_test": {
+        "status": "NOT_RUN",
+        "reason": "a dispersion measurement has no directional null; the relevant check is replication across symbols"
+      },
+      "oos": {
+        "status": "NOT_RUN",
+        "reason": "single symbol-day"
+      },
+      "remove_best": {
+        "status": "NOT_RUN",
+        "reason": "single symbol"
+      },
+      "mechanism_claim": "Variance of a price process grows with elapsed time while a fee and spread charge does not. The ratio of achievable move to fixed cost therefore improves monotonically with horizon, which sets a floor on the shortest tradeable horizon for a given cost structure.",
+      "exploitability_class": "KNOWLEDGE_ONLY",
+      "temporal_stability": "the monotone shape is structural; the specific crossover horizon is symbol and volatility dependent and will move with regime",
+      "status": "observed",
+      "review_criterion": "Replicate the crossover horizon across at least 20 symbols and two volatility regimes. The 1h row rests on n=23 and must not be quoted as established.",
+      "tested_variants": [
+        {
+          "variant": "10s",
+          "result": "sd 3.6 bps, 1.6 percent beyond cost, n=8637"
+        },
+        {
+          "variant": "1m",
+          "result": "sd 8.6 bps, 16.2 percent, n=1439"
+        },
+        {
+          "variant": "5m",
+          "result": "sd 19.5 bps, 48.1 percent, n=287"
+        },
+        {
+          "variant": "15m",
+          "result": "sd 35.5 bps, 71.6 percent, n=95"
+        },
+        {
+          "variant": "1h",
+          "result": "sd 57.6 bps, 95.7 percent, n=23 — too few, reported but not established"
+        },
+        {
+          "variant": "4h",
+          "result": "insufficient samples in one symbol-day; not reported"
+        }
+      ],
+      "task_id": "TASK-AH-046",
+      "evidence_paths": [
+        "reference/BOTALIN_RESEARCH_PIPELINE_PROTOCOL_2026-08-03.md"
+      ],
+      "fixture_flag": false,
+      "source_of_record": "horizon probe, 2026-08-03, AAVEUSDT 2026-07-15",
+      "notes": "t_stat and the interval are zero-width because this is a dispersion table rather than a directional effect; the meaningful uncertainty is the per-horizon n."
+    }
+  ],
+  "data_constraints": [
+    {
+      "record_type": "data_constraint",
+      "constraint_id": "DC.FUNDING.SETTLEMENT_TS_ONLY",
+      "title": "Historical funding archive carries settlement time, not publication time",
+      "statement": "The historical funding archive contains a settlement timestamp but no publication or ingest timestamp; therefore using a value for a decision before settlement creates unprovable causality and a potential look-ahead.",
+      "constraint_kind": "CAUSALITY",
+      "scope_source_ids": [
+        "EDGE.DATA.DISPERSION"
+      ],
+      "scope_note": "Applies to this dataset specifically. It is not a claim about historical funding archives in general, nor about any future forward-recorded funding series.",
+      "evidence": [
+        "Schema carries exactly one time field per record: ts, alongside by_r, by_p, bi_r, bi_p, ok_r, ok_p. No publication field, no predicted-rate field, no ingest field.",
+        "All 691 BTCUSDT timestamps fall exactly on 00:00, 08:00 and 16:00 UTC, with zero off-schedule records. That is the Bybit funding settlement grid.",
+        "All ten per-symbol files were written between 2026-07-11T11:46:59Z and 11:47:06Z, one backfill batch, covering values from 2025-06-01 onward. Ingest time is therefore later than every historical decision time.",
+        "Second-leg fields are absent or empty: ok_p is 0 percent populated across every symbol, and there is no spot price, borrow rate, basis, or bid/ask on either leg.",
+        "Coverage is 691 of roughly 1215 expected 8-hour intervals over 405 days, with gaps up to 112 hours."
+      ],
+      "consequence": "Causal funding carry cannot be evaluated on this dataset. The current Carry implementation is closed. This cannot be repaired by backfill, because the predicted funding rate is a live-only observable and is not retrievable retrospectively.",
+      "status": "confirmed",
+      "review_criterion": "Only on a new source carrying publication_ts, or our own forward-recorded series carrying ingest_ts captured at observation time. Indirect reconstruction of the publication moment is explicitly not an acceptable route.",
+      "task_id": "TASK-AH-041",
+      "evidence_paths": [
+        "tasks/results/TASK-AH-041-TRIAD-STRUCTURAL-STRATEGIES-V0-RESULT.md"
+      ],
+      "fixture_flag": false,
+      "source_of_record": "read-only inspection of /opt/botalin-edge/data/dispersion/, 2026-08-03"
     }
   ]
 }

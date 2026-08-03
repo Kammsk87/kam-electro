@@ -25,6 +25,7 @@ import {
   buildCatalog,
   checkInvariants,
   checkTrialLedger,
+  checkLawCatalogue,
   summarizeTrialLedger,
   computeCoverage,
   catalogToCsv,
@@ -1301,6 +1302,188 @@ test('query "trial-lineage" exposes the attack chain without counting it', () =>
   assert(attacks.every((t) => !t.counts_toward_lower_bound), 'attacks must not count');
   assert(attacks.every((t) => t.attacks_trial_id === 'TL.HTF_MA.TF_1H'), 'attacks must name their target');
   assert(rows[0].declared_prior_trials_seeded === 2, 'only the two timeframe formulations count');
+});
+
+// ---------------------------------------------------------------------------
+// 8c. Market law catalogue
+// ---------------------------------------------------------------------------
+
+section('market law catalogue');
+
+function baseLaw(overrides = {}) {
+  return {
+    record_type: 'market_law',
+    law_id: 'LAW.TEST',
+    subtype: 'empirical_market_law',
+    title: 'A test empirical law',
+    statement: 'Under the stated condition the measured effect is negative and reproduces on both sides.',
+    condition: 'a precisely stated condition',
+    horizon: '60s',
+    effect: { bps: -1 },
+    n: 1000,
+    t_stat: -4.2,
+    ci_low: -1.5,
+    ci_high: -0.5,
+    segment: 'TRAIN',
+    data_source_ids: ['FIXTURE.SYNTH.BARS'],
+    transform_version: 'test:v1',
+    null_test: { status: 'NOT_RUN', reason: 'test fixture' },
+    oos: { status: 'NOT_RUN', reason: 'test fixture' },
+    remove_best: { status: 'NOT_RUN', reason: 'test fixture' },
+    mechanism_claim: 'A stated mechanism long enough to satisfy the schema minimum length.',
+    exploitability_class: 'EXECUTION_POLICY',
+    temporal_stability: 'unknown, single sample',
+    status: 'observed',
+    review_criterion: 'replicate across twenty symbols',
+    tested_variants: [{ variant: 'a', result: 'b' }],
+    task_id: 'TASK-TEST',
+    evidence_paths: [],
+    fixture_flag: true,
+    source_of_record: 'test fixture',
+    ...overrides,
+  };
+}
+
+const IDENTITY_OVERRIDES = {
+  subtype: 'mechanical_identity', status: 'proven',
+  n: null, t_stat: null, ci_low: null, ci_high: null,
+  null_test: null, oos: null, remove_best: null,
+};
+
+function lawWorld(laws = [], constraints = []) {
+  const c = collectionsFrom({ sources: [baseSource()] });
+  c.market_laws = laws;
+  c.data_constraints = constraints;
+  return c;
+}
+
+test('a well-formed empirical law and identity both validate against the schema', () => {
+  assert(validateRecord(schema, 'market_law', baseLaw()).length === 0, 'empirical law should validate');
+  assert(validateRecord(schema, 'market_law', baseLaw(IDENTITY_OVERRIDES)).length === 0, 'identity should validate');
+});
+
+test('a mechanical identity may not carry a sample size or a t-statistic', () => {
+  for (const field of ['n', 't_stat', 'ci_low', 'ci_high']) {
+    const law = baseLaw({ ...IDENTITY_OVERRIDES, [field]: 42 });
+    const { rejections } = checkLawCatalogue(lawWorld([law]));
+    assert(rejections.some((r) => r.reason === 'IDENTITY_CARRIES_MEASUREMENT'),
+      `an identity carrying ${field} must be refused: testing arithmetic for significance is a category error`);
+  }
+});
+
+test('a mechanical identity may not carry the statistical checks', () => {
+  for (const field of ['null_test', 'oos', 'remove_best']) {
+    const law = baseLaw({ ...IDENTITY_OVERRIDES, [field]: { status: 'PASS' } });
+    const { rejections } = checkLawCatalogue(lawWorld([law]));
+    assert(rejections.some((r) => r.reason === 'IDENTITY_CARRIES_MEASUREMENT'), `${field} must be null on an identity`);
+  }
+});
+
+test('a mechanical identity must be proven, and an empirical law never may be', () => {
+  const badIdentity = baseLaw({ ...IDENTITY_OVERRIDES, status: 'observed' });
+  assert(checkLawCatalogue(lawWorld([badIdentity])).rejections.some((r) => r.reason === 'IDENTITY_BAD_STATUS'),
+    'an identity is proven, not observed');
+  const badEmpirical = baseLaw({ status: 'proven' });
+  assert(checkLawCatalogue(lawWorld([badEmpirical])).rejections.some((r) => r.reason === 'EMPIRICAL_CLAIMS_PROOF'),
+    'an empirical law may never claim proof');
+});
+
+test('an empirical law must carry precision', () => {
+  for (const field of ['n', 't_stat', 'ci_low', 'ci_high']) {
+    const law = baseLaw({ [field]: null });
+    assert(checkLawCatalogue(lawWorld([law])).rejections.some((r) => r.reason === 'EMPIRICAL_MISSING_PRECISION'),
+      `${field} is required on an empirical law`);
+  }
+});
+
+test('an empirical law must declare every check, even as NOT_RUN', () => {
+  for (const field of ['null_test', 'oos', 'remove_best']) {
+    const law = baseLaw({ [field]: null });
+    assert(checkLawCatalogue(lawWorld([law])).rejections.some((r) => r.reason === 'CHECK_NOT_DECLARED'),
+      `${field} must be declared explicitly`);
+  }
+});
+
+test('replicated status is earned: every check must be PASS', () => {
+  const notRun = baseLaw({ status: 'replicated' });
+  assert(checkLawCatalogue(lawWorld([notRun])).rejections.some((r) => r.reason === 'REPLICATED_WITHOUT_CHECKS'),
+    'replication cannot be asserted while checks are NOT_RUN');
+
+  const oneFail = baseLaw({
+    status: 'replicated',
+    null_test: { status: 'PASS' }, oos: { status: 'PASS' }, remove_best: { status: 'FAIL' },
+  });
+  assert(checkLawCatalogue(lawWorld([oneFail])).rejections.some((r) => r.reason === 'REPLICATED_WITHOUT_CHECKS'),
+    'one failing check blocks replication');
+
+  const allPass = baseLaw({
+    status: 'replicated',
+    null_test: { status: 'PASS' }, oos: { status: 'PASS' }, remove_best: { status: 'PASS' },
+  });
+  assert(checkLawCatalogue(lawWorld([allPass])).rejections.length === 0, 'all three PASS admits replication');
+});
+
+test('a law must cite existing sources and record its tested variants', () => {
+  assert(checkLawCatalogue(lawWorld([baseLaw({ data_source_ids: ['NO.SUCH'] })])).rejections
+    .some((r) => r.reason === 'UNKNOWN_DATA_SOURCE'), 'unknown source refused');
+  assert(checkLawCatalogue(lawWorld([baseLaw({ tested_variants: [] })])).rejections
+    .some((r) => r.reason === 'NO_TESTED_VARIANTS'), 'negative variants must be recorded');
+});
+
+test('a data constraint is scoped to named existing sources', () => {
+  const c = {
+    record_type: 'data_constraint', constraint_id: 'DC.TEST', title: 'A test constraint',
+    statement: 'A statement long enough to satisfy the schema minimum length requirement.',
+    constraint_kind: 'CAUSALITY', scope_source_ids: ['NO.SUCH'], scope_note: 'scoped to one dataset',
+    evidence: ['some evidence'], consequence: 'blocks something', status: 'confirmed',
+    review_criterion: 'a new source with publication_ts', task_id: 'TASK-TEST',
+    evidence_paths: [], fixture_flag: true, source_of_record: 'test fixture',
+  };
+  assert(validateRecord(schema, 'data_constraint', c).length === 0, 'constraint should validate');
+  assert(checkLawCatalogue(lawWorld([], [c])).rejections.some((r) => r.reason === 'UNKNOWN_SCOPE_SOURCE'),
+    'a constraint may not name a source that does not exist');
+});
+
+test('the seed carries the three laws and the one constraint, correctly typed', () => {
+  const laws = seedCatalog.records.market_laws;
+  assert(laws.length === 3, `expected three laws, got ${laws.length}`);
+  const identity = laws.filter((l) => l.subtype === 'mechanical_identity');
+  const empirical = laws.filter((l) => l.subtype === 'empirical_market_law');
+  assert(identity.length === 1 && identity[0].law_id === 'LAW.BOOK.LEVEL_SIZE_IDENTITY', 'one identity');
+  assert(identity[0].n === null && identity[0].t_stat === null, 'the identity carries no measurement');
+  assert(empirical.length === 2, 'two empirical laws');
+  for (const l of empirical) {
+    assert(l.status === 'observed', `${l.law_id} must be observed, not replicated, on a single symbol-day`);
+    assert(l.null_test.status === 'NOT_RUN', `${l.law_id} must admit its null was not run`);
+  }
+  assert(seedCatalog.records.data_constraints.length === 1, 'one constraint');
+  const dc = seedCatalog.records.data_constraints[0];
+  assert(dc.scope_source_ids.length === 1 && dc.scope_source_ids[0] === 'EDGE.DATA.DISPERSION',
+    'the funding constraint is scoped to one dataset, not to all funding archives');
+  assert(dc.status === 'confirmed', 'the constraint is confirmed');
+});
+
+test('the catalogue summary separates identities from empirical laws', () => {
+  const s = seedCatalog.law_catalogue;
+  assert(s.identities === 1 && s.empirical === 2, `unexpected split ${JSON.stringify(s)}`);
+  assert(s.constraints === 1 && s.constraints_confirmed === 1, 'constraint counts');
+  assert(s.by_status.proven === 1 && s.by_status.observed === 2, 'status breakdown');
+});
+
+test('query "laws" hides precision on an identity and shows it on an empirical law', () => {
+  const identity = runQuery(seedCatalog, 'laws', { subtype: 'mechanical_identity' });
+  assert(identity.length === 1 && identity[0].n === null, 'an identity reports no n');
+  const empirical = runQuery(seedCatalog, 'laws', { subtype: 'empirical_market_law' });
+  assert(empirical.every((l) => l.n !== null && l.ci !== null), 'empirical laws report n and a confidence interval');
+  assert(empirical.every((l) => l.checks.null_test !== null), 'empirical laws report their check status');
+});
+
+test('query "constraints" reports scope and the review criterion', () => {
+  const c = runQuery(seedCatalog, 'constraints', {});
+  assert(c.length === 1, 'one constraint');
+  assert(c[0].scope_source_ids.includes('EDGE.DATA.DISPERSION'), 'scope named');
+  assert(c[0].review_criterion.includes('publication_ts'), 'the review criterion names what would lift it');
+  assert(runQuery(seedCatalog, 'constraints', { source: 'EDGE.DATA.OB' }).length === 0, 'scope filter works');
 });
 
 // ---------------------------------------------------------------------------

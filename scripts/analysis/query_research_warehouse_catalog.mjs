@@ -39,6 +39,8 @@ const COMMANDS = [
   'trials',
   'trial-summary',
   'trial-lineage',
+  'laws',
+  'constraints',
 ];
 
 const USAGE = `query_research_warehouse_catalog.mjs — read-only queries over the Botalin research warehouse catalogue
@@ -58,6 +60,9 @@ Commands:
                  --representation INDIVIDUAL|AGGREGATE_ONLY --include-non-counting
   trial-summary  Lower-bound total, individual vs aggregate split, conservation, missing-evidence sources.
   trial-lineage  Parent experiment -> trials -> outcome -> lessons. Filters: --experiment --family --trial
+  laws           Measured market laws. Filters: --subtype mechanical_identity|empirical_market_law
+                 --status --exploitability
+  constraints    Proven limits of a data source. Filters: --source --kind
 
 Catalogue source:
   --catalog <file>   Read a catalogue JSON previously emitted by the builder.
@@ -105,6 +110,9 @@ export function parseArgs(argv) {
       case '--kind': opts.filters.kind = next(); break;
       case '--representation': opts.filters.representation = next(); break;
       case '--trial': opts.filters.trial = next(); break;
+      case '--subtype': opts.filters.subtype = next(); break;
+      case '--status': opts.filters.status = next(); break;
+      case '--exploitability': opts.filters.exploitability = next(); break;
       case '--include-non-counting': opts.filters.includeNonCounting = true; break;
       case '--top': opts.filters.top = Number.parseInt(next(), 10); break;
       case '-h':
@@ -418,6 +426,33 @@ export function queryTrialLineage(catalog, f = {}) {
   });
 }
 
+export function queryLaws(catalog, f = {}) {
+  return (catalog.records.market_laws ?? [])
+    .filter((l) => (f.subtype ? l.subtype === f.subtype : true))
+    .filter((l) => (f.status ? l.status === f.status : true))
+    .filter((l) => (f.exploitability ? l.exploitability_class === f.exploitability.toUpperCase() : true))
+    .map((l) => ({
+      law_id: l.law_id, subtype: l.subtype, status: l.status, title: l.title, statement: l.statement,
+      condition: l.condition, horizon: l.horizon, effect: l.effect,
+      n: l.n, t_stat: l.t_stat, ci: l.ci_low === null ? null : [l.ci_low, l.ci_high],
+      checks: { null_test: l.null_test?.status ?? null, oos: l.oos?.status ?? null, remove_best: l.remove_best?.status ?? null },
+      mechanism_claim: l.mechanism_claim, exploitability_class: l.exploitability_class,
+      temporal_stability: l.temporal_stability, review_criterion: l.review_criterion,
+      tested_variants: l.tested_variants.length, data_source_ids: l.data_source_ids, task_id: l.task_id,
+    }));
+}
+
+export function queryConstraints(catalog, f = {}) {
+  return (catalog.records.data_constraints ?? [])
+    .filter((c) => (f.source ? c.scope_source_ids.includes(f.source) : true))
+    .filter((c) => (f.kind ? c.constraint_kind === f.kind.toUpperCase() : true))
+    .map((c) => ({
+      constraint_id: c.constraint_id, kind: c.constraint_kind, status: c.status, title: c.title,
+      statement: c.statement, scope_source_ids: c.scope_source_ids, scope_note: c.scope_note,
+      evidence: c.evidence, consequence: c.consequence, review_criterion: c.review_criterion, task_id: c.task_id,
+    }));
+}
+
 export function querySummary(catalog) {
   return {
     schema_version: catalog.catalog_schema_version,
@@ -571,6 +606,38 @@ function renderText(command, payload) {
         for (const l of e.lessons) bullet(`lesson  ${l.lesson_id} ${l.lesson_title} [${l.relation}]`);
       }
       break;
+    case 'laws':
+      lines.push(`market laws: ${payload.length}`);
+      for (const l of payload) {
+        lines.push(`- ${l.law_id}  [${l.subtype}]  status=${l.status}`);
+        bullet(`title      ${l.title}`);
+        bullet(`condition  ${l.condition}`);
+        bullet(`horizon    ${l.horizon}`);
+        if (l.subtype === 'mechanical_identity') {
+          bullet('precision  none — true by construction, not a measurement');
+        } else {
+          bullet(`precision  n=${l.n} t=${l.t_stat} ci=[${l.ci?.join(', ')}]`);
+          bullet(`checks     null=${l.checks.null_test} oos=${l.checks.oos} remove_best=${l.checks.remove_best}`);
+        }
+        bullet(`mechanism  ${l.mechanism_claim}`);
+        bullet(`exploit    ${l.exploitability_class}`);
+        bullet(`stability  ${l.temporal_stability}`);
+        bullet(`review     ${l.review_criterion}`);
+        bullet(`variants   ${l.tested_variants} recorded (including negatives)`);
+      }
+      break;
+    case 'constraints':
+      lines.push(`data constraints: ${payload.length}`);
+      for (const c of payload) {
+        lines.push(`- ${c.constraint_id}  [${c.kind}]  status=${c.status}`);
+        bullet(`statement   ${c.statement}`);
+        bullet(`scope       ${c.scope_source_ids.join(', ')}`);
+        bullet(`scope note  ${c.scope_note}`);
+        for (const e of c.evidence) bullet(`evidence    ${e}`);
+        bullet(`consequence ${c.consequence}`);
+        bullet(`review      ${c.review_criterion}`);
+      }
+      break;
     case 'summary':
       lines.push(`schema ${payload.schema_version}  mode ${payload.mode}  promising_count ${payload.promising_count}`);
       lines.push('counts: ' + Object.entries(payload.counts).map(([k, v]) => `${k}=${v}`).join(' '));
@@ -597,6 +664,8 @@ export function runQuery(catalog, command, filters) {
     case 'trials': return queryTrials(catalog, filters);
     case 'trial-summary': return queryTrialSummary(catalog, filters);
     case 'trial-lineage': return queryTrialLineage(catalog, filters);
+    case 'laws': return queryLaws(catalog, filters);
+    case 'constraints': return queryConstraints(catalog, filters);
     default: throw new Error(`Unknown command '${command}'`);
   }
 }
