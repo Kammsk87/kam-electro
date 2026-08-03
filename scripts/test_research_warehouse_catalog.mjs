@@ -949,9 +949,31 @@ test('query "variants" separates permitted, refused and quarantined', () => {
 test('query "blocking-gap" names the gap blocking the highest-priority next test', () => {
   const gaps = runQuery(seedCatalog, 'blocking-gap', { top: 1 });
   assert(gaps.length === 1, 'expected one top gap');
-  assert(gaps[0].blocking_data_gap_id === 'GAP.OB.HTF_VOLCOMP_COVERAGE', `unexpected top gap ${gaps[0].blocking_data_gap_id}`);
   assert(gaps[0].priority === 1, 'the top gap must be priority 1');
-  assert(gaps[0].gap_requirement.includes('30'), 'the gap must state what would close it');
+  // The identity of the top gap is data, not contract: it moves as sources are verified.
+  // What must hold is that it points at a real catalogued source and says what would close it.
+  const sources = new Set(seedCatalog.records.data_sources.map((s) => s.source_id));
+  assert(sources.has(gaps[0].blocking_data_gap_id), `top gap names an unknown source: ${gaps[0].blocking_data_gap_id}`);
+  assert(typeof gaps[0].gap_requirement === 'string' && gaps[0].gap_requirement.length > 3,
+    'the gap must state what would close it');
+  assert(gaps[0].allowed_successor, 'a priority-1 gap must name its successor task');
+});
+
+test('verifying a source can re-prioritise what blocks the programme', () => {
+  // Carry was priority 2 and blocked on a dispersion archive that carries only settlement
+  // timestamps. EDGE.DATA.HL_CASCADE was then verified as a 60s live funding series with our
+  // own poll timestamp, so the causal blocker no longer applies and Carry moved to the front.
+  const carry = seedCatalog.records.failure_routes.find((f) => f.failure_route_id === 'FR.CARRY_CUSTODY');
+  assert(carry.priority === 1, 'carry is now the top-priority route');
+  assert(carry.blocking_data_gap_id === 'EDGE.DATA.HL_CASCADE', 'and it points at the verified source');
+  const hl = seedCatalog.records.data_sources.find((s) => s.source_id === 'EDGE.DATA.HL_CASCADE');
+  assert(hl && hl.verification_status === 'VERIFIED_READ_ONLY', 'hl_cascade must be verified, not assumed');
+  assert(hl.known_gaps.some((g) => g.includes('SPOT')), 'the remaining hedge-leg gap must still be recorded');
+
+  // The old constraint stays true, and stays scoped to the dataset it was measured on.
+  const dc = seedCatalog.records.data_constraints[0];
+  assert(dc.scope_source_ids.length === 1 && dc.scope_source_ids[0] === 'EDGE.DATA.DISPERSION',
+    'the settlement-timestamp constraint must not have widened to all funding archives');
 });
 
 test('blocking gaps are ordered by priority', () => {

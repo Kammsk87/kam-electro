@@ -347,26 +347,27 @@
       "retained_path": "/opt/botalin/liquidations.db",
       "path_kind": "DB_FILE",
       "run_id": null,
-      "time_span_start": null,
+      "time_span_start": "2026-07-03T00:00:00Z",
       "time_span_end": null,
       "symbols": [
-        "UNKNOWN"
+        "LIQ_UNIVERSE_30"
       ],
       "timeframes": [
         "event"
       ],
-      "schema_fingerprint": "unverified:sqlite_liquidations",
+      "schema_fingerprint": "verified:sqlite liquidations(ts,asset,side,qty,price,notional,raw) PK(ts,asset,side,price), idx on ts and (asset,ts)",
       "write_ownership": "SERVER_COLLECTOR",
       "read_only_status": "MUTABLE_RUNTIME",
-      "verification_status": "DOCUMENTED_UNVERIFIED",
+      "verification_status": "VERIFIED_READ_ONLY",
       "evidence_grade": "RAW_PRIMARY",
       "fixture_flag": false,
       "known_gaps": [
-        "Belongs to the legacy live/paper stack /opt/botalin, not the research fork",
-        "Granularity insufficient: cascades are hidden inside 5m aggregation"
+        "Belongs to the legacy live/paper stack /opt/botalin, not the research fork. Actively written; read immutable only.",
+        "22 of 81,268 rows carry an empty side field and must be excluded, not defaulted.",
+        "30 assets only, concentrated: BTCUSDT 25,882 rows, ETHUSDT 16,695, SOLUSDT 10,817."
       ],
-      "source_of_record": "docs/CURRENT_SOURCE_INVENTORY.md#1,#6",
-      "notes": "Legacy runners are still running against this stack. Read-only access only, and only under a separate GO."
+      "source_of_record": "read-only immutable sqlite inspection, 2026-08-03",
+      "notes": "81,268 event-level rows over roughly 31 days with millisecond timestamps, side, quantity, price and notional. This is the timestamped liquidation feed AH-019 required and could not find."
     },
     {
       "record_type": "data_source",
@@ -530,10 +531,12 @@
       "evidence_grade": "RAW_PRIMARY",
       "fixture_flag": false,
       "known_gaps": [
-        "Current OI/liquidation granularity is 5m; cascades are hidden inside the bar",
-        "Blocks the forced-flow archetype entirely: it is a data request before it is a hypothesis"
+        "PARTLY CLOSED 2026-08-03. Liquidations are event-level in LEGACY.LIQUIDATIONS_DB; OI is 60s in EDGE.DATA.HL_CASCADE, not the 5m previously recorded.",
+        "Still open: OI remains coarser than a sub-minute cascade, and the two sources sit on different stacks and universes (30 liq assets vs 232 HL assets).",
+        "Joining them requires a verified symbol mapping between the legacy Bybit universe and the Hyperliquid universe."
       ],
-      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#32,#33"
+      "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#32,#33",
+      "notes": "Superseded in part. The remaining gap is joinability and sub-minute OI, not the absence of a liquidation feed."
     },
     {
       "record_type": "data_source",
@@ -708,6 +711,72 @@
         "Synthetic. Carries no information about any market."
       ],
       "source_of_record": "data/research_warehouse_catalog_fixture_2026-08-02.json"
+    },
+    {
+      "record_type": "data_source",
+      "source_id": "EDGE.DATA.HL_CASCADE",
+      "title": "Hyperliquid per-asset OI, mark, oracle, funding and impact quotes, 60s poll",
+      "evidence_type": "FUNDING",
+      "owner_system": "botalin-edge",
+      "host_scope": "SERVER_RESIDENT",
+      "retained_path": "/opt/botalin-edge/data/hl_cascade/",
+      "path_kind": "DIRECTORY",
+      "run_id": null,
+      "time_span_start": "2026-07-11T00:00:00Z",
+      "time_span_end": null,
+      "symbols": [
+        "HL_UNIVERSE_232"
+      ],
+      "timeframes": [
+        "60s"
+      ],
+      "schema_fingerprint": "verified:{t,n,a:[[name,OI,markPx,oraclePx,funding,premium,dayNtlVlm,midPx,impactBid,impactAsk]]}",
+      "write_ownership": "SERVER_COLLECTOR",
+      "read_only_status": "APPEND_ONLY_BY_OWNER",
+      "verification_status": "VERIFIED_READ_ONLY",
+      "evidence_grade": "RAW_PRIMARY",
+      "fixture_flag": false,
+      "known_gaps": [
+        "No tradeable SPOT quote. oraclePx is Hyperliquid index, usable to measure basis but not as a hedge leg.",
+        "midPx, impactBid and impactAsk were added 2026-07-12; records before that lack them.",
+        "24 daily files from 2026-07-11; span is short relative to a 55/20/15/10 split."
+      ],
+      "source_of_record": "read-only inspection of /opt/botalin-edge/scripts/hl_cascade_recorder.mjs and the 2026-08-03 file, 2026-08-03",
+      "notes": "t is OUR poll timestamp, not an exchange settlement time. 293 distinct BTC funding values in 1,104 records on 2026-08-03 confirm a live rate rather than a settlement grid. This is the causal funding series DC.FUNDING.SETTLEMENT_TS_ONLY said EDGE.DATA.DISPERSION lacked."
+    },
+    {
+      "record_type": "data_source",
+      "source_id": "EDGE.DATA.MARGIN_LOANRATE",
+      "title": "Borrow / lending rates with poll timestamp and measured latency",
+      "evidence_type": "FUNDING",
+      "owner_system": "botalin-edge",
+      "host_scope": "SERVER_RESIDENT",
+      "retained_path": "/opt/botalin-edge/data/margin_loanrate/",
+      "path_kind": "DIRECTORY",
+      "run_id": null,
+      "time_span_start": null,
+      "time_span_end": null,
+      "symbols": [
+        "USDT",
+        "BTC",
+        "ETH",
+        "USDC"
+      ],
+      "timeframes": [
+        "poll"
+      ],
+      "schema_fingerprint": "verified:{t,lat_ms,rates:[[asset,rate,flag]]}",
+      "write_ownership": "SERVER_COLLECTOR",
+      "read_only_status": "APPEND_ONLY_BY_OWNER",
+      "verification_status": "VERIFIED_READ_ONLY",
+      "evidence_grade": "RAW_PRIMARY",
+      "fixture_flag": false,
+      "known_gaps": [
+        "Only four assets observed in the sampled record; full coverage unverified.",
+        "Span not established."
+      ],
+      "source_of_record": "read-only inspection, 2026-08-03",
+      "notes": "Carries its own poll timestamp and a measured latency field. Supplies the borrow cost leg of a carry trade."
     }
   ],
   "experiments": [
@@ -2476,13 +2545,13 @@
       "failure_route_id": "FR.CARRY_CUSTODY",
       "experiment_id": "EXP.HL_CARRY",
       "family_id": "FAM.CARRY",
-      "failure_mechanism": "Not a signal failure: the carry is contractual, but forward funding softened below the 10-12% floor and the custody monitor that bounds the tail risk does not exist yet.",
+      "failure_mechanism": "Not a signal failure. Forward funding softened below the 10-12 percent floor and the custody monitor does not exist. The causal-timestamp blocker recorded against EDGE.DATA.DISPERSION does NOT apply to EDGE.DATA.HL_CASCADE, which carries a 60s live funding series with our own poll timestamp.",
       "route": "DATA_REQUEST",
       "allowed_successor": "TASK-AH-010-MARKET-NEUTRAL-FUNDING-CARRY-V0",
-      "blocking_data_gap_id": "EDGE.DATA.DISPERSION",
-      "priority": 2,
+      "blocking_data_gap_id": "EDGE.DATA.HL_CASCADE",
+      "priority": 1,
       "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#28",
-      "notes": "Blocking gap is a field-level gap inside an existing source: funding publication timestamps must be confirmed present before A-1 causality holds."
+      "notes": "Re-prioritised 2026-08-03 after EDGE.DATA.HL_CASCADE was verified. Remaining blocker is the hedge leg: hl_cascade has no tradeable spot quote, only the Hyperliquid oracle index. A carry trade needs a tradeable second leg before Stage 1."
     },
     {
       "record_type": "failure_route",
