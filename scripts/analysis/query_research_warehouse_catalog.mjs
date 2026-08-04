@@ -41,6 +41,7 @@ const COMMANDS = [
   'trial-lineage',
   'laws',
   'constraints',
+  'closures',
 ];
 
 const USAGE = `query_research_warehouse_catalog.mjs — read-only queries over the Botalin research warehouse catalogue
@@ -453,6 +454,30 @@ export function queryConstraints(catalog, f = {}) {
     }));
 }
 
+/**
+ * The closure registry. Ordered so that measured closures come before underpowered ones:
+ * conflating the two would convert "we could not tell" into "it does not work", which is the
+ * single most likely way this registry becomes misleading.
+ */
+export function queryClosures(catalog, f = {}) {
+  const rank = { CLOSED_MEASURED: 0, CLOSED_UNDERPOWERED: 1, DATA_BLOCKED: 2, GUARD_ONLY: 3, QUARANTINED: 4, REOPENED: 5 };
+  return (catalog.records.closure_decisions ?? [])
+    .filter((d) => (f.subject ? d.subject === f.subject : true))
+    .filter((d) => (f.kind ? d.subject_kind === f.kind.toUpperCase() : true))
+    .filter((d) => (f.disposition ? d.disposition === f.disposition.toUpperCase() : true))
+    .slice()
+    .sort((a, b) => (rank[a.disposition] ?? 9) - (rank[b.disposition] ?? 9)
+      || (a.decision_id < b.decision_id ? -1 : 1))
+    .map((d) => ({
+      decision_id: d.decision_id, subject: d.subject, subject_kind: d.subject_kind,
+      disposition: d.disposition, authority: d.authority,
+      decisive_measurement: d.decisive_measurement, decisive_metric: d.decisive_metric ?? null,
+      reopen_criterion: d.reopen_criterion, supersedes: d.supersedes ?? [],
+      law_ids: d.law_ids ?? [], constraint_ids: d.constraint_ids ?? [],
+      task_id: d.task_id, decided_at: d.decided_at, notes: d.notes ?? null,
+    }));
+}
+
 export function querySummary(catalog) {
   return {
     schema_version: catalog.catalog_schema_version,
@@ -638,6 +663,19 @@ function renderText(command, payload) {
         bullet(`review      ${c.review_criterion}`);
       }
       break;
+    case 'closures':
+      lines.push(`closure decisions: ${payload.length}`);
+      for (const d of payload) {
+        lines.push(`- ${d.decision_id}  ${d.subject}  [${d.subject_kind}]  ${d.disposition}  by ${d.authority}`);
+        bullet(`measured   ${d.decisive_measurement}`);
+        if (d.decisive_metric) bullet(`metric     ${JSON.stringify(d.decisive_metric)}`);
+        bullet(`reopen     ${d.reopen_criterion}`);
+        if (d.supersedes.length) bullet(`supersedes ${d.supersedes.join(', ')}`);
+        if (d.law_ids.length) bullet(`laws       ${d.law_ids.join(', ')}`);
+        if (d.constraint_ids.length) bullet(`constraint ${d.constraint_ids.join(', ')}`);
+        if (d.notes) bullet(`notes      ${d.notes}`);
+      }
+      break;
     case 'summary':
       lines.push(`schema ${payload.schema_version}  mode ${payload.mode}  promising_count ${payload.promising_count}`);
       lines.push('counts: ' + Object.entries(payload.counts).map(([k, v]) => `${k}=${v}`).join(' '));
@@ -666,6 +704,7 @@ export function runQuery(catalog, command, filters) {
     case 'trial-lineage': return queryTrialLineage(catalog, filters);
     case 'laws': return queryLaws(catalog, filters);
     case 'constraints': return queryConstraints(catalog, filters);
+    case 'closures': return queryClosures(catalog, filters);
     default: throw new Error(`Unknown command '${command}'`);
   }
 }

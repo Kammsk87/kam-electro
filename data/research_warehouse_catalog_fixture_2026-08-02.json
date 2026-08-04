@@ -4889,5 +4889,191 @@
       "fixture_flag": false,
       "source_of_record": "cost model audit over committed artifacts and documents, 2026-08-04"
     }
+  ],
+  "closure_decisions": [
+    {
+      "record_type": "closure_decision",
+      "authority": "CHIEF_SCIENTIST",
+      "supersedes": [
+        "TASK-AH-048"
+      ],
+      "law_ids": [
+        "LAW.FLOW.SWEEP_CONTINUATION_SATURATES"
+      ],
+      "constraint_ids": [],
+      "evidence_paths": [
+        "tasks/results/TASK-AH-051-SWEEP-DEPTH-DOUBLE-SORT-V0-RESULT.md"
+      ],
+      "fixture_flag": false,
+      "decided_at": "2026-08-04",
+      "decision_id": "CD.SWEEP_CONTINUATION",
+      "subject": "FAM.SWEEP_CONTINUATION",
+      "subject_kind": "FAMILY",
+      "disposition": "CLOSED_MEASURED",
+      "decisive_measurement": "Post-sweep continuation rises monotonically with within-symbol notional across nine percentile bands, 4.40 bps below the median to 8.27 bps for the largest one in a thousand, and saturates there. The 5x5 double sort on notional rank and pre-sweep depth response is flat in the depth dimension at every size and horizon; the maximum of 75 reportable cells is 10.27 bps against a 16 bps floor. The extreme cell falls 8.65 bps short at t=8.96 with 2.46 bps detectable, so the shortfall is measured rather than a power problem.",
+      "decisive_metric": {
+        "best_band_bps": 8.27,
+        "extreme_cell_bps": 7.35,
+        "max_cell_bps": 10.27,
+        "cost_floor_bps": 16,
+        "extreme_cell_t": 8.96
+      },
+      "reopen_criterion": "Only on a round-trip cost position below roughly 8 bps, or on a new conditioner that is not derived from the pre-sweep book state and orders the top notional row monotonically. A different percentile cut on the same conditioner is a parameter search and does not qualify.",
+      "task_id": "TASK-AH-051",
+      "source_of_record": "TASK-AH-051 Stage 0 over 553,615 sweeps",
+      "notes": "The paying tail is real -- 32 percent of AH-048 events at 900s exceeded 11 bps -- but it is dispersion, not a conditional mean, and this closure says only that it is not identifiable in advance."
+    },
+    {
+      "record_type": "closure_decision",
+      "authority": "CHIEF_SCIENTIST",
+      "supersedes": [],
+      "law_ids": [
+        "LAW.XSECT.WEEKLY_MOMENTUM_BOUNDED"
+      ],
+      "constraint_ids": [],
+      "evidence_paths": [
+        "reference/AH050_EXTENDED_DATA_RERUN_2026-08-04.md"
+      ],
+      "fixture_flag": false,
+      "decided_at": "2026-08-04",
+      "decision_id": "CD.WEEKLY_XSECT_MOMENTUM",
+      "subject": "FAM.WEEKLY_CROSS_SECTIONAL_MOMENTUM",
+      "subject_kind": "FAMILY",
+      "disposition": "CLOSED_UNDERPOWERED",
+      "decisive_measurement": "Over 187 weeks and 43 symbols the quintile ordering is monotone at 90, 101, 123, 169 and 181 bps, but the long-short spread is 91.1 bps with a standard error of 61.7, t=1.48, against 185 bps detectable at t=3. The published 250 to 410 bps sits 2.6 to 5.2 standard errors above the estimate and is ruled out. The residual has a payoff-trap shape: median 21 bps against a mean of 91, 51 percent of weeks net positive, and a negative net median under the 32 bps stress.",
+      "decisive_metric": {
+        "spread_bps": 91.08,
+        "se_bps": 61.65,
+        "t": 1.477,
+        "detectable_at_t3_bps": 184.95,
+        "published_se_above": [
+          2.6,
+          5.2
+        ],
+        "median_bps": 20.95,
+        "weeks_positive_pct": 51
+      },
+      "reopen_criterion": "Only on a sample roughly four times this one resolving the spread at t=3 with the quintile ordering intact AND a positive net median under the 32 bps stress. Extending the span alone does not qualify unless survivorship is addressed, since the present universe is selected on surviving three and a half years.",
+      "task_id": "TASK-AH-050",
+      "source_of_record": "TASK-AH-050 extended-data re-run",
+      "notes": "CLOSED_UNDERPOWERED, not CLOSED_MEASURED. The published effect is ruled out; the residual is not, and this record must never be cited as showing that cross-sectional momentum does not exist."
+    },
+    {
+      "record_type": "closure_decision",
+      "authority": "CHIEF_SCIENTIST",
+      "supersedes": [],
+      "law_ids": [
+        "LAW.EXEC.BID_FILL_ADVERSE_SELECTION"
+      ],
+      "constraint_ids": [
+        "DC.COST.RESEARCH_FLOOR_IS_FEE_ONLY"
+      ],
+      "evidence_paths": [
+        "reference/BOTALIN_COST_MODEL_AUDIT_2026-08-04.md"
+      ],
+      "fixture_flag": false,
+      "decided_at": "2026-08-04",
+      "decision_id": "CD.MAKER_EXECUTION_ROUTE",
+      "subject": "METHOD.MAKER_EXECUTION_AS_COST_ESCAPE",
+      "subject_kind": "METHOD",
+      "disposition": "CLOSED_MEASURED",
+      "decisive_measurement": "Two independent closures. From the fee schedule: the spread is narrower than the maker fee on most liquid symbols, with a measured median spread of 1.12 bps, so a passive order captures less than it pays before any market risk. From our own measurement: the maker-fill probe recorded -1.07 bps across 4,965 placements at a 28.7 percent fill rate BEFORE fees, at t=-9.07, with the forward move against the filled side roughly threefold the 0.72 bps half-spread captured.",
+      "decisive_metric": {
+        "maker_probe_bps": -1.07,
+        "maker_probe_t": -9.07,
+        "fill_rate_pct": 28.7,
+        "median_spread_bps": 1.12,
+        "half_spread_captured_bps": 0.72
+      },
+      "reopen_criterion": "Only on a materially different fee position -- a maker rebate or a venue whose maker fee sits below the prevailing spread on our universe. A better queue model does not qualify, because adverse selection and not queue position is what the probe measured.",
+      "task_id": "TASK-AH-010",
+      "source_of_record": "cost model audit 2026-08-04"
+    },
+    {
+      "record_type": "closure_decision",
+      "authority": "CHIEF_SCIENTIST",
+      "supersedes": [],
+      "law_ids": [],
+      "constraint_ids": [],
+      "evidence_paths": [
+        "reference/BOTALIN_DIRECTION_LITERATURE_REVIEW_2026-08-04.md"
+      ],
+      "fixture_flag": false,
+      "decided_at": "2026-08-04",
+      "decision_id": "CD.PRICE_PATTERN_CATEGORY",
+      "subject": "METHOD.DIRECTION_FROM_PRICE_HISTORY",
+      "subject_kind": "METHOD",
+      "disposition": "CLOSED_MEASURED",
+      "decisive_measurement": "Thirty-five hypotheses inferring direction from past price have been rejected, none passing. The literature supplies the mechanism rather than merely agreeing: Bajgrowicz and Scaillet found over 7,846 rules and a century of DJIA data that even in-sample profits are completely offset by low transaction costs and that the future best rule could never have been selected ex ante; Marshall, Young and Rose found candlestick value vanishes against a generated-OHLC bootstrap, and the surviving positive results flip with the exit convention rather than the entry pattern.",
+      "decisive_metric": {
+        "hypotheses_rejected": 35,
+        "hypotheses_passed": 0
+      },
+      "reopen_criterion": "Only on a mechanism that names who pays and why, tested at a horizon where the round trip is under 5 percent of the available move. A new pattern formulation on the same data is a documented structural variant at best and does not qualify.",
+      "task_id": "TASK-AH-052",
+      "source_of_record": "literature review 2026-08-04 against the programme record"
+    },
+    {
+      "record_type": "closure_decision",
+      "authority": "CHIEF_SCIENTIST",
+      "supersedes": [],
+      "law_ids": [],
+      "constraint_ids": [],
+      "evidence_paths": [
+        "tasks/results/TASK-AH-052-RULE-SELECTION-PERSISTENCE-V0-RESULT.md"
+      ],
+      "fixture_flag": false,
+      "decided_at": "2026-08-04",
+      "decision_id": "CD.SELECTION_ON_INSAMPLE_RANK",
+      "subject": "METHOD.PRIORITISE_BY_IN_SAMPLE_RANK",
+      "subject_kind": "METHOD",
+      "disposition": "CLOSED_MEASURED",
+      "decisive_measurement": "Across three independent 40-week transitions over 54 enumerated rules, the period-1 winner landed at the 25th percentile of period 2, beat the median in zero of three, and went outright negative every time after averaging +190 bps in the window that selected it. Mean Spearman on the independent series is 0.078 against 0.193 detectable. All three winners were decile portfolios, the most concentrated width -- an overfitting signature rather than a market fact.",
+      "decisive_metric": {
+        "transitions": 3,
+        "winner_percentile": 0.245,
+        "winner_above_median_pct": 0,
+        "mean_spearman": 0.078,
+        "detectable_spearman": 0.193,
+        "winner_p2_bps": [
+          -22.7,
+          -36.6,
+          -81.8
+        ]
+      },
+      "reopen_criterion": "Only on a persistence test with at least ten independent transitions showing a resolvably positive mean Spearman AND the period-1 winner beating the period-2 median in a majority. Rolling windows do not qualify: at 90 percent overlap their transition count is not a sample size.",
+      "task_id": "TASK-AH-052",
+      "source_of_record": "TASK-AH-052",
+      "notes": "Three transitions give a naive sign-test probability of 1/8, so this does not establish the finding alone; its weight is corroborative with Bajgrowicz and Scaillet. It closes a METHOD, not a family: it does not invalidate the thirty-seven closures, because failure is far easier to establish than success. It bears on the opposite direction -- a candidate topping an in-sample leaderboard has thereby earned close to nothing."
+    },
+    {
+      "record_type": "closure_decision",
+      "authority": "CHIEF_SCIENTIST",
+      "supersedes": [],
+      "law_ids": [],
+      "constraint_ids": [
+        "DC.FUNDING.SETTLEMENT_TS_ONLY"
+      ],
+      "evidence_paths": [
+        "tasks/results/TASK-AH-010-MARKET-NEUTRAL-FUNDING-CARRY-V0-RESULT.md"
+      ],
+      "fixture_flag": false,
+      "decided_at": "2026-08-04",
+      "decision_id": "CD.CARRY_CURRENT_IMPLEMENTATION",
+      "subject": "FAM.CARRY",
+      "subject_kind": "FAMILY",
+      "disposition": "CLOSED_MEASURED",
+      "decisive_measurement": "Funding premium and hedgeability do not coexist. Conditional funding on the unhedgeable subset gave +7.06 bps net, but concentration analysis showed a single asset at 151 percent of the total and remove-best took it to -4.48. On the hedgeable subset the 168-hour gross of 14.9 bps falls short of the 22 bps two-leg floor, which the cost audit has since raised to 32.",
+      "decisive_metric": {
+        "conditional_net_bps": 7.06,
+        "remove_best_bps": -4.48,
+        "top_asset_share_pct": 151,
+        "hedgeable_168h_gross_bps": 14.9,
+        "two_leg_floor_bps": 32
+      },
+      "reopen_criterion": "Only on a venue where a persistent funding premium and a tradeable spot leg exist on the SAME asset, evidenced before any return is measured. A larger asset universe on the present venues does not qualify.",
+      "task_id": "TASK-AH-010",
+      "source_of_record": "TASK-AH-010 Stage 0"
+    }
   ]
 }

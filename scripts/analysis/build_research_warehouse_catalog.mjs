@@ -507,6 +507,7 @@ export function checkLawCatalogue(collections) {
   const sourceIds = new Set(collections.data_sources.map((s) => s.source_id));
   const keptLaws = [];
   const keptConstraints = [];
+  const keptDecisions = [];
 
   for (const law of collections.market_laws) {
     const label = `market_law[${law.law_id}]`;
@@ -582,7 +583,41 @@ export function checkLawCatalogue(collections) {
     keptConstraints.push(c);
   }
 
-  return { errors, rejections, keptLaws, keptConstraints };
+  // INV-18 — a closure decision cites only laws and constraints that exist, and it may never
+  // rest on an opinion. The decisive measurement and the reopen criterion are both mandatory:
+  // without the first a direction is closed by assertion, without the second it is closed
+  // permanently by accident rather than by decision.
+  const lawIds = new Set(keptLaws.map((l) => l.law_id));
+  const constraintIds = new Set(keptConstraints.map((c) => c.constraint_id));
+  for (const d of collections.closure_decisions ?? []) {
+    const label = `closure_decision[${d.decision_id}]`;
+    const problems = [];
+    for (const id of d.law_ids ?? []) {
+      if (!lawIds.has(id)) problems.push({ reason: 'UNKNOWN_LAW', detail: `unknown market_law '${id}'` });
+    }
+    for (const id of d.constraint_ids ?? []) {
+      if (!constraintIds.has(id)) problems.push({ reason: 'UNKNOWN_CONSTRAINT', detail: `unknown data_constraint '${id}'` });
+    }
+    // A measured closure must point at something measured. UNDERPOWERED and DATA_BLOCKED are
+    // the dispositions that exist precisely so that an unmeasured closure is labelled rather
+    // than dressed up as a finding.
+    if (d.disposition === 'CLOSED_MEASURED' && (d.law_ids ?? []).length === 0 && !d.decisive_metric) {
+      problems.push({
+        reason: 'MEASURED_CLOSURE_WITHOUT_MEASUREMENT',
+        detail: 'CLOSED_MEASURED requires either a cited market_law or an explicit decisive_metric',
+      });
+    }
+    if (problems.length > 0) {
+      for (const p of problems) {
+        errors.push(`INV-18 ${label}: ${p.detail}`);
+        rejections.push({ record_type: 'closure_decision', id: d.decision_id, reason: p.reason, detail: p.detail });
+      }
+      continue;
+    }
+    keptDecisions.push(d);
+  }
+
+  return { errors, rejections, keptLaws, keptConstraints, keptDecisions };
 }
 
 /** Aggregates the ledger into the headline reconciliation figures. Pure. */
@@ -812,6 +847,7 @@ const COLLECTION_OF = {
   trial_evidence: 'trial_evidence',
   market_law: 'market_laws',
   data_constraint: 'data_constraints',
+  closure_decision: 'closure_decisions',
   failure_route: 'failure_routes',
   lesson_link: 'lesson_links',
   lineage_edge: 'lineage_edges',
@@ -826,6 +862,7 @@ export function emptyCollections() {
     trial_evidence: [],
     market_laws: [],
     data_constraints: [],
+    closure_decisions: [],
     failure_routes: [],
     lesson_links: [],
     lineage_edges: [],
@@ -904,6 +941,7 @@ export function buildCatalog(schema, manifests, options = {}) {
   rejections.push(...laws.rejections);
   collections.market_laws = laws.keptLaws;
   collections.data_constraints = laws.keptConstraints;
+  collections.closure_decisions = laws.keptDecisions;
 
   const coverage = computeCoverage(schema, collections.data_sources);
 
@@ -936,6 +974,10 @@ export function buildCatalog(schema, manifests, options = {}) {
       empirical: collections.market_laws.filter((l) => l.subtype === 'empirical_market_law').length,
       by_status: collections.market_laws.reduce((a, l) => ({ ...a, [l.status]: (a[l.status] ?? 0) + 1 }), {}),
       by_exploitability: collections.market_laws.reduce((a, l) => ({ ...a, [l.exploitability_class]: (a[l.exploitability_class] ?? 0) + 1 }), {}),
+      closure_decisions: collections.closure_decisions.length,
+      closures_measured: collections.closure_decisions.filter((d) => d.disposition === 'CLOSED_MEASURED').length,
+      closures_underpowered: collections.closure_decisions.filter((d) => d.disposition === 'CLOSED_UNDERPOWERED').length,
+      closures_data_blocked: collections.closure_decisions.filter((d) => d.disposition === 'DATA_BLOCKED').length,
       constraints: collections.data_constraints.length,
       constraints_confirmed: collections.data_constraints.filter((c) => c.status === 'confirmed').length,
     },
@@ -1066,6 +1108,21 @@ export function catalogToCsv(schema, catalog) {
       fixture_flag: c.fixture_flag,
       retained_or_evidence_path: c.evidence_paths.join('|'),
       source_of_record: c.source_of_record,
+    });
+  }
+  for (const d of catalog.records.closure_decisions ?? []) {
+    push({
+      record_type: 'closure_decision',
+      id: d.decision_id,
+      family_id: d.subject,
+      title_or_mechanism: d.decisive_measurement,
+      type_or_segment: d.subject_kind,
+      verdict_or_status: d.disposition,
+      evidence_grade: d.authority,
+      verification_status: '',
+      fixture_flag: d.fixture_flag,
+      retained_or_evidence_path: (d.evidence_paths ?? []).join('|'),
+      source_of_record: d.source_of_record,
     });
   }
   for (const f of catalog.records.failure_routes) {

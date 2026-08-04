@@ -35,8 +35,20 @@
       "RESULT_ARTIFACT",
       "REFERENCE_DOC"
     ],
-    "host_scope": ["SERVER_RESIDENT", "REPO_RESIDENT", "EXTERNAL_VENUE", "SYNTHETIC"],
-    "path_kind": ["FILE", "DIRECTORY", "GLOB", "DB_FILE", "SERVICE_STREAM", "NOT_APPLICABLE"],
+    "host_scope": [
+      "SERVER_RESIDENT",
+      "REPO_RESIDENT",
+      "EXTERNAL_VENUE",
+      "SYNTHETIC"
+    ],
+    "path_kind": [
+      "FILE",
+      "DIRECTORY",
+      "GLOB",
+      "DB_FILE",
+      "SERVICE_STREAM",
+      "NOT_APPLICABLE"
+    ],
     "write_ownership": [
       "SERVER_COLLECTOR",
       "SERVER_RUNNER",
@@ -46,8 +58,18 @@
       "WAREHOUSE_SYNTHETIC",
       "UNKNOWN"
     ],
-    "read_only_status": ["READ_ONLY", "APPEND_ONLY_BY_OWNER", "MUTABLE_RUNTIME", "UNKNOWN"],
-    "verification_status": ["VERIFIED_READ_ONLY", "DOCUMENTED_UNVERIFIED", "MISSING", "UNKNOWN"],
+    "read_only_status": [
+      "READ_ONLY",
+      "APPEND_ONLY_BY_OWNER",
+      "MUTABLE_RUNTIME",
+      "UNKNOWN"
+    ],
+    "verification_status": [
+      "VERIFIED_READ_ONLY",
+      "DOCUMENTED_UNVERIFIED",
+      "MISSING",
+      "UNKNOWN"
+    ],
     "evidence_grade": [
       "RAW_PRIMARY",
       "DERIVED_PRIMARY",
@@ -79,9 +101,23 @@
       "REPLAY",
       "UNSPECIFIED"
     ],
-    "axis_L": ["L0", "L1", "L2", "L3"],
-    "axis_X": ["X0", "X1", "X2", "X3"],
-    "gate_status": ["PASS", "FAIL", "NOT_RUN"],
+    "axis_L": [
+      "L0",
+      "L1",
+      "L2",
+      "L3"
+    ],
+    "axis_X": [
+      "X0",
+      "X1",
+      "X2",
+      "X3"
+    ],
+    "gate_status": [
+      "PASS",
+      "FAIL",
+      "NOT_RUN"
+    ],
     "verdict": [
       "INSUFFICIENT_DATA",
       "DATA_REQUEST",
@@ -125,15 +161,31 @@
       "REPLAY",
       "DIAGNOSTIC"
     ],
-    "trial_representation": ["INDIVIDUAL", "AGGREGATE_ONLY"],
+    "trial_representation": [
+      "INDIVIDUAL",
+      "AGGREGATE_ONLY"
+    ],
     "reconciliation_status": [
       "RECONCILED",
       "AGGREGATE_PENDING_CHILDREN",
       "UNRECOVERABLE_PENDING_SOURCE"
     ],
-    "law_subtype": ["mechanical_identity", "empirical_market_law"],
-    "law_status": ["proven", "observed", "replicated", "broken", "retired"],
-    "check_status": ["PASS", "FAIL", "NOT_RUN"],
+    "law_subtype": [
+      "mechanical_identity",
+      "empirical_market_law"
+    ],
+    "law_status": [
+      "proven",
+      "observed",
+      "replicated",
+      "broken",
+      "retired"
+    ],
+    "check_status": [
+      "PASS",
+      "FAIL",
+      "NOT_RUN"
+    ],
     "exploitability_class": [
       "ENTRY",
       "SIZE",
@@ -143,9 +195,22 @@
       "EXECUTION_POLICY",
       "KNOWLEDGE_ONLY"
     ],
-    "constraint_kind": ["SCHEMA", "CAUSALITY", "COVERAGE", "GRANULARITY", "RETENTION"],
-    "constraint_status": ["confirmed", "suspected", "resolved"],
-    "lesson_relation": ["CREATED_BY", "APPLIED_BY"],
+    "constraint_kind": [
+      "SCHEMA",
+      "CAUSALITY",
+      "COVERAGE",
+      "GRANULARITY",
+      "RETENTION"
+    ],
+    "constraint_status": [
+      "confirmed",
+      "suspected",
+      "resolved"
+    ],
+    "lesson_relation": [
+      "CREATED_BY",
+      "APPLIED_BY"
+    ],
     "lineage_edge_kind": [
       "CREATED_LESSON",
       "APPLIED_LESSON",
@@ -154,6 +219,24 @@
       "DATA_REQUEST_FOR",
       "GUARD_DERIVED_FROM",
       "SUPERSEDED_BY"
+    ],
+    "closure_disposition": [
+      "CLOSED_MEASURED",
+      "CLOSED_UNDERPOWERED",
+      "DATA_BLOCKED",
+      "GUARD_ONLY",
+      "QUARANTINED",
+      "REOPENED"
+    ],
+    "closure_authority": [
+      "CHIEF_SCIENTIST",
+      "OPERATOR"
+    ],
+    "closure_subject_kind": [
+      "FAMILY",
+      "HYPOTHESIS",
+      "METHOD",
+      "DATA_ROUTE"
     ]
   },
   "invariants": {
@@ -173,7 +256,8 @@
     "INV-14_IDENTITY_IS_NOT_A_MEASUREMENT": "A mechanical_identity is true by construction: it carries no n, t_stat, ci, null_test, oos or remove_best, and its status is 'proven'. An empirical_market_law is the opposite: it must carry n, t_stat and a confidence interval, must declare all three checks explicitly (PASS, FAIL or NOT_RUN), and may never hold status 'proven'. This exists so nobody applies a t-test to an arithmetic identity.",
     "INV-15_REPLICATION_REQUIRES_THE_CHECKS": "An empirical_market_law may reach status 'replicated' only when null_test, oos and remove_best are all PASS. With any check NOT_RUN or FAIL the status stays 'observed' or worse.",
     "INV-16_CONSTRAINTS_ARE_SCOPED": "A data_constraint names the specific data_source ids it applies to, and each must exist. A constraint may not be stated globally over an entire evidence class.",
-    "INV-17_LAWS_CITE_THEIR_SOURCES": "Every market_law references at least one existing data_source, names a transform_version, and records its tested variants including the negative ones."
+    "INV-17_LAWS_CITE_THEIR_SOURCES": "Every market_law references at least one existing data_source, names a transform_version, and records its tested variants including the negative ones.",
+    "INV-18": "Every closure_decision names a decisive measurement and a reopen criterion, and every law_id and constraint_id it cites must exist in the catalogue."
   },
   "record_types": {
     "data_source": {
@@ -181,29 +265,95 @@
       "collection": "data_sources",
       "layer": "immutable_data_lake",
       "fields": {
-        "record_type": { "type": "const", "const": "data_source" },
-        "source_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
-        "title": { "type": "string", "min_length": 3 },
-        "evidence_type": { "type": "enum", "enum": "evidence_type" },
-        "owner_system": { "type": "string", "min_length": 2 },
-        "host_scope": { "type": "enum", "enum": "host_scope" },
-        "retained_path": { "type": "path_reference" },
-        "path_kind": { "type": "enum", "enum": "path_kind" },
-        "run_id": { "type": "string", "nullable": true },
-        "time_span_start": { "type": "iso_datetime", "nullable": true },
-        "time_span_end": { "type": "iso_datetime", "nullable": true },
-        "symbols": { "type": "string_array" },
-        "timeframes": { "type": "string_array" },
-        "schema_fingerprint": { "type": "string", "min_length": 1 },
-        "write_ownership": { "type": "enum", "enum": "write_ownership" },
-        "read_only_status": { "type": "enum", "enum": "read_only_status" },
-        "verification_status": { "type": "enum", "enum": "verification_status" },
-        "evidence_grade": { "type": "enum", "enum": "evidence_grade" },
-        "fixture_flag": { "type": "boolean" },
-        "superseded_by_raw_source_id": { "type": "string", "nullable": true, "optional": true },
-        "known_gaps": { "type": "string_array", "optional": true },
-        "source_of_record": { "type": "string", "min_length": 3 },
-        "notes": { "type": "string", "optional": true }
+        "record_type": {
+          "type": "const",
+          "const": "data_source"
+        },
+        "source_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$"
+        },
+        "title": {
+          "type": "string",
+          "min_length": 3
+        },
+        "evidence_type": {
+          "type": "enum",
+          "enum": "evidence_type"
+        },
+        "owner_system": {
+          "type": "string",
+          "min_length": 2
+        },
+        "host_scope": {
+          "type": "enum",
+          "enum": "host_scope"
+        },
+        "retained_path": {
+          "type": "path_reference"
+        },
+        "path_kind": {
+          "type": "enum",
+          "enum": "path_kind"
+        },
+        "run_id": {
+          "type": "string",
+          "nullable": true
+        },
+        "time_span_start": {
+          "type": "iso_datetime",
+          "nullable": true
+        },
+        "time_span_end": {
+          "type": "iso_datetime",
+          "nullable": true
+        },
+        "symbols": {
+          "type": "string_array"
+        },
+        "timeframes": {
+          "type": "string_array"
+        },
+        "schema_fingerprint": {
+          "type": "string",
+          "min_length": 1
+        },
+        "write_ownership": {
+          "type": "enum",
+          "enum": "write_ownership"
+        },
+        "read_only_status": {
+          "type": "enum",
+          "enum": "read_only_status"
+        },
+        "verification_status": {
+          "type": "enum",
+          "enum": "verification_status"
+        },
+        "evidence_grade": {
+          "type": "enum",
+          "enum": "evidence_grade"
+        },
+        "fixture_flag": {
+          "type": "boolean"
+        },
+        "superseded_by_raw_source_id": {
+          "type": "string",
+          "nullable": true,
+          "optional": true
+        },
+        "known_gaps": {
+          "type": "string_array",
+          "optional": true
+        },
+        "source_of_record": {
+          "type": "string",
+          "min_length": 3
+        },
+        "notes": {
+          "type": "string",
+          "optional": true
+        }
       }
     },
     "experiment": {
@@ -211,29 +361,90 @@
       "collection": "experiments",
       "layer": "research_catalogue",
       "fields": {
-        "record_type": { "type": "const", "const": "experiment" },
-        "experiment_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
-        "family_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
-        "title": { "type": "string", "min_length": 3 },
-        "model_family": { "type": "string", "min_length": 2 },
-        "mechanism_tags": { "type": "string_array", "min_items": 1 },
-        "data_source_ids": { "type": "string_array", "min_items": 1 },
-        "timeframes": { "type": "string_array" },
-        "universe": { "type": "string_array" },
-        "frozen_rule": { "type": "object" },
-        "decision_time_fields": { "type": "string_array" },
-        "execution_time_fields": { "type": "string_array" },
-        "outcome_time_fields": { "type": "string_array" },
-        "costs": { "type": "object" },
-        "lifecycle_state": { "type": "enum", "enum": "lifecycle_state" },
-        "commit_id": { "type": "string", "nullable": true },
-        "branch": { "type": "string", "nullable": true },
-        "evidence_paths": { "type": "string_array" },
-        "evidence_grade": { "type": "enum", "enum": "evidence_grade" },
-        "fixture_flag": { "type": "boolean" },
-        "prior_trials_seeded": { "type": "integer", "minimum": 0, "optional": true },
-        "source_of_record": { "type": "string", "min_length": 3 },
-        "notes": { "type": "string", "optional": true }
+        "record_type": {
+          "type": "const",
+          "const": "experiment"
+        },
+        "experiment_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$"
+        },
+        "family_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$"
+        },
+        "title": {
+          "type": "string",
+          "min_length": 3
+        },
+        "model_family": {
+          "type": "string",
+          "min_length": 2
+        },
+        "mechanism_tags": {
+          "type": "string_array",
+          "min_items": 1
+        },
+        "data_source_ids": {
+          "type": "string_array",
+          "min_items": 1
+        },
+        "timeframes": {
+          "type": "string_array"
+        },
+        "universe": {
+          "type": "string_array"
+        },
+        "frozen_rule": {
+          "type": "object"
+        },
+        "decision_time_fields": {
+          "type": "string_array"
+        },
+        "execution_time_fields": {
+          "type": "string_array"
+        },
+        "outcome_time_fields": {
+          "type": "string_array"
+        },
+        "costs": {
+          "type": "object"
+        },
+        "lifecycle_state": {
+          "type": "enum",
+          "enum": "lifecycle_state"
+        },
+        "commit_id": {
+          "type": "string",
+          "nullable": true
+        },
+        "branch": {
+          "type": "string",
+          "nullable": true
+        },
+        "evidence_paths": {
+          "type": "string_array"
+        },
+        "evidence_grade": {
+          "type": "enum",
+          "enum": "evidence_grade"
+        },
+        "fixture_flag": {
+          "type": "boolean"
+        },
+        "prior_trials_seeded": {
+          "type": "integer",
+          "minimum": 0,
+          "optional": true
+        },
+        "source_of_record": {
+          "type": "string",
+          "min_length": 3
+        },
+        "notes": {
+          "type": "string",
+          "optional": true
+        }
       }
     },
     "result": {
@@ -241,28 +452,93 @@
       "collection": "results",
       "layer": "research_catalogue",
       "fields": {
-        "record_type": { "type": "const", "const": "result" },
-        "result_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
-        "experiment_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
-        "segment": { "type": "enum", "enum": "segment" },
-        "axis_L": { "type": "enum", "enum": "axis_L" },
-        "axis_X": { "type": "enum", "enum": "axis_X" },
-        "gates": { "type": "gate_map" },
-        "verdict": { "type": "enum", "enum": "verdict" },
-        "metrics_net_of_cost": { "type": "object" },
-        "n_events": { "type": "integer", "minimum": 0, "nullable": true },
-        "n_symbols": { "type": "integer", "minimum": 0, "nullable": true },
-        "n_blocks": { "type": "integer", "minimum": 0, "nullable": true },
-        "validator_id": { "type": "string", "nullable": true },
-        "validator_run_hash": { "type": "string", "nullable": true },
-        "overlap_status": { "type": "enum", "enum": "overlap_status" },
-        "closure_status": { "type": "enum", "enum": "closure_status" },
-        "observed_at": { "type": "iso_datetime", "nullable": true },
-        "evidence_paths": { "type": "string_array" },
-        "evidence_grade": { "type": "enum", "enum": "evidence_grade" },
-        "fixture_flag": { "type": "boolean" },
-        "source_of_record": { "type": "string", "min_length": 3 },
-        "notes": { "type": "string", "optional": true }
+        "record_type": {
+          "type": "const",
+          "const": "result"
+        },
+        "result_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$"
+        },
+        "experiment_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$"
+        },
+        "segment": {
+          "type": "enum",
+          "enum": "segment"
+        },
+        "axis_L": {
+          "type": "enum",
+          "enum": "axis_L"
+        },
+        "axis_X": {
+          "type": "enum",
+          "enum": "axis_X"
+        },
+        "gates": {
+          "type": "gate_map"
+        },
+        "verdict": {
+          "type": "enum",
+          "enum": "verdict"
+        },
+        "metrics_net_of_cost": {
+          "type": "object"
+        },
+        "n_events": {
+          "type": "integer",
+          "minimum": 0,
+          "nullable": true
+        },
+        "n_symbols": {
+          "type": "integer",
+          "minimum": 0,
+          "nullable": true
+        },
+        "n_blocks": {
+          "type": "integer",
+          "minimum": 0,
+          "nullable": true
+        },
+        "validator_id": {
+          "type": "string",
+          "nullable": true
+        },
+        "validator_run_hash": {
+          "type": "string",
+          "nullable": true
+        },
+        "overlap_status": {
+          "type": "enum",
+          "enum": "overlap_status"
+        },
+        "closure_status": {
+          "type": "enum",
+          "enum": "closure_status"
+        },
+        "observed_at": {
+          "type": "iso_datetime",
+          "nullable": true
+        },
+        "evidence_paths": {
+          "type": "string_array"
+        },
+        "evidence_grade": {
+          "type": "enum",
+          "enum": "evidence_grade"
+        },
+        "fixture_flag": {
+          "type": "boolean"
+        },
+        "source_of_record": {
+          "type": "string",
+          "min_length": 3
+        },
+        "notes": {
+          "type": "string",
+          "optional": true
+        }
       }
     },
     "failure_route": {
@@ -270,17 +546,51 @@
       "collection": "failure_routes",
       "layer": "lessons_and_lineage",
       "fields": {
-        "record_type": { "type": "const", "const": "failure_route" },
-        "failure_route_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
-        "experiment_id": { "type": "string", "nullable": true },
-        "family_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
-        "failure_mechanism": { "type": "string", "min_length": 8 },
-        "route": { "type": "enum", "enum": "failure_route" },
-        "allowed_successor": { "type": "string", "nullable": true },
-        "blocking_data_gap_id": { "type": "string", "nullable": true },
-        "priority": { "type": "integer", "minimum": 1, "maximum": 9 },
-        "source_of_record": { "type": "string", "min_length": 3 },
-        "notes": { "type": "string", "optional": true }
+        "record_type": {
+          "type": "const",
+          "const": "failure_route"
+        },
+        "failure_route_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$"
+        },
+        "experiment_id": {
+          "type": "string",
+          "nullable": true
+        },
+        "family_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$"
+        },
+        "failure_mechanism": {
+          "type": "string",
+          "min_length": 8
+        },
+        "route": {
+          "type": "enum",
+          "enum": "failure_route"
+        },
+        "allowed_successor": {
+          "type": "string",
+          "nullable": true
+        },
+        "blocking_data_gap_id": {
+          "type": "string",
+          "nullable": true
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9
+        },
+        "source_of_record": {
+          "type": "string",
+          "min_length": 3
+        },
+        "notes": {
+          "type": "string",
+          "optional": true
+        }
       }
     },
     "lesson_link": {
@@ -288,17 +598,49 @@
       "collection": "lesson_links",
       "layer": "lessons_and_lineage",
       "fields": {
-        "record_type": { "type": "const", "const": "lesson_link" },
-        "lesson_link_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
-        "lesson_id": { "type": "string", "pattern": "^LESSON-[0-9]{3}$" },
-        "lesson_title": { "type": "string", "min_length": 3 },
-        "experiment_id": { "type": "string", "nullable": true },
-        "family_id": { "type": "string", "nullable": true },
-        "relation": { "type": "enum", "enum": "lesson_relation" },
-        "ledger_path": { "type": "path_reference" },
-        "ledger_verification": { "type": "enum", "enum": "verification_status" },
-        "source_of_record": { "type": "string", "min_length": 3 },
-        "notes": { "type": "string", "optional": true }
+        "record_type": {
+          "type": "const",
+          "const": "lesson_link"
+        },
+        "lesson_link_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$"
+        },
+        "lesson_id": {
+          "type": "string",
+          "pattern": "^LESSON-[0-9]{3}$"
+        },
+        "lesson_title": {
+          "type": "string",
+          "min_length": 3
+        },
+        "experiment_id": {
+          "type": "string",
+          "nullable": true
+        },
+        "family_id": {
+          "type": "string",
+          "nullable": true
+        },
+        "relation": {
+          "type": "enum",
+          "enum": "lesson_relation"
+        },
+        "ledger_path": {
+          "type": "path_reference"
+        },
+        "ledger_verification": {
+          "type": "enum",
+          "enum": "verification_status"
+        },
+        "source_of_record": {
+          "type": "string",
+          "min_length": 3
+        },
+        "notes": {
+          "type": "string",
+          "optional": true
+        }
       }
     },
     "trial_ledger_entry": {
@@ -306,31 +648,104 @@
       "collection": "trial_ledger_entries",
       "layer": "research_catalogue",
       "fields": {
-        "record_type": { "type": "const", "const": "trial_ledger_entry" },
-        "trial_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
-        "parent_experiment_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
-        "family_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
-        "mechanism_tags": { "type": "string_array", "min_items": 1 },
-        "kind": { "type": "enum", "enum": "trial_kind" },
-        "representation": { "type": "enum", "enum": "trial_representation" },
-        "exact_trial_count": { "type": "integer", "minimum": 1 },
-        "dedup_key": { "type": "string", "min_length": 3 },
-        "counts_toward_lower_bound": { "type": "boolean" },
-        "member_of_aggregate_trial_id": { "type": "string", "nullable": true },
-        "attacks_trial_id": { "type": "string", "nullable": true },
-        "evidence_path": { "type": "path_reference" },
-        "verification_grade": { "type": "enum", "enum": "verification_status" },
-        "evidence_grade": { "type": "enum", "enum": "evidence_grade" },
-        "parameter_fingerprint": { "type": "string", "nullable": true },
-        "split": { "type": "enum", "enum": "segment" },
-        "cost_model_applied": { "type": "boolean" },
-        "verdict": { "type": "enum", "enum": "verdict", "nullable": true },
-        "failure_route": { "type": "enum", "enum": "failure_route", "nullable": true },
-        "reconciliation_status": { "type": "enum", "enum": "reconciliation_status" },
-        "missing_child_evidence_id": { "type": "string", "nullable": true },
-        "fixture_flag": { "type": "boolean" },
-        "source_of_record": { "type": "string", "min_length": 3 },
-        "notes": { "type": "string", "optional": true }
+        "record_type": {
+          "type": "const",
+          "const": "trial_ledger_entry"
+        },
+        "trial_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$"
+        },
+        "parent_experiment_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$"
+        },
+        "family_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$"
+        },
+        "mechanism_tags": {
+          "type": "string_array",
+          "min_items": 1
+        },
+        "kind": {
+          "type": "enum",
+          "enum": "trial_kind"
+        },
+        "representation": {
+          "type": "enum",
+          "enum": "trial_representation"
+        },
+        "exact_trial_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "dedup_key": {
+          "type": "string",
+          "min_length": 3
+        },
+        "counts_toward_lower_bound": {
+          "type": "boolean"
+        },
+        "member_of_aggregate_trial_id": {
+          "type": "string",
+          "nullable": true
+        },
+        "attacks_trial_id": {
+          "type": "string",
+          "nullable": true
+        },
+        "evidence_path": {
+          "type": "path_reference"
+        },
+        "verification_grade": {
+          "type": "enum",
+          "enum": "verification_status"
+        },
+        "evidence_grade": {
+          "type": "enum",
+          "enum": "evidence_grade"
+        },
+        "parameter_fingerprint": {
+          "type": "string",
+          "nullable": true
+        },
+        "split": {
+          "type": "enum",
+          "enum": "segment"
+        },
+        "cost_model_applied": {
+          "type": "boolean"
+        },
+        "verdict": {
+          "type": "enum",
+          "enum": "verdict",
+          "nullable": true
+        },
+        "failure_route": {
+          "type": "enum",
+          "enum": "failure_route",
+          "nullable": true
+        },
+        "reconciliation_status": {
+          "type": "enum",
+          "enum": "reconciliation_status"
+        },
+        "missing_child_evidence_id": {
+          "type": "string",
+          "nullable": true
+        },
+        "fixture_flag": {
+          "type": "boolean"
+        },
+        "source_of_record": {
+          "type": "string",
+          "min_length": 3
+        },
+        "notes": {
+          "type": "string",
+          "optional": true
+        }
       }
     },
     "market_law": {
@@ -338,35 +753,119 @@
       "collection": "market_laws",
       "layer": "market_law_catalogue",
       "fields": {
-        "record_type": { "type": "const", "const": "market_law" },
-        "law_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
-        "subtype": { "type": "enum", "enum": "law_subtype" },
-        "title": { "type": "string", "min_length": 8 },
-        "statement": { "type": "string", "min_length": 20 },
-        "condition": { "type": "string", "min_length": 12 },
-        "horizon": { "type": "string", "min_length": 2 },
-        "effect": { "type": "object" },
-        "n": { "type": "integer", "minimum": 0, "nullable": true },
-        "t_stat": { "type": "number", "nullable": true },
-        "ci_low": { "type": "number", "nullable": true },
-        "ci_high": { "type": "number", "nullable": true },
-        "segment": { "type": "enum", "enum": "segment" },
-        "data_source_ids": { "type": "string_array", "min_items": 1 },
-        "transform_version": { "type": "string", "min_length": 1 },
-        "null_test": { "type": "check_result", "nullable": true },
-        "oos": { "type": "check_result", "nullable": true },
-        "remove_best": { "type": "check_result", "nullable": true },
-        "mechanism_claim": { "type": "string", "min_length": 20 },
-        "exploitability_class": { "type": "enum", "enum": "exploitability_class" },
-        "temporal_stability": { "type": "string", "min_length": 8 },
-        "status": { "type": "enum", "enum": "law_status" },
-        "review_criterion": { "type": "string", "min_length": 12 },
-        "tested_variants": { "type": "object_array" },
-        "task_id": { "type": "string", "min_length": 3 },
-        "evidence_paths": { "type": "string_array" },
-        "fixture_flag": { "type": "boolean" },
-        "source_of_record": { "type": "string", "min_length": 3 },
-        "notes": { "type": "string", "optional": true }
+        "record_type": {
+          "type": "const",
+          "const": "market_law"
+        },
+        "law_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$"
+        },
+        "subtype": {
+          "type": "enum",
+          "enum": "law_subtype"
+        },
+        "title": {
+          "type": "string",
+          "min_length": 8
+        },
+        "statement": {
+          "type": "string",
+          "min_length": 20
+        },
+        "condition": {
+          "type": "string",
+          "min_length": 12
+        },
+        "horizon": {
+          "type": "string",
+          "min_length": 2
+        },
+        "effect": {
+          "type": "object"
+        },
+        "n": {
+          "type": "integer",
+          "minimum": 0,
+          "nullable": true
+        },
+        "t_stat": {
+          "type": "number",
+          "nullable": true
+        },
+        "ci_low": {
+          "type": "number",
+          "nullable": true
+        },
+        "ci_high": {
+          "type": "number",
+          "nullable": true
+        },
+        "segment": {
+          "type": "enum",
+          "enum": "segment"
+        },
+        "data_source_ids": {
+          "type": "string_array",
+          "min_items": 1
+        },
+        "transform_version": {
+          "type": "string",
+          "min_length": 1
+        },
+        "null_test": {
+          "type": "check_result",
+          "nullable": true
+        },
+        "oos": {
+          "type": "check_result",
+          "nullable": true
+        },
+        "remove_best": {
+          "type": "check_result",
+          "nullable": true
+        },
+        "mechanism_claim": {
+          "type": "string",
+          "min_length": 20
+        },
+        "exploitability_class": {
+          "type": "enum",
+          "enum": "exploitability_class"
+        },
+        "temporal_stability": {
+          "type": "string",
+          "min_length": 8
+        },
+        "status": {
+          "type": "enum",
+          "enum": "law_status"
+        },
+        "review_criterion": {
+          "type": "string",
+          "min_length": 12
+        },
+        "tested_variants": {
+          "type": "object_array"
+        },
+        "task_id": {
+          "type": "string",
+          "min_length": 3
+        },
+        "evidence_paths": {
+          "type": "string_array"
+        },
+        "fixture_flag": {
+          "type": "boolean"
+        },
+        "source_of_record": {
+          "type": "string",
+          "min_length": 3
+        },
+        "notes": {
+          "type": "string",
+          "optional": true
+        }
       }
     },
     "data_constraint": {
@@ -374,22 +873,68 @@
       "collection": "data_constraints",
       "layer": "market_law_catalogue",
       "fields": {
-        "record_type": { "type": "const", "const": "data_constraint" },
-        "constraint_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
-        "title": { "type": "string", "min_length": 8 },
-        "statement": { "type": "string", "min_length": 20 },
-        "constraint_kind": { "type": "enum", "enum": "constraint_kind" },
-        "scope_source_ids": { "type": "string_array", "min_items": 1 },
-        "scope_note": { "type": "string", "min_length": 12 },
-        "evidence": { "type": "string_array", "min_items": 1 },
-        "consequence": { "type": "string", "min_length": 12 },
-        "status": { "type": "enum", "enum": "constraint_status" },
-        "review_criterion": { "type": "string", "min_length": 12 },
-        "task_id": { "type": "string", "min_length": 3 },
-        "evidence_paths": { "type": "string_array" },
-        "fixture_flag": { "type": "boolean" },
-        "source_of_record": { "type": "string", "min_length": 3 },
-        "notes": { "type": "string", "optional": true }
+        "record_type": {
+          "type": "const",
+          "const": "data_constraint"
+        },
+        "constraint_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$"
+        },
+        "title": {
+          "type": "string",
+          "min_length": 8
+        },
+        "statement": {
+          "type": "string",
+          "min_length": 20
+        },
+        "constraint_kind": {
+          "type": "enum",
+          "enum": "constraint_kind"
+        },
+        "scope_source_ids": {
+          "type": "string_array",
+          "min_items": 1
+        },
+        "scope_note": {
+          "type": "string",
+          "min_length": 12
+        },
+        "evidence": {
+          "type": "string_array",
+          "min_items": 1
+        },
+        "consequence": {
+          "type": "string",
+          "min_length": 12
+        },
+        "status": {
+          "type": "enum",
+          "enum": "constraint_status"
+        },
+        "review_criterion": {
+          "type": "string",
+          "min_length": 12
+        },
+        "task_id": {
+          "type": "string",
+          "min_length": 3
+        },
+        "evidence_paths": {
+          "type": "string_array"
+        },
+        "fixture_flag": {
+          "type": "boolean"
+        },
+        "source_of_record": {
+          "type": "string",
+          "min_length": 3
+        },
+        "notes": {
+          "type": "string",
+          "optional": true
+        }
       }
     },
     "trial_evidence": {
@@ -397,18 +942,53 @@
       "collection": "trial_evidence",
       "layer": "research_catalogue",
       "fields": {
-        "record_type": { "type": "const", "const": "trial_evidence" },
-        "evidence_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
-        "trial_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
-        "required_artefact": { "type": "string", "min_length": 8 },
-        "artefact_location_hint": { "type": "path_reference" },
-        "location_verification": { "type": "enum", "enum": "verification_status" },
-        "recoverable_child_count_estimate": { "type": "integer", "minimum": 0, "nullable": true },
-        "recovery_phase": { "type": "string", "min_length": 3 },
-        "blocking_reason": { "type": "string", "min_length": 8 },
-        "fixture_flag": { "type": "boolean" },
-        "source_of_record": { "type": "string", "min_length": 3 },
-        "notes": { "type": "string", "optional": true }
+        "record_type": {
+          "type": "const",
+          "const": "trial_evidence"
+        },
+        "evidence_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$"
+        },
+        "trial_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$"
+        },
+        "required_artefact": {
+          "type": "string",
+          "min_length": 8
+        },
+        "artefact_location_hint": {
+          "type": "path_reference"
+        },
+        "location_verification": {
+          "type": "enum",
+          "enum": "verification_status"
+        },
+        "recoverable_child_count_estimate": {
+          "type": "integer",
+          "minimum": 0,
+          "nullable": true
+        },
+        "recovery_phase": {
+          "type": "string",
+          "min_length": 3
+        },
+        "blocking_reason": {
+          "type": "string",
+          "min_length": 8
+        },
+        "fixture_flag": {
+          "type": "boolean"
+        },
+        "source_of_record": {
+          "type": "string",
+          "min_length": 3
+        },
+        "notes": {
+          "type": "string",
+          "optional": true
+        }
       }
     },
     "lineage_edge": {
@@ -416,18 +996,127 @@
       "collection": "lineage_edges",
       "layer": "lessons_and_lineage",
       "fields": {
-        "record_type": { "type": "const", "const": "lineage_edge" },
-        "edge_id": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$" },
-        "from_id": { "type": "string", "min_length": 3 },
-        "to_id": { "type": "string", "min_length": 3 },
-        "edge_kind": { "type": "enum", "enum": "lineage_edge_kind" },
-        "structural_difference": { "type": "string", "nullable": true },
-        "new_task_id": { "type": "string", "nullable": true },
-        "new_model_identity": { "type": "string", "nullable": true },
-        "permitted": { "type": "boolean" },
-        "justification": { "type": "string", "min_length": 8 },
-        "source_of_record": { "type": "string", "min_length": 3 },
-        "notes": { "type": "string", "optional": true }
+        "record_type": {
+          "type": "const",
+          "const": "lineage_edge"
+        },
+        "edge_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9_.-]{2,79}$"
+        },
+        "from_id": {
+          "type": "string",
+          "min_length": 3
+        },
+        "to_id": {
+          "type": "string",
+          "min_length": 3
+        },
+        "edge_kind": {
+          "type": "enum",
+          "enum": "lineage_edge_kind"
+        },
+        "structural_difference": {
+          "type": "string",
+          "nullable": true
+        },
+        "new_task_id": {
+          "type": "string",
+          "nullable": true
+        },
+        "new_model_identity": {
+          "type": "string",
+          "nullable": true
+        },
+        "permitted": {
+          "type": "boolean"
+        },
+        "justification": {
+          "type": "string",
+          "min_length": 8
+        },
+        "source_of_record": {
+          "type": "string",
+          "min_length": 3
+        },
+        "notes": {
+          "type": "string",
+          "optional": true
+        }
+      }
+    },
+    "closure_decision": {
+      "key": "decision_id",
+      "collection": "closure_decisions",
+      "layer": "market_law_catalogue",
+      "fields": {
+        "record_type": {
+          "type": "const",
+          "const": "closure_decision"
+        },
+        "decision_id": {
+          "type": "string",
+          "pattern": "^CD\\.[A-Z0-9][A-Z0-9_.-]{2,79}$"
+        },
+        "subject": {
+          "type": "string",
+          "min_length": 3
+        },
+        "subject_kind": {
+          "type": "enum",
+          "enum": "closure_subject_kind"
+        },
+        "disposition": {
+          "type": "enum",
+          "enum": "closure_disposition"
+        },
+        "authority": {
+          "type": "enum",
+          "enum": "closure_authority"
+        },
+        "decisive_measurement": {
+          "type": "string",
+          "min_length": 20
+        },
+        "decisive_metric": {
+          "type": "object",
+          "optional": true
+        },
+        "reopen_criterion": {
+          "type": "string",
+          "min_length": 20
+        },
+        "supersedes": {
+          "type": "string_array"
+        },
+        "law_ids": {
+          "type": "string_array"
+        },
+        "constraint_ids": {
+          "type": "string_array"
+        },
+        "task_id": {
+          "type": "string",
+          "min_length": 3
+        },
+        "decided_at": {
+          "type": "string",
+          "min_length": 10
+        },
+        "evidence_paths": {
+          "type": "string_array"
+        },
+        "fixture_flag": {
+          "type": "boolean"
+        },
+        "source_of_record": {
+          "type": "string",
+          "min_length": 3
+        },
+        "notes": {
+          "type": "string",
+          "optional": true
+        }
       }
     }
   },

@@ -1372,11 +1372,35 @@ const IDENTITY_OVERRIDES = {
   null_test: null, oos: null, remove_best: null,
 };
 
-function lawWorld(laws = [], constraints = []) {
+function lawWorld(laws = [], constraints = [], decisions = []) {
   const c = collectionsFrom({ sources: [baseSource()] });
   c.market_laws = laws;
   c.data_constraints = constraints;
+  c.closure_decisions = decisions;
   return c;
+}
+
+function baseDecision(overrides = {}) {
+  return {
+    record_type: 'closure_decision',
+    decision_id: 'CD.TEST',
+    subject: 'FAM.TEST',
+    subject_kind: 'FAMILY',
+    disposition: 'CLOSED_MEASURED',
+    authority: 'CHIEF_SCIENTIST',
+    decisive_measurement: 'The measured effect of 7.35 bps falls 8.65 bps short of the 16 bps floor at t=8.96.',
+    decisive_metric: { effect_bps: 7.35, floor_bps: 16 },
+    reopen_criterion: 'Only on a round-trip cost position below roughly 8 bps, evidenced before any retest.',
+    supersedes: [],
+    law_ids: [],
+    constraint_ids: [],
+    task_id: 'TASK-TEST',
+    decided_at: '2026-08-04',
+    evidence_paths: [],
+    fixture_flag: true,
+    source_of_record: 'test fixture',
+    ...overrides,
+  };
 }
 
 test('a well-formed empirical law and identity both validate against the schema', () => {
@@ -1524,6 +1548,67 @@ test('query "laws" hides precision on an identity and shows it on an empirical l
   const empirical = runQuery(seedCatalog, 'laws', { subtype: 'empirical_market_law' });
   assert(empirical.every((l) => l.n !== null && l.ci !== null), 'empirical laws report n and a confidence interval');
   assert(empirical.every((l) => l.checks.null_test !== null), 'empirical laws report their check status');
+});
+
+test('a well-formed closure decision validates against the schema', () => {
+  assert(validateRecord(schema, 'closure_decision', baseDecision()).length === 0, 'should validate');
+});
+
+test('a closure may not cite a law or constraint that does not exist', () => {
+  const d = baseDecision({ law_ids: ['NO.SUCH.LAW'] });
+  assert(checkLawCatalogue(lawWorld([], [], [d])).rejections.some((r) => r.reason === 'UNKNOWN_LAW'),
+    'a dangling law citation must be rejected');
+  const e = baseDecision({ constraint_ids: ['NO.SUCH.CONSTRAINT'] });
+  assert(checkLawCatalogue(lawWorld([], [], [e])).rejections.some((r) => r.reason === 'UNKNOWN_CONSTRAINT'),
+    'a dangling constraint citation must be rejected');
+});
+
+test('a measured closure must point at something measured', () => {
+  // A closure with no number behind it is an opinion, and the whole point of the registry is
+  // that opinions do not close directions.
+  const bare = baseDecision({ law_ids: [], decisive_metric: undefined });
+  assert(checkLawCatalogue(lawWorld([], [], [bare])).rejections
+    .some((r) => r.reason === 'MEASURED_CLOSURE_WITHOUT_MEASUREMENT'),
+    'CLOSED_MEASURED needs a cited law or an explicit metric');
+  // UNDERPOWERED exists precisely so an unmeasured closure is labelled rather than dressed up.
+  const under = baseDecision({ disposition: 'CLOSED_UNDERPOWERED', law_ids: [], decisive_metric: undefined });
+  assert(checkLawCatalogue(lawWorld([], [], [under])).rejections.length === 0,
+    'an underpowered closure carries no such requirement, because it claims no measurement');
+});
+
+test('the seed registry closes methods as well as families', () => {
+  const reg = seedCatalog.records.closure_decisions;
+  assert(reg.length === 6, `expected six seed decisions, got ${reg.length}`);
+  const methods = reg.filter((d) => d.subject_kind === 'METHOD');
+  assert(methods.length === 3,
+    'a programme that only ever closes strategies keeps rediscovering the same way of being wrong');
+  for (const d of reg) {
+    assert(d.reopen_criterion && d.reopen_criterion.length >= 20,
+      `${d.decision_id}: without a reopen criterion a direction is closed permanently by accident`);
+    assert(d.decisive_measurement && d.decisive_measurement.length >= 20,
+      `${d.decision_id}: every closure names the number that forced it`);
+  }
+});
+
+test('underpowered and measured closures are never conflated in the seed', () => {
+  const reg = seedCatalog.records.closure_decisions;
+  const under = reg.filter((d) => d.disposition === 'CLOSED_UNDERPOWERED');
+  assert(under.length === 1 && under[0].decision_id === 'CD.WEEKLY_XSECT_MOMENTUM',
+    'the weekly cross-section is the one closure that could not resolve its residual');
+  assert(/ruled out/.test(under[0].decisive_measurement),
+    'and it must state what WAS ruled out, so the label is not just a hedge');
+});
+
+test('query "closures" orders measured before underpowered and reports both criteria', () => {
+  const rows = runQuery(seedCatalog, 'closures', {});
+  assert(rows.length === 6, 'every decision is returned');
+  const firstUnder = rows.findIndex((d) => d.disposition === 'CLOSED_UNDERPOWERED');
+  const lastMeasured = rows.map((d) => d.disposition).lastIndexOf('CLOSED_MEASURED');
+  assert(lastMeasured < firstUnder,
+    'measured closures sort ahead of underpowered ones so the two are never read as equivalent');
+  assert(rows.every((d) => d.reopen_criterion && d.decisive_measurement), 'both are surfaced');
+  const methodsOnly = runQuery(seedCatalog, 'closures', { kind: 'method' });
+  assert(methodsOnly.length === 3 && methodsOnly.every((d) => d.subject_kind === 'METHOD'), 'the kind filter works');
 });
 
 test('query "constraints" reports scope and the review criterion', () => {
