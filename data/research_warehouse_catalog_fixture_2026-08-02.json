@@ -4734,6 +4734,104 @@
       "fixture_flag": false,
       "source_of_record": "TASK-AH-051 Stage 0 over 553,615 sweeps, 30,454 train events after the decile cut",
       "notes": "The headline n and precision are quoted on the top band, the 99.9-100th percentile, because that is the band the exploitability question turns on: it is the best case and it still falls 7.7 bps short of the floor. The interval is the normal-approximation interval on that band. Lower bands carry far larger n and t, as the effect table shows. This law closes the AH-048 conditioning route; it does not close the observation that 32 percent of large-sweep events at 900s exceed 11 bps, which remains true and remains dispersion rather than a tradeable conditional mean."
+    },
+    {
+      "record_type": "market_law",
+      "law_id": "LAW.XSECT.WEEKLY_MOMENTUM_BOUNDED",
+      "subtype": "empirical_market_law",
+      "title": "Weekly cross-sectional momentum in liquid crypto perps orders the quintiles but is bounded far below the published effect",
+      "statement": "Sorting liquid perpetuals into quintiles on trailing three-week return and holding one week produces a monotone ordering of forward returns -- 90, 101, 123, 169 and 181 bps across the five buckets over 100 non-overlapping rebalances. The long-short spread is 91.1 bps gross with a standard error of 61.7, so it cannot be distinguished from zero at t=1.48. It CAN however be distinguished from the published effect: Liu, Tsyvinski and Wu report 250 to 410 bps weekly, which sit 2.6, 3.4 and 5.2 standard errors above this estimate. An effect of the published magnitude is not present in this universe over this period. The payoff shape argues against the residual being real: the median is 21 bps against a mean of 91, only 51 percent of weeks are net positive, and at the 32 bps double-cost stress the net median is negative.",
+      "condition": "43 Bybit perpetuals with a complete weekly close series from 2023-01-02 to 2026-07-27, 187 weeks; equal-weighted quintiles on trailing three-week return, one-week hold, no overlap; turnover measured at 43 percent long and 49 percent short per rebalance and charged at 16 bps per side",
+      "horizon": "one week hold, three-week formation",
+      "effect": {
+        "quintile_means_bps": [
+          90.3,
+          101.3,
+          122.7,
+          169.2,
+          181.3
+        ],
+        "quintiles_monotone": true,
+        "long_short_gross_bps": 91.08,
+        "long_short_gross_median_bps": 20.95,
+        "standard_error_bps": 61.65,
+        "gross_t": 1.477,
+        "measured_cost_bps": 14.59,
+        "net_mean_bps": 76.49,
+        "share_weeks_net_positive_pct": 51,
+        "net_median_at_double_cost_bps": -6.83,
+        "detectable_at_t3_bps": 184.95,
+        "published_effect_bps_range": [
+          250,
+          410
+        ],
+        "published_effect_standard_errors_above": [
+          2.6,
+          5.2
+        ],
+        "neighbours_gross_bps": {
+          "1w": 54.6,
+          "2w": 56.3,
+          "4w": 72
+        }
+      },
+      "n": 100,
+      "t_stat": 1.477,
+      "ci_low": -29.8,
+      "ci_high": 212,
+      "segment": "TRAIN",
+      "data_source_ids": [
+        "EDGE.DATA.BARS"
+      ],
+      "transform_version": "ah050_weekly_cross_sectional_momentum.mjs Stage 0 on a panel rebuilt from public daily klines 2023-01-01 to 2026-08-04; cross-validated against the server hourly-derived panel at 0.00 bps mean absolute difference over 2,193 overlapping symbol-weeks",
+      "null_test": {
+        "status": "NOT_RUN",
+        "reason": "Stage 0 closed UNDERPOWERED, so no rule was formed for a matched null to shuffle"
+      },
+      "oos": {
+        "status": "NOT_RUN",
+        "reason": "83 sealed weeks were left untouched because the gate did not pass"
+      },
+      "remove_best": {
+        "status": "NOT_RUN",
+        "reason": "Stage 0 closed before robustness checks"
+      },
+      "mechanism_claim": "The monotone ordering is consistent with a genuine cross-sectional momentum effect, but its magnitude here is an order of magnitude below the published one and its payoff shape -- near-zero median with a coin-flip hit rate -- is the signature of a series carried by a handful of weeks rather than of a stable premium. No mechanism is claimed for the residual, because the residual is not established.",
+      "exploitability_class": "KNOWLEDGE_ONLY",
+      "temporal_stability": "187 weeks spanning several regimes. The ordering appeared only once the time series was long enough: a 99-week panel with 76 symbols does not show it, while a 187-week panel with 43 does. The limiting resource is rebalance count, not cross-section width.",
+      "status": "observed",
+      "review_criterion": "Promote only if a sample roughly four times this one resolves the spread at t=3 with the ordering intact AND the net median turns positive at the 32 bps stress. Mark broken if a longer sample puts the spread within one standard error of the published 250 bps, which would mean this measurement was the outlier.",
+      "tested_variants": [
+        {
+          "variant": "187 weeks x 43 symbols, primary",
+          "result": "quintiles monotone 90/101/123/169/181; spread 91.1 bps, t=1.48; median 21 bps; 51 percent of weeks net positive"
+        },
+        {
+          "variant": "99 weeks x 76 symbols, pre-declared wide variant",
+          "result": "spread 102.6 bps, t=1.35; quintiles 33/116/35/86/135, NOT monotone -- doubling the cross-section does not buy the ordering"
+        },
+        {
+          "variant": "51 weeks x 87 symbols, the original run",
+          "result": "spread 105.9 bps, t=0.88; quintiles not monotone; median 217 bps and 72 percent of weeks positive, both small-sample artifacts that more data removed"
+        },
+        {
+          "variant": "neighbour formations 1w, 2w, 4w",
+          "result": "54.6, 56.3 and 72.0 bps at t of 0.79, 0.87 and 1.15 -- all positive and coherent, unlike the 51-week run where 1w was negative"
+        },
+        {
+          "variant": "32 bps double-cost stress",
+          "result": "net median -6.83 bps"
+        }
+      ],
+      "task_id": "TASK-AH-050",
+      "evidence_paths": [
+        "reference/AH050_EXTENDED_DATA_RERUN_2026-08-04.md",
+        "reference/AH050_WEEKLY_CROSS_SECTIONAL_MOMENTUM_PROTOCOL_2026-08-04.md",
+        "tasks/results/TASK-AH-050-WEEKLY-CROSS-SECTIONAL-MOMENTUM-V0-RESULT.md"
+      ],
+      "fixture_flag": false,
+      "source_of_record": "TASK-AH-050 extended-data re-run, 2026-08-04",
+      "notes": "The interval is the normal-approximation interval on the long-short spread and spans zero, which is the point: this record bounds the effect from ABOVE rather than establishing it. Survivorship is severe and is not corrected: 43 of 109 symbols carried a complete series from January 2023, so the universe is selected on having survived three and a half years. The source paper reports that crypto momentum is stronger in larger coins, so the selection points the test at the right population, but it also means the estimate is not an unbiased sample of the universe."
     }
   ],
   "data_constraints": [

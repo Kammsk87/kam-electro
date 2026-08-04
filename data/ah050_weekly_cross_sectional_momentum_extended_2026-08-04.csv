@@ -1,0 +1,7 @@
+metric,formation_weeks,n,gross_mean_bps,gross_t,mean_cost_bps,net_mean_bps,net_median_bps,share_weeks_net_positive_pct
+train,3,100,91.0790,1.4773,14.5889,76.4901,7.0618,51.0000
+train_double_cost,3,100,91.0790,1.4773,29.1778,61.9012,-6.8271,48.0000
+train_at_superseded_floor,3,100,91.0790,1.4773,10.0299,81.0492,11.4021,51.0000
+neighbour,1,101,54.6081,0.7934,25.3377,29.2704,-50.9880,48.5149
+neighbour,2,101,56.3116,0.8702,17.9824,38.3292,-57.5615,44.5545
+neighbour,4,100,71.9614,1.1502,12.8133,59.1480,44.4304,54.0000

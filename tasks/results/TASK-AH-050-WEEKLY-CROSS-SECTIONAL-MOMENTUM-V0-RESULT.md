@@ -87,6 +87,56 @@ this is a **backfill and not a collection wait** — the history exists. That ma
 cheapest unblock currently available, but it is a separate data task requiring approval, and
 extending the span reopens survivorship rather than settling it.
 
+---
+
+# AMENDMENT — extended-data re-run, same day
+
+The backfill was approved and run. The specification did not change; only the span did. Full
+detail in `reference/AH050_EXTENDED_DATA_RERUN_2026-08-04.md`.
+
+**Data.** Public daily klines 2023-01-01 to 2026-08-04 for all 109 symbols, public market-data
+endpoint only. Panel rebuilt entirely from that single source. Cross-validated against the
+original server-derived panel: **2,193 overlapping symbol-weeks, mean absolute difference
+0.00 bps.** Span chosen by a rule written before the backfill finished — earliest start with at
+least 40 complete symbols — giving **187 weeks × 43 symbols**, 100 train rebalances, 83 sealed.
+
+**Verdict: `UNDERPOWERED`** — but a materially more informative one.
+
+| | 51 weeks | **187 weeks** |
+|---|---:|---:|
+| gross mean | 105.9 | **91.1** |
+| gross median | 216.8 | **21.0** |
+| gross t | 0.88 | **1.48** |
+| detectable at t = 3 | 362 | **185** |
+| weeks net positive | 72 % | **51 %** |
+| quintiles monotone | no | **yes** |
+
+**Three things the extra data settled.**
+
+1. **The published effect is ruled out.** Standard error is now 61.7 bps. The source's 250 to
+   410 bps sit 2.6 to 5.2 standard errors above our 91.1. An effect of that magnitude is not
+   present in this universe over this period. The 51-week sample could not have said so.
+2. **The limiting resource was weeks, not symbols.** A pre-declared wide variant — 99 weeks ×
+   76 symbols — gives t = 1.35 and quintiles of 33, 116, 35, 86, 135, not monotone. Nearly
+   doubling the cross-section does not buy the ordering; nearly doubling the time series does.
+3. **The cross-sectional ordering is real:** 90, 101, 123, 169, 181, monotone across all five.
+
+**One thing it removed.** The 51-week run's flattering median of 217 bps and 72 percent hit
+rate were small-sample artifacts. On 100 rebalances the median is 21 bps against a mean of 91
+and the hit rate is 51 percent, with a negative net median at the 32 bps stress. Positive mean,
+near-zero median, coin-flip hit rate — the payoff-trap signature already recorded as a
+rejection route for `FAM.AMEL_DIRECTIONAL`.
+
+**Survivorship is now severe** and is not corrected: 43 of 109 symbols carried a complete
+series from January 2023, so the universe is selected on surviving three and a half years.
+
+**Assessment.** The backfill did its job: it converted "we cannot tell" into two definite
+statements and dissolved the encouraging-looking parts of the first run. What remains is a
+monotone ordering worth about 91 bps a week that cannot be distinguished from zero and whose
+payoff shape is a trap. Resolving it at t = 3 would need roughly four times this sample again,
+and the shape argues against spending it. Recorded as `LAW.XSECT.WEEKLY_MOMENTUM_BOUNDED`,
+which bounds the effect from above rather than establishing it. Sealed segment untouched.
+
 ## Deliverables
 
 1. `scripts/analysis/ah050_weekly_cross_sectional_momentum.mjs`

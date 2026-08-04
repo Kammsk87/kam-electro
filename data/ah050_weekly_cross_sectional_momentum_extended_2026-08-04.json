@@ -1,0 +1,142 @@
+{
+  "task": "TASK-AH-050",
+  "stage": 0,
+  "label": "DISCOVERY_NOT_PROOF",
+  "promising_count": 0,
+  "frozen": {
+    "task": "TASK-AH-050",
+    "stage": 0,
+    "formation_weeks": 3,
+    "neighbour_formation_weeks": [
+      1,
+      2,
+      4
+    ],
+    "holding_weeks": 1,
+    "quintiles": 5,
+    "weighting": "EQUAL",
+    "overlap": "NONE",
+    "cost_bps_per_side": 16,
+    "double_cost_bps_per_side": 32,
+    "superseded_cost_bps_per_side": 11,
+    "train_fraction": 0.55,
+    "min_weeks_per_oos_segment": 30,
+    "power_target_t": 3,
+    "source": "Liu, Tsyvinski & Wu, Common Risk Factors in Cryptocurrency, JF 77(2) 2022"
+  },
+  "sealed_segments_untouched": true,
+  "universe_symbols": 43,
+  "dropped_symbols": [],
+  "total_weeks": 187,
+  "total_rebalances": 183,
+  "train_rebalances": 100,
+  "sealed_rebalances_available": 83,
+  "train": {
+    "n": 100,
+    "gross_mean_bps": 91.07901614249464,
+    "gross_median_bps": 20.950668166668127,
+    "gross_sd_bps": 616.5071778911333,
+    "gross_t_stat": 1.4773391033993435,
+    "mean_cost_bps": 14.588888888888885,
+    "mean_turnover_long": 0.42625,
+    "mean_turnover_short": 0.4855555555555556,
+    "net_mean_bps": 76.49012725360576,
+    "net_median_bps": 7.061779277779238,
+    "net_positive": true,
+    "share_weeks_net_positive_pct": 51
+  },
+  "train_double_cost": {
+    "n": 100,
+    "gross_mean_bps": 91.07901614249464,
+    "gross_median_bps": 20.950668166668127,
+    "gross_sd_bps": 616.5071778911333,
+    "gross_t_stat": 1.4773391033993435,
+    "mean_cost_bps": 29.17777777777777,
+    "mean_turnover_long": 0.42625,
+    "mean_turnover_short": 0.4855555555555556,
+    "net_mean_bps": 61.90123836471689,
+    "net_median_bps": -6.82710961110965,
+    "net_positive": true,
+    "share_weeks_net_positive_pct": 48
+  },
+  "train_at_superseded_floor": {
+    "n": 100,
+    "gross_mean_bps": 91.07901614249464,
+    "gross_median_bps": 20.950668166668127,
+    "gross_sd_bps": 616.5071778911333,
+    "gross_t_stat": 1.4773391033993435,
+    "mean_cost_bps": 10.02986111111111,
+    "mean_turnover_long": 0.42625,
+    "mean_turnover_short": 0.4855555555555556,
+    "net_mean_bps": 81.04915503138356,
+    "net_median_bps": 11.402057055557016,
+    "net_positive": true,
+    "share_weeks_net_positive_pct": 51
+  },
+  "quintile_profile": {
+    "means_bps": [
+      90.2572743682959,
+      101.27371455153236,
+      122.68943626279645,
+      169.20002835805914,
+      181.33629051079055
+    ],
+    "monotone": true
+  },
+  "power": {
+    "n": 100,
+    "sd_bps": 616.5071778911333,
+    "target_t": 3,
+    "detectable_bps": 184.95215336733997
+  },
+  "neighbours": [
+    {
+      "formation_weeks": 1,
+      "n": 101,
+      "gross_mean_bps": 54.60811582762855,
+      "gross_median_bps": -28.321381829497366,
+      "gross_sd_bps": 691.744255071239,
+      "gross_t_stat": 0.7933636859982474,
+      "mean_cost_bps": 25.337733773377312,
+      "mean_turnover_long": 0.7772277227722773,
+      "mean_turnover_short": 0.8063806380638061,
+      "net_mean_bps": 29.270382054251193,
+      "net_median_bps": -50.988048496164026,
+      "net_positive": true,
+      "share_weeks_net_positive_pct": 48.51485148514851
+    },
+    {
+      "formation_weeks": 2,
+      "n": 101,
+      "gross_mean_bps": 56.31160508783813,
+      "gross_median_bps": -38.894829908978984,
+      "gross_sd_bps": 650.3616049577496,
+      "gross_t_stat": 0.8701691841036904,
+      "mean_cost_bps": 17.982398239823983,
+      "mean_turnover_long": 0.530940594059406,
+      "mean_turnover_short": 0.592959295929593,
+      "net_mean_bps": 38.32920684801413,
+      "net_median_bps": -57.56149657564565,
+      "net_positive": true,
+      "share_weeks_net_positive_pct": 44.554455445544555
+    },
+    {
+      "formation_weeks": 4,
+      "n": 100,
+      "gross_mean_bps": 71.96138268180323,
+      "gross_median_bps": 53.874825151878774,
+      "gross_sd_bps": 625.6585116381118,
+      "gross_t_stat": 1.1501702820823532,
+      "mean_cost_bps": 12.813333333333333,
+      "mean_turnover_long": 0.3675,
+      "mean_turnover_short": 0.43333333333333335,
+      "net_mean_bps": 59.14804934846982,
+      "net_median_bps": 44.430380707434324,
+      "net_positive": true,
+      "share_weeks_net_positive_pct": 54
+    }
+  ],
+  "cost_floor_bps_per_side": 16,
+  "verdict": "UNDERPOWERED",
+  "closure_reason": "gross mean 91.1 bps is not distinguishable from zero in this sample, which can only detect 185 bps at t=3; absence of evidence, not evidence of absence, and a positive point estimate at this precision is not a finding"
+}
