@@ -5082,6 +5082,58 @@
       "reopen_criterion": "Only on a venue where a persistent funding premium and a tradeable spot leg exist on the SAME asset, evidenced before any return is measured. A larger asset universe on the present venues does not qualify.",
       "task_id": "TASK-AH-010",
       "source_of_record": "TASK-AH-010 Stage 0"
+    },
+    {
+      "record_type": "closure_decision",
+      "authority": "CHIEF_SCIENTIST",
+      "supersedes": [],
+      "law_ids": [],
+      "constraint_ids": [],
+      "evidence_paths": [
+        "reference/BOTALIN_DIRECTION_LITERATURE_REVIEW_2026-08-04.md"
+      ],
+      "fixture_flag": false,
+      "decided_at": "2026-08-05",
+      "decision_id": "CD.CROSS_EXCHANGE_LEADLAG",
+      "subject": "FAM.CROSS_EXCHANGE_LEADLAG",
+      "subject_kind": "DATA_ROUTE",
+      "disposition": "DATA_BLOCKED",
+      "decisive_measurement": "The archive contains exactly ONE tick-resolution venue. Of 27 catalogued sources, EDGE.DATA.TICKS is the only one at tick granularity; EDGE.DATA.HL_CASCADE, the only other venue present, records at 60s. There is no Binance source at all. A lead-lag measured in hundreds of milliseconds requires two millisecond-stamped streams and we hold one, so the question cannot be posed at any cost threshold.",
+      "decisive_metric": {
+        "tick_resolution_venues": 1,
+        "second_venue_cadence_s": 60,
+        "catalogued_sources": 27,
+        "required_streams": 2
+      },
+      "reopen_criterion": "All three, together. (a) A second venue recorded at tick or L2-event resolution with its own ingest timestamp captured at observation time, not the venue-reported timestamp. (b) A MEASURED clock offset between the two streams, published with its dispersion: two venues timestamps are not comparable until the offset is known, and an unmeasured offset would make any apparent lag indistinguishable from clock skew. (c) A pre-declared expectation that the cross-venue spread exceeds the audited 16 bps round trip for long enough to act, since our own measured 10-second dispersion is 3.6 bps and a spread below the floor is untradeable however reliably it is detected.",
+      "task_id": "TASK-AH-052",
+      "source_of_record": "direction triage 2026-08-05, verified against the catalogued source inventory",
+      "notes": "DATA_BLOCKED, not CLOSED_MEASURED: the hypothesis is well posed and the data is absent. Clause (b) is the one most likely to be skipped and is the reason this is recorded at all — a lead-lag study that omits clock alignment measures its own infrastructure, which is the same failure mode as DC.FUNDING.SETTLEMENT_TS_ONLY in a different guise."
+    },
+    {
+      "record_type": "closure_decision",
+      "authority": "CHIEF_SCIENTIST",
+      "supersedes": [],
+      "law_ids": [],
+      "constraint_ids": [],
+      "evidence_paths": [
+        "reference/BOTALIN_DIRECTION_LITERATURE_REVIEW_2026-08-04.md"
+      ],
+      "fixture_flag": false,
+      "decided_at": "2026-08-05",
+      "decision_id": "CD.SECTOR_IMBALANCE",
+      "subject": "FAM.CROSS_SECTIONAL_SECTOR_IMBALANCE",
+      "subject_kind": "DATA_ROUTE",
+      "disposition": "DATA_BLOCKED",
+      "decisive_measurement": "No sector taxonomy exists anywhere in the archive. A scan of all 27 catalogued data sources found zero carrying a sector, category, taxonomy or classification field. Sector-relative return cannot be computed without one, so the construct has no input.",
+      "decisive_metric": {
+        "sources_scanned": 27,
+        "sources_with_taxonomy": 0
+      },
+      "reopen_criterion": "A versioned, POINT-IN-TIME sector taxonomy: each assignment carries the date from which it held, and reassignments create a new record rather than overwriting the old one. Applying present-day labels backwards is look-ahead — a coin relabelled from one sector to another in 2026 would carry that label through 2024 data and encode knowledge of what it became. The taxonomy must also state its assignment rule, so that membership is auditable rather than editorial. A vendor list without dated history does not qualify.",
+      "task_id": "TASK-AH-052",
+      "source_of_record": "direction triage 2026-08-05, verified against the catalogued source inventory",
+      "notes": "Distinct from CD.WEEKLY_XSECT_MOMENTUM, which closed a cross-sectional signal on measured grounds; this one has never been measured because it has no input. If a taxonomy arrives, the underpowered finding recorded against the weekly cross-section applies to the sector variant too and should be checked before spending the data."
     }
   ]
 }

@@ -115,16 +115,29 @@ clause is a silent retry under R4 and must be refused.
 
 ## 7. Current registry
 
-Six decisions as of 2026-08-04:
+Eight decisions as of 2026-08-05:
 
-| id | subject | disposition |
-|---|---|---|
-| `CD.SWEEP_CONTINUATION` | FAM.SWEEP_CONTINUATION | CLOSED_MEASURED |
-| `CD.WEEKLY_XSECT_MOMENTUM` | FAM.WEEKLY_CROSS_SECTIONAL_MOMENTUM | CLOSED_UNDERPOWERED |
-| `CD.MAKER_EXECUTION_ROUTE` | METHOD.MAKER_EXECUTION_AS_COST_ESCAPE | CLOSED_MEASURED |
-| `CD.PRICE_PATTERN_CATEGORY` | METHOD.DIRECTION_FROM_PRICE_HISTORY | CLOSED_MEASURED |
-| `CD.SELECTION_ON_INSAMPLE_RANK` | METHOD.PRIORITISE_BY_IN_SAMPLE_RANK | CLOSED_MEASURED |
-| `CD.CARRY_CURRENT_IMPLEMENTATION` | FAM.CARRY | CLOSED_MEASURED |
+| id | subject | kind | disposition |
+|---|---|---|---|
+| `CD.SWEEP_CONTINUATION` | FAM.SWEEP_CONTINUATION | FAMILY | CLOSED_MEASURED |
+| `CD.MAKER_EXECUTION_ROUTE` | METHOD.MAKER_EXECUTION_AS_COST_ESCAPE | METHOD | CLOSED_MEASURED |
+| `CD.PRICE_PATTERN_CATEGORY` | METHOD.DIRECTION_FROM_PRICE_HISTORY | METHOD | CLOSED_MEASURED |
+| `CD.SELECTION_ON_INSAMPLE_RANK` | METHOD.PRIORITISE_BY_IN_SAMPLE_RANK | METHOD | CLOSED_MEASURED |
+| `CD.CARRY_CURRENT_IMPLEMENTATION` | FAM.CARRY | FAMILY | CLOSED_MEASURED |
+| `CD.WEEKLY_XSECT_MOMENTUM` | FAM.WEEKLY_CROSS_SECTIONAL_MOMENTUM | FAMILY | CLOSED_UNDERPOWERED |
+| `CD.CROSS_EXCHANGE_LEADLAG` | FAM.CROSS_EXCHANGE_LEADLAG | DATA_ROUTE | DATA_BLOCKED |
+| `CD.SECTOR_IMBALANCE` | FAM.CROSS_SECTIONAL_SECTOR_IMBALANCE | DATA_ROUTE | DATA_BLOCKED |
+
+The two `DATA_BLOCKED` routes were added by the direction triage of 2026-08-05, which ran the
+three feasibility checks — data, cost threshold, cadence — against five proposed vectors before
+any code was written. Three of the five were already covered by existing records; these two were
+not, and both fail on data rather than on measurement.
+
+A `DATA_BLOCKED` entry carries a heavier burden than its brevity suggests. Its reopen criterion
+must name a dataset precise enough that a half-satisfying one can be refused: a second venue
+without a *measured clock offset* cannot answer a lead-lag question, and a sector taxonomy
+without *dated history* encodes look-ahead. Both are written that way, and a test asserts every
+data-blocked route quantifies the absence it claims.
 
 **Three of the six close a method rather than a family.** That is the point of the role: a
 programme that only ever closes strategies will keep rediscovering the same way of being wrong.

@@ -1578,7 +1578,7 @@ test('a measured closure must point at something measured', () => {
 
 test('the seed registry closes methods as well as families', () => {
   const reg = seedCatalog.records.closure_decisions;
-  assert(reg.length === 6, `expected six seed decisions, got ${reg.length}`);
+  assert(reg.length === 8, `expected eight seed decisions, got ${reg.length}`);
   const methods = reg.filter((d) => d.subject_kind === 'METHOD');
   assert(methods.length === 3,
     'a programme that only ever closes strategies keeps rediscovering the same way of being wrong');
@@ -1599,9 +1599,23 @@ test('underpowered and measured closures are never conflated in the seed', () =>
     'and it must state what WAS ruled out, so the label is not just a hedge');
 });
 
+test('a data-blocked route names the data that would lift it, not merely that it is blocked', () => {
+  const blocked = seedCatalog.records.closure_decisions.filter((d) => d.disposition === 'DATA_BLOCKED');
+  assert(blocked.length === 2, `expected two data-blocked routes, got ${blocked.length}`);
+  for (const d of blocked) {
+    assert(d.subject_kind === 'DATA_ROUTE', `${d.decision_id}: a blocked route is not a family verdict`);
+    // The decisive measurement of a DATA_BLOCKED entry is a fact about the archive, so it must
+    // carry a count rather than a market number: "we looked and it is not there".
+    assert(d.decisive_metric && Object.keys(d.decisive_metric).length > 0,
+      `${d.decision_id}: must quantify the absence it claims`);
+    assert(d.reopen_criterion.length > 100,
+      `${d.decision_id}: a one-line reopen criterion invites a half-satisfying dataset`);
+  }
+});
+
 test('query "closures" orders measured before underpowered and reports both criteria', () => {
   const rows = runQuery(seedCatalog, 'closures', {});
-  assert(rows.length === 6, 'every decision is returned');
+  assert(rows.length === 8, 'every decision is returned');
   const firstUnder = rows.findIndex((d) => d.disposition === 'CLOSED_UNDERPOWERED');
   const lastMeasured = rows.map((d) => d.disposition).lastIndexOf('CLOSED_MEASURED');
   assert(lastMeasured < firstUnder,
