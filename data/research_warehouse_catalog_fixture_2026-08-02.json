@@ -4628,6 +4628,112 @@
       "fixture_flag": false,
       "source_of_record": "exploratory descriptive measurement over axisA/aligned.json, 534,051 rows, 18 symbols, 375 days",
       "notes": "UNRESOLVED, recorded deliberately. The persistent negative mean of -5 to -8 bps may be an artifact of our own join rather than a property of the market. Two candidate explanations were considered. A timing lag between the spot and perp bar is the obvious one, but it is weakened by the evidence: a lag artifact scales with volatility, yet the mean sits in a narrow -5 to -8 band while the standard deviation varies twentyfold across symbols. A constant definitional offset -- perp mark price against spot last trade, or an index versus a venue price -- fits the observed near-constancy better. Neither was tested. The decision-relevant part of this law is the DISPERSION, which is robust to any additive offset: shifting every observation by 8 bps cannot move BTC from 13.7 sigma to within reach of the floor. The mean is recorded for completeness and must not be cited as evidence of backwardation until the review criterion is met. The t-statistic is reported with autocorrelation adjustment but cannot distinguish a real effect from a systematic offset, and so carries no weight on this question."
+    },
+    {
+      "record_type": "market_law",
+      "law_id": "LAW.FLOW.SWEEP_CONTINUATION_SATURATES",
+      "subtype": "empirical_market_law",
+      "title": "Post-sweep continuation rises with sweep size and saturates below the cost floor",
+      "statement": "After a multi-level aggressive parent order, price continues in the sweep direction, and the size of that continuation rises monotonically with the sweep notional measured as a percentile rank within its own symbol. It also saturates: from 4.40 bps below the median to 8.27 bps for the largest one in a thousand, with the gain per doubling of percentile shrinking at the top. The relation is measured across nine bands with t running from 72.7 to 5.7. At no size does it reach the audited 16 bps round-trip floor. Conditioning it further on the pre-sweep depth response of the side about to be consumed adds nothing: a 5x5 double sort on within-symbol notional rank and depth-response rank is flat in the depth dimension at every size and at 60s, 300s and 900s, and the maximum of all 75 reportable cells is 10.27 bps.",
+      "condition": "multi-level parent sweeps reconstructed at a 100 ms burst gap on 10 Bybit symbols over 13 days; entry at the mid at sweep completion; notional ranked within symbol, never pooled across symbols",
+      "horizon": "60s primary; the same ordering holds at 300s and 900s",
+      "effect": {
+        "continuation_bps_by_within_symbol_percentile": {
+          "0-50": 4.4,
+          "50-80": 4.4,
+          "80-90": 6.08,
+          "90-95": 6.68,
+          "95-98": 7.01,
+          "98-99": 7.1,
+          "99-99.5": 7.31,
+          "99.5-99.9": 7.63,
+          "99.9-100": 8.27
+        },
+        "n_by_band": {
+          "0-50": 152246,
+          "50-80": 91349,
+          "80-90": 30448,
+          "90-95": 15225,
+          "95-98": 9135,
+          "98-99": 3045,
+          "99-99.5": 1523,
+          "99.5-99.9": 1216,
+          "99.9-100": 301
+        },
+        "t_by_band": {
+          "0-50": 72.7,
+          "50-80": 53.3,
+          "80-90": 41.2,
+          "90-95": 30.5,
+          "95-98": 25.8,
+          "98-99": 13.9,
+          "99-99.5": 11.4,
+          "99.5-99.9": 8.7,
+          "99.9-100": 5.7
+        },
+        "double_sort_extreme_cell_bps": 7.35,
+        "double_sort_extreme_cell_t": 8.96,
+        "double_sort_max_reportable_cell_bps": 10.27,
+        "cost_floor_bps": 16,
+        "depth_conditioner_orders_anything": false
+      },
+      "n": 304187,
+      "t_stat": 5.7,
+      "ci_low": 3.4,
+      "ci_high": 11.2,
+      "segment": "TRAIN",
+      "data_source_ids": [
+        "EDGE.DATA.TICKS",
+        "EDGE.DATA.OB"
+      ],
+      "transform_version": "ah051_sweep_depth_double_sort.mjs Stage 0, 2026-08-04; sweeps from the AH-046 parent reconstruction at the frozen 100 ms gap",
+      "null_test": {
+        "status": "NOT_RUN",
+        "reason": "Stage 0 closed on a measured shortfall against the cost floor, so no rule was formed for a matched null to shuffle"
+      },
+      "oos": {
+        "status": "NOT_RUN",
+        "reason": "train segment only by contract; 24,393 sealed events were left untouched because the gate closed"
+      },
+      "remove_best": {
+        "status": "NOT_RUN",
+        "reason": "Stage 0 closed before robustness checks; the ordering does hold across all ten symbols pooled but per-symbol removal was not run"
+      },
+      "mechanism_claim": "A large aggressive order both reveals information and consumes liquidity, and the price adjustment it triggers is partly complete by the time the order finishes. Entering at completion collects only the remainder. Larger orders reveal more but also consume more of their own move before completion, which is why the relation rises and then flattens. The pre-sweep state of the consumed book side does not discriminate, which suggests the remaining move is dispersion rather than a conditional expectation.",
+      "exploitability_class": "KNOWLEDGE_ONLY",
+      "temporal_stability": "One archive, 13 days, 10 symbols. The monotone ordering held across all nine bands and at all three horizons within that archive; persistence across regimes is untested.",
+      "status": "observed",
+      "review_criterion": "Promote to replicated only on a second non-overlapping archive of at least 10 days covering at least 20 symbols, with the band ordering reproduced. Mark broken if any band above the 99th percentile reaches the audited round-trip floor, which would reopen the family.",
+      "tested_variants": [
+        {
+          "variant": "full notional range, nine within-symbol percentile bands",
+          "result": "monotone 4.40 -> 8.27 bps, t from 72.7 to 5.7"
+        },
+        {
+          "variant": "5x5 double sort, notional rank x pre-sweep depth response",
+          "result": "flat in the depth dimension at every size; extreme cell 7.35 bps, t=8.96, not monotone"
+        },
+        {
+          "variant": "300s and 900s neighbours",
+          "result": "same absence of ordering in the depth dimension; max reportable cell 10.27 bps across all 75"
+        },
+        {
+          "variant": "raw notional pooled across symbols -- REJECTED AS A DEFECT",
+          "result": "produced a grid running backwards against a direct per-symbol measurement; the pooled sort ranks symbols rather than events and must never be used"
+        },
+        {
+          "variant": "guard predicate as the conditioner -- not run",
+          "result": "rejected a priori: during a large sweep the guard flow term is dominated by the sweep itself and carries almost no variation to sort on"
+        }
+      ],
+      "task_id": "TASK-AH-051",
+      "evidence_paths": [
+        "reference/AH051_SWEEP_DEPTH_DOUBLE_SORT_PROTOCOL_2026-08-04.md",
+        "tasks/results/TASK-AH-051-SWEEP-DEPTH-DOUBLE-SORT-V0-RESULT.md"
+      ],
+      "fixture_flag": false,
+      "source_of_record": "TASK-AH-051 Stage 0 over 553,615 sweeps, 30,454 train events after the decile cut",
+      "notes": "The headline n and precision are quoted on the top band, the 99.9-100th percentile, because that is the band the exploitability question turns on: it is the best case and it still falls 7.7 bps short of the floor. The interval is the normal-approximation interval on that band. Lower bands carry far larger n and t, as the effect table shows. This law closes the AH-048 conditioning route; it does not close the observation that 32 percent of large-sweep events at 900s exceed 11 bps, which remains true and remains dispersion rather than a tradeable conditional mean."
     }
   ],
   "data_constraints": [

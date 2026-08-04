@@ -1468,12 +1468,12 @@ test('a data constraint is scoped to named existing sources', () => {
 
 test('the seed laws are correctly typed and none overclaims its status', () => {
   const laws = seedCatalog.records.market_laws;
-  assert(laws.length === 5, `expected five seed laws, got ${laws.length}`);
+  assert(laws.length === 6, `expected six seed laws, got ${laws.length}`);
   const identity = laws.filter((l) => l.subtype === 'mechanical_identity');
   const empirical = laws.filter((l) => l.subtype === 'empirical_market_law');
   assert(identity.length === 1 && identity[0].law_id === 'LAW.BOOK.LEVEL_SIZE_IDENTITY', 'one identity');
   assert(identity[0].n === null && identity[0].t_stat === null, 'the identity carries no measurement');
-  assert(empirical.length === 4, `expected four empirical laws, got ${empirical.length}`);
+  assert(empirical.length === 5, `expected five empirical laws, got ${empirical.length}`);
 
   for (const l of empirical) {
     assert(l.status !== 'proven', `${l.law_id} may never claim proof`);
@@ -1512,9 +1512,9 @@ test('the seed laws are correctly typed and none overclaims its status', () => {
 
 test('the catalogue summary separates identities from empirical laws', () => {
   const s = seedCatalog.law_catalogue;
-  assert(s.identities === 1 && s.empirical === 4, `unexpected split ${JSON.stringify(s)}`);
+  assert(s.identities === 1 && s.empirical === 5, `unexpected split ${JSON.stringify(s)}`);
   assert(s.constraints === 2 && s.constraints_confirmed === 2, 'constraint counts');
-  assert(s.by_status.proven === 1 && s.by_status.observed === 4, 'status breakdown');
+  assert(s.by_status.proven === 1 && s.by_status.observed === 5, 'status breakdown');
   assert(s.by_status.replicated === undefined, 'nothing in the seed claims replication');
 });
 
