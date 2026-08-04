@@ -1494,17 +1494,26 @@ test('the seed laws are correctly typed and none overclaims its status', () => {
     'all checks passing does not make it replicated: the producing task gated DATA_INADEQUATE on sample span');
   assert(guard.review_criterion.includes('non-overlapping'), 'promotion requires a second independent archive span');
 
-  assert(seedCatalog.records.data_constraints.length === 1, 'one constraint');
-  const dc = seedCatalog.records.data_constraints[0];
+  assert(seedCatalog.records.data_constraints.length === 2, 'two constraints');
+  const dc = seedCatalog.records.data_constraints.find((x) => x.constraint_id === 'DC.FUNDING.SETTLEMENT_TS_ONLY');
+  assert(dc, 'the funding constraint is present');
   assert(dc.scope_source_ids.length === 1 && dc.scope_source_ids[0] === 'EDGE.DATA.DISPERSION',
     'the funding constraint is scoped to one dataset, not to all funding archives');
   assert(dc.status === 'confirmed', 'the constraint is confirmed');
+  // The cost constraint is scoped to a GAP source rather than to any engine, because the
+  // defect is a missing fee schedule and not a bug in any one script.
+  const cc = seedCatalog.records.data_constraints.find((x) => x.constraint_id === 'DC.COST.RESEARCH_FLOOR_IS_FEE_ONLY');
+  assert(cc, 'the cost-floor constraint is present');
+  assert(cc.scope_source_ids.length === 1 && cc.scope_source_ids[0] === 'GAP.COST.FEE_SCHEDULE',
+    'the cost constraint is scoped to the missing fee schedule');
+  assert(cc.consequence.includes('reopens none'),
+    'the correction must state that it deepens every closure rather than reopening one');
 });
 
 test('the catalogue summary separates identities from empirical laws', () => {
   const s = seedCatalog.law_catalogue;
   assert(s.identities === 1 && s.empirical === 4, `unexpected split ${JSON.stringify(s)}`);
-  assert(s.constraints === 1 && s.constraints_confirmed === 1, 'constraint counts');
+  assert(s.constraints === 2 && s.constraints_confirmed === 2, 'constraint counts');
   assert(s.by_status.proven === 1 && s.by_status.observed === 4, 'status breakdown');
   assert(s.by_status.replicated === undefined, 'nothing in the seed claims replication');
 });
@@ -1519,9 +1528,12 @@ test('query "laws" hides precision on an identity and shows it on an empirical l
 
 test('query "constraints" reports scope and the review criterion', () => {
   const c = runQuery(seedCatalog, 'constraints', {});
-  assert(c.length === 1, 'one constraint');
-  assert(c[0].scope_source_ids.includes('EDGE.DATA.DISPERSION'), 'scope named');
-  assert(c[0].review_criterion.includes('publication_ts'), 'the review criterion names what would lift it');
+  assert(c.length === 2, 'two constraints');
+  const funding = c.find((x) => x.constraint_id === 'DC.FUNDING.SETTLEMENT_TS_ONLY');
+  assert(funding.scope_source_ids.includes('EDGE.DATA.DISPERSION'), 'scope named');
+  assert(funding.review_criterion.includes('publication_ts'), 'the review criterion names what would lift it');
+  assert(c.every((x) => x.review_criterion && x.scope_source_ids.length > 0),
+    'every constraint names its scope and what would lift it');
   assert(runQuery(seedCatalog, 'constraints', { source: 'EDGE.DATA.OB' }).length === 0, 'scope filter works');
 });
 
