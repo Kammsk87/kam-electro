@@ -4724,6 +4724,14 @@
         {
           "variant": "guard predicate as the conditioner -- not run",
           "result": "rejected a priori: during a large sweep the guard flow term is dominated by the sweep itself and carries almost no variation to sort on"
+        },
+        {
+          "variant": "Hawkes self-excitation intensity as the conditioner, tau 1s / 10s / 60s",
+          "result": "Rejected. The conditioner IS independent of notional -- within-symbol Spearman of intensity rank against notional rank is -0.038, -0.045 and -0.049 at the three decay constants, so it is not size wearing a different name. But it does not order the top notional row: 6.33/6.35/6.42/6.17/6.44 at 1s, 6.39/6.38/6.57/6.26/6.11 at 10s, 6.65/6.35/5.97/6.80/5.94 at 60s -- flat at all three and monotone at none. The maximum cell in that row is 6.80 bps against the 16 bps floor. Measured on 304,494 train sweeps, 12,182 events per cell, top-row t between 20.6 and 40.2."
+        },
+        {
+          "variant": "Hawkes intensity pooled across all notional levels",
+          "result": "Continuation DECLINES mildly with intensity rather than rising: quintile means 4.95/4.99/4.78/4.92/4.31 at tau 1s and 5.07/4.87/4.90/4.82/4.30 at tau 60s, t between 34.7 and 76.0. The self-excitation thesis predicts the opposite, so this refutes the cascade story rather than leaving it open."
         }
       ],
       "task_id": "TASK-AH-051",
@@ -4733,7 +4741,7 @@
       ],
       "fixture_flag": false,
       "source_of_record": "TASK-AH-051 Stage 0 over 553,615 sweeps, 30,454 train events after the decile cut",
-      "notes": "The headline n and precision are quoted on the top band, the 99.9-100th percentile, because that is the band the exploitability question turns on: it is the best case and it still falls 7.7 bps short of the floor. The interval is the normal-approximation interval on that band. Lower bands carry far larger n and t, as the effect table shows. This law closes the AH-048 conditioning route; it does not close the observation that 32 percent of large-sweep events at 900s exceed 11 bps, which remains true and remains dispersion rather than a tradeable conditional mean."
+      "notes": "The headline n and precision are quoted on the top band, the 99.9-100th percentile, because that is the band the exploitability question turns on: it is the best case and it still falls 7.7 bps short of the floor. The interval is the normal-approximation interval on that band. Lower bands carry far larger n and t, as the effect table shows. This law closes the AH-048 conditioning route; it does not close the observation that 32 percent of large-sweep events at 900s exceed 11 bps, which remains true and remains dispersion rather than a tradeable conditional mean. A reopen under the closure criterion was attempted on 2026-08-05 using Hawkes self-excitation intensity and refused; see the two variants above and CD.SWEEP_CONTINUATION."
     },
     {
       "record_type": "market_law",
@@ -4921,7 +4929,7 @@
       "reopen_criterion": "Only on a round-trip cost position below roughly 8 bps, or on a new conditioner that is not derived from the pre-sweep book state and orders the top notional row monotonically. A different percentile cut on the same conditioner is a parameter search and does not qualify.",
       "task_id": "TASK-AH-051",
       "source_of_record": "TASK-AH-051 Stage 0 over 553,615 sweeps",
-      "notes": "The paying tail is real -- 32 percent of AH-048 events at 900s exceeded 11 bps -- but it is dispersion, not a conditional mean, and this closure says only that it is not identifiable in advance."
+      "notes": "The paying tail is real -- 32 percent of AH-048 events at 900s exceeded 11 bps -- but it is dispersion, not a conditional mean, and this closure says only that it is not identifiable in advance. REOPEN ATTEMPTED AND REFUSED 2026-08-05. Hawkes self-excitation intensity from the sweep arrival stream satisfies the FIRST clause of the reopen criterion: it is not derived from the pre-sweep book state, and its within-symbol Spearman against notional rank is -0.04 at every declared decay constant, so it identifies a genuinely different subset. It fails the SECOND clause at all three constants -- the top notional row is flat in intensity and monotone at none of tau 1s, 10s or 60s, with a maximum cell of 6.80 bps against the 16 bps floor. Pooled across notional levels the relation runs mildly the WRONG way, 4.95 down to 4.31 bps, which refutes the cascade thesis rather than leaving it open. A further attempt on the same conditioner at a different decay constant is a parameter search and does not qualify."
     },
     {
       "record_type": "closure_decision",
