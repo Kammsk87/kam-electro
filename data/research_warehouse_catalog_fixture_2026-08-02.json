@@ -5134,6 +5134,41 @@
       "task_id": "TASK-AH-052",
       "source_of_record": "direction triage 2026-08-05, verified against the catalogued source inventory",
       "notes": "Distinct from CD.WEEKLY_XSECT_MOMENTUM, which closed a cross-sectional signal on measured grounds; this one has never been measured because it has no input. If a taxonomy arrives, the underpowered finding recorded against the weekly cross-section applies to the sector variant too and should be checked before spending the data."
+    },
+    {
+      "record_type": "closure_decision",
+      "decision_id": "CD.OFI_AS_DIRECTION",
+      "subject": "METHOD.ORDER_FLOW_IMBALANCE_AS_DIRECTION",
+      "subject_kind": "METHOD",
+      "disposition": "CLOSED_MEASURED",
+      "authority": "CHIEF_SCIENTIST",
+      "decisive_measurement": "Parent order flow imbalance carries +0.073 bps out of sample at a gross t of 0.50 over 56,073 observations, against an audited 16 bps round trip. Reconstructed at the frozen 100 ms burst gap over 553,632 parent orders. The same signal used SUPPRESSIVELY rather than directionally is the only surviving result in the programme: the execution guard measures +0.715 bps of avoided adverse move at t=20.1 over 779,540 observations with all three checks PASS.",
+      "decisive_metric": {
+        "directional_oos_bps": 0.073,
+        "directional_gross_t": 0.5,
+        "directional_n": 56073,
+        "suppressive_bps": 0.715,
+        "suppressive_t": 20.1,
+        "suppressive_n": 779540,
+        "cost_floor_bps": 16
+      },
+      "reopen_criterion": "Only on order-book data at EVENT resolution rather than snapshots. The canonical construct measures limit adds, cancels and market orders at the touch between consecutive events; our book is written at a measured 10,000 ms median cadence, which is not that object. A reopen must also carry the staleness curve required by the G3 guard protocol, since a feed change that does not move the mean decision staleness changes nothing. Recomputing the same snapshot-based quantity at a different aggregation is a parameter search and does not qualify.",
+      "supersedes": [
+        "TASK-AH-046"
+      ],
+      "law_ids": [
+        "LAW.EXEC.FLOW_DEPTH_AGREEMENT_PREDICTS_ADVERSE"
+      ],
+      "constraint_ids": [],
+      "task_id": "TASK-AH-046",
+      "decided_at": "2026-08-05",
+      "evidence_paths": [
+        "reference/AH046_PARENT_ORDER_FLOW_IMBALANCE_PROTOCOL_2026-08-03.md",
+        "reference/BOTALIN_DIRECTION_LITERATURE_REVIEW_2026-08-04.md"
+      ],
+      "fixture_flag": false,
+      "source_of_record": "TASK-AH-046 out-of-sample result, reclassified by the direction triage 2026-08-05",
+      "notes": "This closes a METHOD in one use and confirms it in another, which is why it is recorded rather than left implicit. It matches Cont, Kukanov and Stoikov exactly: order flow imbalance explains the repricing happening NOW, with a slope inversely proportional to depth. From that it follows that stepping into the move is costly -- which is the guard -- and it does not follow that the next move is predictable, which is AH-046. The programme measured both halves independently before reading the paper. OFI is hereby fixed as a filtering instrument in the guard lane and may not be proposed again as a direction source without satisfying the reopen criterion."
     }
   ]
 }

@@ -115,7 +115,7 @@ clause is a silent retry under R4 and must be refused.
 
 ## 7. Current registry
 
-Eight decisions as of 2026-08-05:
+Nine decisions as of 2026-08-05:
 
 | id | subject | kind | disposition |
 |---|---|---|---|
@@ -123,6 +123,7 @@ Eight decisions as of 2026-08-05:
 | `CD.MAKER_EXECUTION_ROUTE` | METHOD.MAKER_EXECUTION_AS_COST_ESCAPE | METHOD | CLOSED_MEASURED |
 | `CD.PRICE_PATTERN_CATEGORY` | METHOD.DIRECTION_FROM_PRICE_HISTORY | METHOD | CLOSED_MEASURED |
 | `CD.SELECTION_ON_INSAMPLE_RANK` | METHOD.PRIORITISE_BY_IN_SAMPLE_RANK | METHOD | CLOSED_MEASURED |
+| `CD.OFI_AS_DIRECTION` | METHOD.ORDER_FLOW_IMBALANCE_AS_DIRECTION | METHOD | CLOSED_MEASURED |
 | `CD.CARRY_CURRENT_IMPLEMENTATION` | FAM.CARRY | FAMILY | CLOSED_MEASURED |
 | `CD.WEEKLY_XSECT_MOMENTUM` | FAM.WEEKLY_CROSS_SECTIONAL_MOMENTUM | FAMILY | CLOSED_UNDERPOWERED |
 | `CD.CROSS_EXCHANGE_LEADLAG` | FAM.CROSS_EXCHANGE_LEADLAG | DATA_ROUTE | DATA_BLOCKED |
@@ -139,8 +140,13 @@ without a *measured clock offset* cannot answer a lead-lag question, and a secto
 without *dated history* encodes look-ahead. Both are written that way, and a test asserts every
 data-blocked route quantifies the absence it claims.
 
-**Three of the six close a method rather than a family.** That is the point of the role: a
+**Four of the nine close a method rather than a family.** That is the point of the role: a
 programme that only ever closes strategies will keep rediscovering the same way of being wrong.
-The three are the maker route as a cost escape, direction inferred from price history, and
-prioritising by in-sample rank — none of which is a strategy, and each of which would otherwise
-have kept generating them.
+They are the maker route as a cost escape, direction inferred from price history, prioritising
+by in-sample rank, and order-flow imbalance used as a direction source — none of which is a
+strategy, and each of which would otherwise have kept generating them.
+
+`CD.OFI_AS_DIRECTION` is the instructive one: it closes a method in one use and **confirms it in
+another**. Order flow imbalance fails as a predictor at +0.073 bps and t = 0.50, and the same
+signal used suppressively is the guard, the only surviving result in the programme. A registry
+that could only record failure would have lost that distinction.
