@@ -1,0 +1,84 @@
+{
+  "symbol": "AAVEUSDT",
+  "tick_span": [
+    "2026-07-15T00:00:00.191Z",
+    "2026-07-15T23:59:55.727Z"
+  ],
+  "ticks": 111140,
+  "snapshots_used": 8630,
+  "horizon_ms": 60000,
+  "deltas_ms": [
+    0,
+    1000,
+    3000,
+    5000,
+    8000
+  ],
+  "rows": [
+    {
+      "delta_ms": 0,
+      "n_allow": 14047,
+      "n_veto": 3213,
+      "veto_rate_pct": 18.61529548088065,
+      "allow_mean_bps": 0.06200975157360431,
+      "veto_mean_bps": -0.2711020791641519,
+      "separation_bps": 0.33311183073775624,
+      "se_bps": 0.17313559106167897,
+      "t_stat": 1.9239939558070775,
+      "no_data": 0,
+      "retained_pct": 100
+    },
+    {
+      "delta_ms": 1000,
+      "n_allow": 14047,
+      "n_veto": 3213,
+      "veto_rate_pct": 18.61529548088065,
+      "allow_mean_bps": 0.05107468012986525,
+      "veto_mean_bps": -0.22329475001064944,
+      "separation_bps": 0.2743694301405147,
+      "se_bps": 0.17311509235505046,
+      "t_stat": 1.5848960735196709,
+      "no_data": 0,
+      "retained_pct": 82.36556159919557
+    },
+    {
+      "delta_ms": 3000,
+      "n_allow": 14047,
+      "n_veto": 3213,
+      "veto_rate_pct": 18.61529548088065,
+      "allow_mean_bps": 0.050461106183457526,
+      "veto_mean_bps": -0.2206122497849446,
+      "separation_bps": 0.2710733559684021,
+      "se_bps": 0.17323418393055665,
+      "t_stat": 1.564779824731738,
+      "no_data": 0,
+      "retained_pct": 81.3760818305507
+    },
+    {
+      "delta_ms": 5000,
+      "n_allow": 14047,
+      "n_veto": 3213,
+      "veto_rate_pct": 18.61529548088065,
+      "allow_mean_bps": 0.03374942117840509,
+      "veto_mean_bps": -0.14754999044290582,
+      "separation_bps": 0.1812994116213109,
+      "se_bps": 0.17428296751668812,
+      "t_stat": 1.0402589203328256,
+      "no_data": 0,
+      "retained_pct": 54.425989980535896
+    },
+    {
+      "delta_ms": 8000,
+      "n_allow": 14047,
+      "n_veto": 3213,
+      "veto_rate_pct": 18.61529548088065,
+      "allow_mean_bps": 0.01922973091841617,
+      "veto_mean_bps": -0.08407097112075707,
+      "separation_bps": 0.10330070203917324,
+      "se_bps": 0.17511773689587165,
+      "t_stat": 0.5898928564877344,
+      "no_data": 0,
+      "retained_pct": 31.01081754148119
+    }
+  ]
+}

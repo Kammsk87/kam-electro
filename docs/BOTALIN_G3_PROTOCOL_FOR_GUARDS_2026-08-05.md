@@ -75,6 +75,14 @@ not only at its boundary:
 - offsets at 25, 50 and 75 percent of the median interval;
 - each with the declared latency band added.
 
+A pilot against this section was run on 2026-08-05 (`reference/GUARD_STALENESS_DECAY_PILOT_2026-08-05.md`).
+It confirms the section's premise and sharpens it: on one symbol-day the separation retains 82
+percent at 1 s, 81 percent at 3 s, **54 percent at 5 s** and 31 percent at 8 s, with the decay
+carried by the VETO side rising toward zero — the adverse move is largely consumed within the
+first seconds. At a 10-second cadence a real intent carries a mean staleness near 5 seconds, so
+the expected retention is about half. The pilot is underpowered on its own (t = 1.92 even at
+offset 0) and is a shape indication, not a measurement.
+
 **Kill condition specific to guards:** if the measured separation decays to zero by the 50
 percent offset, the guard is an artifact of snapshot alignment rather than a usable execution
 policy, and no latency engineering rescues it — the input simply is not there when the decision
