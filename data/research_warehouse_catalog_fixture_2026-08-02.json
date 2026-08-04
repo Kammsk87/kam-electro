@@ -4312,31 +4312,40 @@
       "law_id": "LAW.COST.HORIZON_VS_ROUNDTRIP",
       "subtype": "empirical_market_law",
       "title": "Below roughly five minutes the round-trip cost exceeds one standard deviation of the move",
-      "statement": "Mid-move dispersion scales with horizon while the round-trip cost is a constant, so the share of moves able to pay 11 bps rises from 1.6 percent at 10 seconds to 48.1 percent at 5 minutes. At 60 seconds the 11 bps floor exceeds the 8.6 bps standard deviation of the move, which closes an unfiltered taker route at that horizon regardless of signal quality.",
-      "condition": "mid-to-mid move measured on the recorded book, against the frozen 11 bps round-trip taker cost",
-      "horizon": "10s, 1m, 5m, 15m, 1h",
+      "statement": "Mid-move dispersion scales with horizon while the round-trip cost is a constant, so the share of moves able to pay the floor rises from 1.6 percent at 10 seconds to 48.1 percent at 5 minutes and 97.7 percent at one week. At 60 seconds the floor exceeds the 8.6 bps standard deviation of the move, which closes an unfiltered taker route at that horizon regardless of signal quality. At one week the relation has inverted completely: weekly single-symbol dispersion is 1397 bps, and the audited 16 bps floor is crossed by 97.7 percent of moves. The floor therefore binds through the holding horizon, not through the market.",
+      "condition": "mid-to-mid move measured on the recorded book for horizons up to 1h against the frozen 11 bps round-trip taker cost; the 1w row is measured on weekly closes for 87 symbols over 50 weeks against the audited 16 bps floor",
+      "horizon": "10s, 1m, 5m, 15m, 1h, 1w",
       "effect": {
         "sd_bps": {
           "10s": 3.6,
           "1m": 8.6,
           "5m": 19.5,
           "15m": 35.5,
-          "1h": 57.6
+          "1h": 57.6,
+          "1w": 1397
         },
         "share_beyond_11bps_pct": {
           "10s": 1.6,
           "1m": 16.2,
           "5m": 48.1,
           "15m": 71.6,
-          "1h": 95.7
+          "1h": 95.7,
+          "1w": 98
         },
         "n_by_horizon": {
           "10s": 8637,
           "1m": 1439,
           "5m": 287,
           "15m": 95,
-          "1h": 23
-        }
+          "1h": 23,
+          "1w": 4350
+        },
+        "share_beyond_audited_16bps_pct": {
+          "1w": 97.7
+        },
+        "weekly_median_abs_move_bps": 751,
+        "weekly_measured_turnover_cost_bps": 14.74,
+        "weekly_longshort_dispersion_bps": 602.96
       },
       "n": 8637,
       "t_stat": 0,
@@ -4344,7 +4353,8 @@
       "ci_high": 0,
       "segment": "UNSPECIFIED",
       "data_source_ids": [
-        "EDGE.DATA.OB"
+        "EDGE.DATA.OB",
+        "EDGE.DATA.BARS"
       ],
       "transform_version": "probe_horizon.mjs; AAVEUSDT 2026-07-15",
       "null_test": {
@@ -4363,7 +4373,7 @@
       "exploitability_class": "KNOWLEDGE_ONLY",
       "temporal_stability": "the monotone shape is structural; the specific crossover horizon is symbol and volatility dependent and will move with regime",
       "status": "observed",
-      "review_criterion": "Replicate the crossover horizon across at least 20 symbols and two volatility regimes. The 1h row rests on n=23 and must not be quoted as established.",
+      "review_criterion": "Replicate the crossover horizon across at least 20 symbols and two volatility regimes. The 1h row rests on n=23 and must not be quoted as established. The 1w row rests on a survivorship-selected universe of 87 symbols that carried a complete year, and must not be quoted without that caveat. Mark broken if a weekly measurement on a comparable universe puts the cost share above 20 percent.",
       "tested_variants": [
         {
           "variant": "10s",
@@ -4388,15 +4398,33 @@
         {
           "variant": "4h",
           "result": "insufficient samples in one symbol-day; not reported"
+        },
+        {
+          "variant": "1w single-symbol move",
+          "result": "sd 1397 bps, 97.7 percent beyond the audited 16 bps floor, median absolute move 751 bps, n=4350 over 87 symbols and 50 weeks"
+        },
+        {
+          "variant": "1w cross-sectional long-short, measured turnover",
+          "result": "cost 14.74 bps against 602.96 bps weekly dispersion, 2.4 percent; at the 32 bps stress, 4.9 percent"
+        },
+        {
+          "variant": "1w turnover measured rather than assumed",
+          "result": "42 percent of the long book and 50 percent of the short book replaced per rebalance; a full-replacement assumption overstates the cost by roughly a factor of two"
+        },
+        {
+          "variant": "15m sweep continuation, AH-048, for contrast",
+          "result": "16 bps floor against an 8.94 bps mean move -- 179 percent, the floor binds"
         }
       ],
       "task_id": "TASK-AH-046",
       "evidence_paths": [
-        "reference/BOTALIN_RESEARCH_PIPELINE_PROTOCOL_2026-08-03.md"
+        "reference/BOTALIN_RESEARCH_PIPELINE_PROTOCOL_2026-08-03.md",
+        "reference/AH050_WEEKLY_CROSS_SECTIONAL_MOMENTUM_PROTOCOL_2026-08-04.md",
+        "tasks/results/TASK-AH-050-WEEKLY-CROSS-SECTIONAL-MOMENTUM-V0-RESULT.md"
       ],
       "fixture_flag": false,
       "source_of_record": "horizon probe, 2026-08-03, AAVEUSDT 2026-07-15",
-      "notes": "t_stat and the interval are zero-width because this is a dispersion table rather than a directional effect; the meaningful uncertainty is the per-horizon n."
+      "notes": "t_stat and the interval are zero-width because this is a dispersion table rather than a directional effect; the meaningful uncertainty is the per-horizon n. The 1w row was added by TASK-AH-050 and carries two caveats that the shorter horizons do not: the universe is selected on having survived a full year with an unbroken series, and the producing task closed UNDERPOWERED. Nothing in this record is evidence that any weekly strategy works -- AH-050 measured t=0.88 with a non-monotone quintile profile. What the 1w row establishes is only that at that horizon the cost floor stops being the binding constraint."
     },
     {
       "record_type": "market_law",

@@ -1,0 +1,253 @@
+{
+  "task": "TASK-AH-050",
+  "stage": 0,
+  "label": "DISCOVERY_NOT_PROOF",
+  "promising_count": 0,
+  "frozen": {
+    "task": "TASK-AH-050",
+    "stage": 0,
+    "formation_weeks": 3,
+    "neighbour_formation_weeks": [
+      1,
+      2,
+      4
+    ],
+    "holding_weeks": 1,
+    "quintiles": 5,
+    "weighting": "EQUAL",
+    "overlap": "NONE",
+    "cost_bps_per_side": 16,
+    "double_cost_bps_per_side": 32,
+    "superseded_cost_bps_per_side": 11,
+    "train_fraction": 0.55,
+    "min_weeks_per_oos_segment": 30,
+    "power_target_t": 3,
+    "source": "Liu, Tsyvinski & Wu, Common Risk Factors in Cryptocurrency, JF 77(2) 2022"
+  },
+  "sealed_segments_untouched": true,
+  "universe_symbols": 87,
+  "dropped_symbols": [
+    {
+      "symbol": "ASTERUSDT",
+      "have": 26,
+      "need": 51
+    },
+    {
+      "symbol": "AVNTUSDT",
+      "have": 27,
+      "need": 51
+    },
+    {
+      "symbol": "BIRBUSDT",
+      "have": 7,
+      "need": 51
+    },
+    {
+      "symbol": "CCUSDT",
+      "have": 20,
+      "need": 51
+    },
+    {
+      "symbol": "ELSAUSDT",
+      "have": 8,
+      "need": 51
+    },
+    {
+      "symbol": "HOLOUSDT",
+      "have": 27,
+      "need": 51
+    },
+    {
+      "symbol": "HUSDT",
+      "have": 38,
+      "need": 51
+    },
+    {
+      "symbol": "LITUSDT",
+      "have": 11,
+      "need": 51
+    },
+    {
+      "symbol": "MEGAUSDT",
+      "have": 21,
+      "need": 51
+    },
+    {
+      "symbol": "MMTUSDT",
+      "have": 20,
+      "need": 51
+    },
+    {
+      "symbol": "MONUSDT",
+      "have": 16,
+      "need": 51
+    },
+    {
+      "symbol": "RESOLVUSDT",
+      "have": 40,
+      "need": 51
+    },
+    {
+      "symbol": "SENTUSDT",
+      "have": 18,
+      "need": 51
+    },
+    {
+      "symbol": "SKYUSDT",
+      "have": 31,
+      "need": 51
+    },
+    {
+      "symbol": "SXTUSDT",
+      "have": 46,
+      "need": 51
+    },
+    {
+      "symbol": "TACUSDT",
+      "have": 35,
+      "need": 51
+    },
+    {
+      "symbol": "TRIAUSDT",
+      "have": 6,
+      "need": 51
+    },
+    {
+      "symbol": "USD1USDT",
+      "have": 35,
+      "need": 51
+    },
+    {
+      "symbol": "WLFIUSDT",
+      "have": 30,
+      "need": 51
+    },
+    {
+      "symbol": "XAUTUSDT",
+      "have": 50,
+      "need": 51
+    },
+    {
+      "symbol": "XPLUSDT",
+      "have": 30,
+      "need": 51
+    },
+    {
+      "symbol": "ZBTUSDT",
+      "have": 22,
+      "need": 51
+    }
+  ],
+  "total_weeks": 51,
+  "total_rebalances": 47,
+  "train_rebalances": 25,
+  "sealed_rebalances_available": 22,
+  "train": {
+    "n": 25,
+    "gross_mean_bps": 105.93444285883619,
+    "gross_median_bps": 216.82729531004253,
+    "gross_sd_bps": 602.9620739612383,
+    "gross_t_stat": 0.8784502992276613,
+    "mean_cost_bps": 14.736732026143793,
+    "mean_turnover_long": 0.4188235294117647,
+    "mean_turnover_short": 0.5022222222222222,
+    "net_mean_bps": 91.1977108326924,
+    "net_median_bps": 205.01030184599023,
+    "net_positive": true,
+    "share_weeks_net_positive_pct": 72
+  },
+  "train_double_cost": {
+    "n": 25,
+    "gross_mean_bps": 105.93444285883619,
+    "gross_median_bps": 216.82729531004253,
+    "gross_sd_bps": 602.9620739612383,
+    "gross_t_stat": 0.8784502992276613,
+    "mean_cost_bps": 29.473464052287586,
+    "mean_turnover_long": 0.4188235294117647,
+    "mean_turnover_short": 0.5022222222222222,
+    "net_mean_bps": 76.46097880654862,
+    "net_median_bps": 192.9543550425074,
+    "net_positive": true,
+    "share_weeks_net_positive_pct": 68
+  },
+  "train_at_superseded_floor": {
+    "n": 25,
+    "gross_mean_bps": 105.93444285883619,
+    "gross_median_bps": 216.82729531004253,
+    "gross_sd_bps": 602.9620739612383,
+    "gross_t_stat": 0.8784502992276613,
+    "mean_cost_bps": 10.131503267973857,
+    "mean_turnover_long": 0.4188235294117647,
+    "mean_turnover_short": 0.5022222222222222,
+    "net_mean_bps": 95.80293959086235,
+    "net_median_bps": 208.70311230350657,
+    "net_positive": true,
+    "share_weeks_net_positive_pct": 72
+  },
+  "quintile_profile": {
+    "means_bps": [
+      70.41876121036174,
+      122.40154876612628,
+      103.1296776371534,
+      48.90001424630716,
+      176.353204069198
+    ],
+    "monotone": false
+  },
+  "power": {
+    "n": 25,
+    "sd_bps": 602.9620739612383,
+    "target_t": 3,
+    "detectable_bps": 361.77724437674294
+  },
+  "neighbours": [
+    {
+      "formation_weeks": 1,
+      "n": 26,
+      "gross_mean_bps": -10.861983921690458,
+      "gross_median_bps": 46.71865142371627,
+      "gross_sd_bps": 581.2322849046197,
+      "gross_t_stat": -0.09528973082099093,
+      "mean_cost_bps": 24.532931121166413,
+      "mean_turnover_long": 0.7533936651583713,
+      "mean_turnover_short": 0.77991452991453,
+      "net_mean_bps": -35.39491504285688,
+      "net_median_bps": 21.594468417180316,
+      "net_positive": false,
+      "share_weeks_net_positive_pct": 53.84615384615385
+    },
+    {
+      "formation_weeks": 2,
+      "n": 26,
+      "gross_mean_bps": 190.57833492178167,
+      "gross_median_bps": 208.5229043969952,
+      "gross_sd_bps": 527.1298481648706,
+      "gross_t_stat": 1.843497673328958,
+      "mean_cost_bps": 17.33534439416792,
+      "mean_turnover_long": 0.502262443438914,
+      "mean_turnover_short": 0.5811965811965811,
+      "net_mean_bps": 173.24299052761378,
+      "net_median_bps": 190.79741420091676,
+      "net_positive": true,
+      "share_weeks_net_positive_pct": 65.38461538461539
+    },
+    {
+      "formation_weeks": 4,
+      "n": 25,
+      "gross_mean_bps": 94.5350727712348,
+      "gross_median_bps": 195.75370308315024,
+      "gross_sd_bps": 367.8924407155923,
+      "gross_t_stat": 1.2848194514047833,
+      "mean_cost_bps": 12.871111111111116,
+      "mean_turnover_long": 0.36,
+      "mean_turnover_short": 0.4444444444444446,
+      "net_mean_bps": 81.66396166012368,
+      "net_median_bps": 163.75370308315024,
+      "net_positive": true,
+      "share_weeks_net_positive_pct": 60
+    }
+  ],
+  "cost_floor_bps_per_side": 16,
+  "verdict": "STAGE_0_INFEASIBLE",
+  "closure_reason": "only 22 sealed weeks, below 30"
+}
