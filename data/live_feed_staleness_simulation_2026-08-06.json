@@ -1,0 +1,77 @@
+{
+ "module": "LIVE_FEED_STALENESS_SIMULATION",
+ "frozen": {
+  "module": "LIVE_FEED_STALENESS_SIMULATION",
+  "offsets_ms": [
+   0,
+   2500,
+   5000,
+   7500,
+   9900
+  ],
+  "poll_cycle_ms": 10000,
+  "live_estimator": "MEAN_OVER_UNIFORM_OFFSETS",
+  "wait_cap_snapshots": 3,
+  "max_price_age_ms": 30000,
+  "prior_expectation_bps": 0.027,
+  "prior_basis": "aligned 0.0591 x 46 percent staleness retention at the 5s mean offset"
+ },
+ "symbols": 9,
+ "by_offset": {
+  "0": {
+   "offset_ms": 0,
+   "n": 444503,
+   "mean_bps": 0.053661673928312205,
+   "se_bps": 0.0026243701904675506,
+   "t_stat": 20.44744835283775
+  },
+  "2500": {
+   "offset_ms": 2500,
+   "n": 445590,
+   "mean_bps": 0.0324347262757651,
+   "se_bps": 0.0023468615094031763,
+   "t_stat": 13.820468803041337
+  },
+  "5000": {
+   "offset_ms": 5000,
+   "n": 446017,
+   "mean_bps": 0.022902449586784376,
+   "se_bps": 0.0020650489682973944,
+   "t_stat": 11.09051162388035
+  },
+  "7500": {
+   "offset_ms": 7500,
+   "n": 446335,
+   "mean_bps": 0.015078784179213347,
+   "se_bps": 0.0016596943621943342,
+   "t_stat": 9.085277700935979
+  },
+  "9900": {
+   "offset_ms": 9900,
+   "n": 446652,
+   "mean_bps": 0.010326849683649454,
+   "se_bps": 0.0010523968819213928,
+   "t_stat": 9.812695059296843
+  }
+ },
+ "live_estimate_bps": 0.026880896730744896,
+ "aligned_bps": 0.053661673928312205,
+ "retention_vs_aligned": 0.5009328774696009,
+ "prior_check": {
+  "expected_bps": 0.027,
+  "measured_bps": 0.026880896730744896,
+  "standard_errors_from_prior": -0.045383562764018476
+ },
+ "sub_second_curve_post_hoc": {
+  "note": "descriptive only, no verdict rests on it",
+  "retention_pct": {
+   "100": 96.1,
+   "250": 92.1,
+   "500": 87.5,
+   "1000": 79.3,
+   "1500": 71,
+   "2000": 64.8,
+   "2500": 60.4
+  }
+ }
+}
