@@ -1,0 +1,476 @@
+{
+  "task": "TASK-AH-054",
+  "stage": 0,
+  "label": "SAMPLE_AUDIT_NO_PNL",
+  "promising_count": 0,
+  "frozen": {
+    "task": "TASK-AH-054",
+    "stage": 0,
+    "bar_ms": 14400000,
+    "day_ms": 86400000,
+    "universe_size": 30,
+    "excluded_symbols": [
+      "TACUSDT",
+      "VANRYUSDT"
+    ],
+    "benchmark": "BTCUSDT",
+    "market_filter_sma_days": 50,
+    "relative_strength_days": 7,
+    "relative_strength_quantile": 0.8,
+    "breakout_lookback_bars": 18,
+    "vol_burst_min": 1.3,
+    "vol_burst_window": 20,
+    "declared_direction": "LONG",
+    "entry_reference": "BREAKING_4H_CLOSE",
+    "hard_stop_pct": -5,
+    "ema_exit_period": 20,
+    "timeout_bars": 42,
+    "leverage": 1,
+    "cost_bps_roundtrip": 16,
+    "double_cost_bps_roundtrip": 32,
+    "measured_funding_bps_per_hold": 0.8,
+    "train_fraction": 0.55,
+    "min_events": 100,
+    "min_events_per_oos_segment": 30,
+    "prior_expectation_bps": 181.3
+  },
+  "sealed_segments_untouched": true,
+  "universe": [
+    {
+      "symbol": "BTCUSDT",
+      "median_daily_turnover": 5854118783.2342,
+      "bars": 7875
+    },
+    {
+      "symbol": "ETHUSDT",
+      "median_daily_turnover": 2435539584.8543,
+      "bars": 7875
+    },
+    {
+      "symbol": "SOLUSDT",
+      "median_daily_turnover": 1042955111.556,
+      "bars": 7875
+    },
+    {
+      "symbol": "XRPUSDT",
+      "median_daily_turnover": 315494033.05575,
+      "bars": 7875
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "median_daily_turnover": 191839694.89897,
+      "bars": 7875
+    },
+    {
+      "symbol": "HYPEUSDT",
+      "median_daily_turnover": 183123305.37683,
+      "bars": 3648
+    },
+    {
+      "symbol": "WIFUSDT",
+      "median_daily_turnover": 156081158.30345,
+      "bars": 5622
+    },
+    {
+      "symbol": "SUIUSDT",
+      "median_daily_turnover": 121226650.539,
+      "bars": 7140
+    },
+    {
+      "symbol": "ENAUSDT",
+      "median_daily_turnover": 83569004.2684,
+      "bars": 5131
+    },
+    {
+      "symbol": "ADAUSDT",
+      "median_daily_turnover": 77844718.4369,
+      "bars": 7875
+    },
+    {
+      "symbol": "LINKUSDT",
+      "median_daily_turnover": 72215010.59,
+      "bars": 7875
+    },
+    {
+      "symbol": "AVAXUSDT",
+      "median_daily_turnover": 69792485.2775,
+      "bars": 7875
+    },
+    {
+      "symbol": "ONDOUSDT",
+      "median_daily_turnover": 64288246.59185,
+      "bars": 5551
+    },
+    {
+      "symbol": "WLDUSDT",
+      "median_daily_turnover": 57401162.712799996,
+      "bars": 6649
+    },
+    {
+      "symbol": "NEARUSDT",
+      "median_daily_turnover": 57185503.7164,
+      "bars": 7875
+    },
+    {
+      "symbol": "POPCATUSDT",
+      "median_daily_turnover": 54159617.8409,
+      "bars": 5161
+    },
+    {
+      "symbol": "BNBUSDT",
+      "median_daily_turnover": 52038112.186500005,
+      "bars": 7875
+    },
+    {
+      "symbol": "LTCUSDT",
+      "median_daily_turnover": 51592310.063,
+      "bars": 7875
+    },
+    {
+      "symbol": "TRUMPUSDT",
+      "median_daily_turnover": 46924817.797,
+      "bars": 3385
+    },
+    {
+      "symbol": "ARBUSDT",
+      "median_daily_turnover": 44097516.525145,
+      "bars": 7386
+    },
+    {
+      "symbol": "TIAUSDT",
+      "median_daily_turnover": 43703679.928,
+      "bars": 6053
+    },
+    {
+      "symbol": "OPUSDT",
+      "median_daily_turnover": 42923852.55783,
+      "bars": 7875
+    },
+    {
+      "symbol": "GALAUSDT",
+      "median_daily_turnover": 39758261.728135005,
+      "bars": 7875
+    },
+    {
+      "symbol": "VIRTUALUSDT",
+      "median_daily_turnover": 38194407.7632,
+      "bars": 3853
+    },
+    {
+      "symbol": "INJUSDT",
+      "median_daily_turnover": 37548761.8216,
+      "bars": 7875
+    },
+    {
+      "symbol": "APTUSDT",
+      "median_daily_turnover": 36373862.406734996,
+      "bars": 7875
+    },
+    {
+      "symbol": "SEIUSDT",
+      "median_daily_turnover": 36108482.45883,
+      "bars": 6512
+    },
+    {
+      "symbol": "BCHUSDT",
+      "median_daily_turnover": 32905176.172000002,
+      "bars": 7875
+    },
+    {
+      "symbol": "AAVEUSDT",
+      "median_daily_turnover": 32607507.6989,
+      "bars": 7875
+    },
+    {
+      "symbol": "XAUTUSDT",
+      "median_daily_turnover": 30083065.78949,
+      "bars": 2935
+    }
+  ],
+  "universe_size": 30,
+  "dropped_symbols": [
+    {
+      "symbol": "BIRBUSDT",
+      "why": "NO_TURNOVER"
+    },
+    {
+      "symbol": "ELSAUSDT",
+      "why": "NO_TURNOVER"
+    },
+    {
+      "symbol": "TACUSDT",
+      "why": "BASIS_DISPERSION"
+    },
+    {
+      "symbol": "TRIAUSDT",
+      "why": "NO_TURNOVER"
+    },
+    {
+      "symbol": "VANRYUSDT",
+      "why": "BASIS_DISPERSION"
+    }
+  ],
+  "total_events": 464,
+  "events_per_symbol": {
+    "SOLUSDT": 20,
+    "OPUSDT": 14,
+    "LTCUSDT": 11,
+    "BTCUSDT": 22,
+    "BNBUSDT": 19,
+    "INJUSDT": 24,
+    "APTUSDT": 13,
+    "GALAUSDT": 12,
+    "XRPUSDT": 16,
+    "ADAUSDT": 15,
+    "DOGEUSDT": 16,
+    "LINKUSDT": 18,
+    "AAVEUSDT": 24,
+    "NEARUSDT": 12,
+    "ARBUSDT": 14,
+    "AVAXUSDT": 12,
+    "BCHUSDT": 18,
+    "ETHUSDT": 18,
+    "WLDUSDT": 13,
+    "SUIUSDT": 20,
+    "TIAUSDT": 15,
+    "SEIUSDT": 17,
+    "WIFUSDT": 17,
+    "ONDOUSDT": 16,
+    "POPCATUSDT": 13,
+    "ENAUSDT": 17,
+    "VIRTUALUSDT": 12,
+    "HYPEUSDT": 13,
+    "XAUTUSDT": 11,
+    "TRUMPUSDT": 2
+  },
+  "events_per_year": {
+    "2023": 108,
+    "2024": 152,
+    "2025": 131,
+    "2026": 73
+  },
+  "train_events": 255,
+  "sealed_events_available": 209,
+  "span": {
+    "first": "2023-02-20",
+    "last": "2026-08-03"
+  },
+  "diagnostics": {
+    "bars_considered": 202301,
+    "rejected_market_filter": 93279,
+    "rejected_relative_strength": 85760,
+    "rejected_trigger": 22061,
+    "rejected_overlap": 737,
+    "bull_days": 713,
+    "days_with_filter": 1264
+  },
+  "bucket_balance": {
+    "relative_strength": {
+      "key": "relative_strength",
+      "n": 464,
+      "distinct": 443,
+      "distinct_pct": 95.47413793103448,
+      "tie_pct": 4.525862068965517,
+      "bucket_sizes": [
+        93,
+        93,
+        93,
+        93,
+        92
+      ],
+      "max_min_ratio": 1.0108695652173914,
+      "degenerate": false,
+      "p05": -0.008420065467421134,
+      "p50": 0.07319226247782296,
+      "p95": 0.34135682628597663
+    },
+    "vol_burst": {
+      "key": "vol_burst",
+      "n": 464,
+      "distinct": 464,
+      "distinct_pct": 100,
+      "tie_pct": 0,
+      "bucket_sizes": [
+        93,
+        93,
+        93,
+        93,
+        92
+      ],
+      "max_min_ratio": 1.0108695652173914,
+      "degenerate": false,
+      "p05": 1.3659357760259019,
+      "p50": 2.07546385715255,
+      "p95": 5.079107450298235
+    }
+  },
+  "spacing_bars": {
+    "n": 434,
+    "min": 43,
+    "median": 224,
+    "mean": 398.17511520737327
+  },
+  "prior_expectation_bps": 181.3,
+  "cost_bps": 16.8,
+  "pnl_computed": false,
+  "verdict": "STAGE_0_PASS",
+  "closure_reason": null,
+  "stage1": {
+    "task": "TASK-AH-054",
+    "stage": 1,
+    "label": "TRAIN_ONLY_NOT_A_PASSPORT",
+    "promising_count": 0,
+    "frozen": {
+      "task": "TASK-AH-054",
+      "stage": 0,
+      "bar_ms": 14400000,
+      "day_ms": 86400000,
+      "universe_size": 30,
+      "excluded_symbols": [
+        "TACUSDT",
+        "VANRYUSDT"
+      ],
+      "benchmark": "BTCUSDT",
+      "market_filter_sma_days": 50,
+      "relative_strength_days": 7,
+      "relative_strength_quantile": 0.8,
+      "breakout_lookback_bars": 18,
+      "vol_burst_min": 1.3,
+      "vol_burst_window": 20,
+      "declared_direction": "LONG",
+      "entry_reference": "BREAKING_4H_CLOSE",
+      "hard_stop_pct": -5,
+      "ema_exit_period": 20,
+      "timeout_bars": 42,
+      "leverage": 1,
+      "cost_bps_roundtrip": 16,
+      "double_cost_bps_roundtrip": 32,
+      "measured_funding_bps_per_hold": 0.8,
+      "train_fraction": 0.55,
+      "min_events": 100,
+      "min_events_per_oos_segment": 30,
+      "prior_expectation_bps": 181.3
+    },
+    "segment": "TRAIN",
+    "sealed_segments_untouched": true,
+    "sealed_events_reserved": 209,
+    "prior_expectation_bps": 181.3,
+    "all": {
+      "n": 255,
+      "gross_mean_bps": 325.8923513664512,
+      "gross_median_bps": -389.0114297172642,
+      "net_mean_bps": 309.6197239154706,
+      "net_median_bps": -405.11142971726423,
+      "sd_bps": 2095.430544307672,
+      "t_stat": 2.35952965005799,
+      "detectable_bps": 393.6628521381723,
+      "win_rate_pct": 30.58823529411765,
+      "avg_win_bps": 1969.7717405126757,
+      "avg_loss_bps": -421.97269017821304,
+      "payoff_ratio": 4.668007637368134,
+      "p05_bps": -516.16,
+      "p95_bps": 3624.9156346381974,
+      "mean_hold_bars": 13.631372549019607,
+      "exit_reasons": {
+        "EMA": 116,
+        "STOP": 121,
+        "TIMEOUT": 18
+      },
+      "final_cumulative_bps": 78953.029598445,
+      "max_drawdown_bps": -11787.729521949695
+    },
+    "payoff_trap_signature": false,
+    "payoff_shape": "STOPPED_TREND_FOLLOWER",
+    "benchmark": {
+      "note": "BTC held over the identical window of each trade, not a single buy-and-hold figure",
+      "n": 255,
+      "benchmark_mean_bps": 126.18710666558485,
+      "benchmark_median_bps": -19.584930888479903,
+      "excess_mean_bps": 183.43261724988565,
+      "excess_median_bps": -256.1787894517505,
+      "trades_beating_benchmark_pct": 27.058823529411764
+    },
+    "remove_best_symbol": {
+      "removed": "WIFUSDT",
+      "its_total_net_bps": 18840.924794364404,
+      "share_of_total_pct": 23.86346019929738,
+      "remaining": {
+        "n": 245,
+        "gross_mean_bps": 261.631856343186,
+        "gross_median_bps": -338.1642512077299,
+        "net_mean_bps": 245.35552981257385,
+        "net_median_bps": -354.30425120772986,
+        "sd_bps": 1708.602818093458,
+        "t_stat": 2.2476970437752577,
+        "detectable_bps": 327.4758898118297,
+        "win_rate_pct": 30.612244897959183,
+        "avg_win_bps": 1749.1857462083242,
+        "avg_loss_bps": -418.0989774208454,
+        "payoff_ratio": 4.18366425337522,
+        "p05_bps": -516.16,
+        "p95_bps": 2990.841488694147,
+        "mean_hold_bars": 13.816326530612244,
+        "exit_reasons": {
+          "EMA": 114,
+          "STOP": 114,
+          "TIMEOUT": 17
+        },
+        "final_cumulative_bps": 60112.10480408059,
+        "max_drawdown_bps": -8774.32
+      }
+    },
+    "remove_best_year": {
+      "removed": "2024",
+      "its_total_net_bps": 73297.25900316543,
+      "share_of_total_pct": 92.83653759197739,
+      "remaining": {
+        "n": 108,
+        "gross_mean_bps": 68.61602403036633,
+        "gross_median_bps": -500,
+        "net_mean_bps": 52.368246252588555,
+        "net_median_bps": -516.02,
+        "sd_bps": 1226.6117176669918,
+        "t_stat": 0.44368301022893136,
+        "detectable_bps": 354.0923026930935,
+        "win_rate_pct": 22.22222222222222,
+        "avg_win_bps": 1695.5625380616177,
+        "avg_loss_bps": -417.11583712142004,
+        "payoff_ratio": 4.06496801886726,
+        "p05_bps": -516.16,
+        "p95_bps": 2155.733189522342,
+        "mean_hold_bars": 12.38888888888889,
+        "exit_reasons": {
+          "EMA": 47,
+          "STOP": 56,
+          "TIMEOUT": 5
+        },
+        "final_cumulative_bps": 5655.770595279564,
+        "max_drawdown_bps": -8774.32
+      }
+    },
+    "matched_null": {
+      "draws": 200,
+      "null_mean_bps": 15.517016933158207,
+      "null_p05": -57.402387482679316,
+      "null_p95": 101.8798795101928
+    },
+    "per_year": {
+      "2023": {
+        "n": 108,
+        "total_bps": 5655.770595279564,
+        "mean_bps": 52.368246252588555
+      },
+      "2024": {
+        "n": 147,
+        "total_bps": 73297.25900316543,
+        "mean_bps": 498.62080954534304
+      }
+    },
+    "prior_check": {
+      "expected_gross_bps": 181.3,
+      "measured_gross_bps": 325.8923513664512,
+      "difference_bps": 144.59235136645117,
+      "standard_errors_from_prior": 1.1018998916034413
+    }
+  }
+}

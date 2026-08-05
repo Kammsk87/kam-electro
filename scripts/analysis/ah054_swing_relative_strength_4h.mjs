@@ -423,6 +423,281 @@ export function stage0(bySymbol) {
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// Stage 1 — evaluation on the TRAIN segment only
+// ---------------------------------------------------------------------------
+
+/** EMA series precomputed once per symbol. Seeded with a simple mean over the first `period`. */
+export function emaSeries(bars, period = FROZEN.ema_exit_period) {
+  const out = new Array(bars.length).fill(null);
+  if (bars.length < period) return out;
+  const k = 2 / (period + 1);
+  let e = 0;
+  for (let j = 0; j < period; j += 1) e += bars[j][C];
+  e /= period;
+  out[period - 1] = e;
+  for (let j = period; j < bars.length; j += 1) {
+    e = bars[j][C] * k + e * (1 - k);
+    out[j] = e;
+  }
+  return out;
+}
+
+/**
+ * The frozen exit ladder, checked from the bar AFTER entry.
+ *
+ * When a bar's range contains the stop, the stop is taken. Assuming the favourable path inside
+ * a bar is the standard way a replay flatters itself, and this strategy's stop is 500 bps wide,
+ * so the assumption would matter.
+ */
+export function simulateExit(bars, i, emaArr) {
+  const entry = bars[i][C];
+  if (!(entry > 0)) return null;
+  const stopPx = entry * (1 + FROZEN.hard_stop_pct / 100);
+  const last = Math.min(i + FROZEN.timeout_bars, bars.length - 1);
+  if (last <= i) return null;
+  for (let k = i + 1; k <= last; k += 1) {
+    if (bars[k][L] <= stopPx) {
+      return { exit_index: k, exit_price: stopPx, gross_bps: FROZEN.hard_stop_pct * 100, reason: 'STOP' };
+    }
+    const e = emaArr[k];
+    if (e !== null && bars[k][C] < e) {
+      return { exit_index: k, exit_price: bars[k][C], gross_bps: 1e4 * (bars[k][C] / entry - 1), reason: 'EMA' };
+    }
+    if (k === i + FROZEN.timeout_bars) {
+      return { exit_index: k, exit_price: bars[k][C], gross_bps: 1e4 * (bars[k][C] / entry - 1), reason: 'TIMEOUT' };
+    }
+  }
+  return { exit_index: last, exit_price: bars[last][C], gross_bps: 1e4 * (bars[last][C] / entry - 1), reason: 'TRUNCATED' };
+}
+
+/**
+ * Funding charged over the actual hold at the rate measured conditionally on the bull filter
+ * this strategy trades inside: +0.04 bps per 8-hour settlement.
+ *
+ * This is a measured CONSTANT applied uniformly, not a per-trade series: funding history is
+ * held for 18 symbols and this universe is 30, so a per-trade series does not exist. Stated
+ * rather than hidden, and the magnitude makes it immaterial — a full 7-day hold costs 0.84 bps
+ * against a 16 bps round trip.
+ */
+export function fundingBps(holdBars) {
+  const settlements = (holdBars * FROZEN.bar_ms) / (8 * 3600_000);
+  return settlements * 0.04;
+}
+
+const q = (xs, f) => {
+  const s = [...xs].sort((a, b) => a - b);
+  return s[Math.min(s.length - 1, Math.floor(s.length * f))];
+};
+
+/** Max drawdown on the equity curve of sequential trades, in bps of cumulative net return. */
+export function maxDrawdown(netSeries) {
+  let cum = 0;
+  let peak = 0;
+  let mdd = 0;
+  for (const x of netSeries) {
+    cum += x;
+    if (cum > peak) peak = cum;
+    if (cum - peak < mdd) mdd = cum - peak;
+  }
+  return { final_cumulative_bps: cum, max_drawdown_bps: mdd };
+}
+
+export function tradeStats(trades) {
+  if (!trades.length) return { n: 0 };
+  const net = trades.map((t) => t.net_bps);
+  const gross = trades.map((t) => t.gross_bps);
+  const wins = net.filter((x) => x > 0);
+  const losses = net.filter((x) => x < 0);
+  const sd = stdev(net);
+  const se = sd !== null ? sd / Math.sqrt(net.length) : null;
+  const dd = maxDrawdown(net);
+  return {
+    n: net.length,
+    gross_mean_bps: mean(gross),
+    gross_median_bps: median(gross),
+    net_mean_bps: mean(net),
+    net_median_bps: median(net),
+    sd_bps: sd,
+    t_stat: se && se > 0 ? mean(net) / se : null,
+    detectable_bps: se !== null ? 3 * se : null,
+    win_rate_pct: (100 * wins.length) / net.length,
+    avg_win_bps: wins.length ? mean(wins) : null,
+    avg_loss_bps: losses.length ? mean(losses) : null,
+    payoff_ratio: wins.length && losses.length ? mean(wins) / Math.abs(mean(losses)) : null,
+    p05_bps: q(net, 0.05),
+    p95_bps: q(net, 0.95),
+    mean_hold_bars: mean(trades.map((t) => t.hold_bars)),
+    exit_reasons: trades.reduce((a, t) => { a[t.reason] = (a[t.reason] || 0) + 1; return a; }, {}),
+    ...dd,
+  };
+}
+
+/**
+ * Build trades for a given event list. `benchByTs` maps a 4H timestamp to the benchmark close,
+ * so each trade can be compared with holding BTC over the identical window rather than against
+ * a single buy-and-hold number for the whole span.
+ */
+export function buildTrades(bySymbol, events, emaCache, benchByTs) {
+  const out = [];
+  for (const e of events) {
+    const bars = bySymbol[e.symbol];
+    if (!bars) continue;
+    const emaArr = emaCache[e.symbol] ?? (emaCache[e.symbol] = emaSeries(bars));
+    const x = simulateExit(bars, e.bar_index, emaArr);
+    if (!x) continue;
+    const holdBars = x.exit_index - e.bar_index;
+    const fund = fundingBps(holdBars);
+    const net = x.gross_bps - FROZEN.cost_bps_roundtrip - fund;
+    let benchBps = null;
+    if (benchByTs) {
+      const b0 = benchByTs.get(bars[e.bar_index][TS]);
+      const b1 = benchByTs.get(bars[x.exit_index][TS]);
+      if (b0 > 0 && b1 > 0) benchBps = 1e4 * (b1 / b0 - 1);
+    }
+    out.push({
+      symbol: e.symbol,
+      day: e.day,
+      year: e.day.slice(0, 4),
+      ts: e.ts,
+      bar_index: e.bar_index,
+      hold_bars: holdBars,
+      reason: x.reason,
+      gross_bps: x.gross_bps,
+      funding_bps: fund,
+      net_bps: net,
+      benchmark_bps: benchBps,
+      excess_over_benchmark_bps: benchBps === null ? null : net - benchBps,
+      vol_burst: e.vol_burst,
+      relative_strength: e.relative_strength,
+    });
+  }
+  return out;
+}
+
+/**
+ * Deterministic linear congruential generator, seeded from a frozen constant so the matched
+ * null reproduces exactly. The engine draws no entropy from the platform and reads no clock;
+ * the static scan asserts that, and this comment deliberately avoids naming the banned symbol
+ * so it does not trip its own check.
+ */
+function lcg(seed) {
+  let s = seed >>> 0;
+  return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 2 ** 32; };
+}
+
+/**
+ * A matched null: the same number of entries per symbol, placed at random admissible bars under
+ * the identical exit rules. It answers whether the ENTRY CONDITION matters, as distinct from
+ * whether holding these symbols in this period paid.
+ */
+export function matchedNull(bySymbol, events, emaCache, benchByTs, draws = 200, seed = 54_054) {
+  const rnd = lcg(seed);
+  const perSymbol = {};
+  for (const e of events) perSymbol[e.symbol] = (perSymbol[e.symbol] || 0) + 1;
+  const lo = Math.min(...events.map((e) => e.bar_index));
+  const hi = Math.max(...events.map((e) => e.bar_index));
+  const means = [];
+  for (let d = 0; d < draws; d += 1) {
+    const fake = [];
+    for (const [sym, count] of Object.entries(perSymbol)) {
+      const bars = bySymbol[sym];
+      if (!bars) continue;
+      const top = Math.min(hi, bars.length - FROZEN.timeout_bars - 2);
+      if (top <= lo) continue;
+      for (let c = 0; c < count; c += 1) {
+        const i = lo + Math.floor(rnd() * (top - lo));
+        fake.push({ symbol: sym, day: dayKey(bars[i][TS]), ts: bars[i][TS], bar_index: i, vol_burst: null, relative_strength: null });
+      }
+    }
+    const t = buildTrades(bySymbol, fake, emaCache, benchByTs);
+    if (t.length) means.push(mean(t.map((x) => x.net_bps)));
+  }
+  means.sort((a, b) => a - b);
+  return { draws: means.length, null_mean_bps: mean(means), null_p05: means[Math.floor(means.length * 0.05)], null_p95: means[Math.floor(means.length * 0.95)] };
+}
+
+export function stage1(bySymbol, stage0Result) {
+  if (stage0Result.verdict !== 'STAGE_0_PASS') {
+    return { task: FROZEN.task, stage: 1, verdict: 'NOT_AUTHORISED', promising_count: 0,
+      closure_reason: `Stage 0 returned ${stage0Result.verdict}` };
+  }
+  const uni = selectUniverse(bySymbol);
+  const { events } = buildEvents(bySymbol, uni.chosen);
+  const cut = Math.floor(events.length * FROZEN.train_fraction);
+  const train = events.slice(0, cut);
+
+  const benchBars = bySymbol[FROZEN.benchmark];
+  const benchByTs = benchBars ? new Map(benchBars.map((b) => [b[TS], b[C]])) : null;
+  const emaCache = {};
+  const trades = buildTrades(bySymbol, train, emaCache, benchByTs);
+
+  const all = tradeStats(trades);
+
+  // remove-best-symbol and remove-best-year: does one name or one year carry it?
+  const bySym = {};
+  const byYear = {};
+  for (const t of trades) {
+    (bySym[t.symbol] ??= []).push(t.net_bps);
+    (byYear[t.year] ??= []).push(t.net_bps);
+  }
+  const totalNet = trades.reduce((a, t) => a + t.net_bps, 0);
+  const symTot = Object.entries(bySym).map(([k, v]) => [k, v.reduce((a, b) => a + b, 0)]).sort((a, b) => b[1] - a[1]);
+  const yearTot = Object.entries(byYear).map(([k, v]) => [k, v.reduce((a, b) => a + b, 0)]).sort((a, b) => b[1] - a[1]);
+  const bestSym = symTot[0];
+  const bestYear = yearTot[0];
+
+  const withoutSym = tradeStats(trades.filter((t) => t.symbol !== bestSym[0]));
+  const withoutYear = tradeStats(trades.filter((t) => t.year !== bestYear[0]));
+
+  const bench = trades.map((t) => t.benchmark_bps).filter((x) => x !== null);
+  const excess = trades.map((t) => t.excess_over_benchmark_bps).filter((x) => x !== null);
+
+  return {
+    task: FROZEN.task,
+    stage: 1,
+    label: 'TRAIN_ONLY_NOT_A_PASSPORT',
+    promising_count: 0,
+    frozen: FROZEN,
+    segment: 'TRAIN',
+    sealed_segments_untouched: true,
+    sealed_events_reserved: events.length - cut,
+    prior_expectation_bps: FROZEN.prior_expectation_bps,
+    all,
+    // The recorded trap is a positive mean with a near-zero median AND a payoff ratio below 1
+    // -- many tiny wins against rare catastrophic losses, as in FAM.AMEL_DIRECTIONAL and the
+    // Bybit account at 77.5 percent wins and a payoff of 0.089. A negative median with a payoff
+    // ABOVE 1 is the ordinary shape of a stopped trend follower and must not be flagged; an
+    // earlier cut of this line fired on exactly that healthy case.
+    payoff_trap_signature: all.net_mean_bps > 0 && all.net_median_bps <= 0
+      && all.payoff_ratio !== null && all.payoff_ratio < 1,
+    payoff_shape: all.payoff_ratio !== null && all.payoff_ratio >= 1
+      ? 'STOPPED_TREND_FOLLOWER' : 'MANY_SMALL_WINS',
+    benchmark: {
+      note: 'BTC held over the identical window of each trade, not a single buy-and-hold figure',
+      n: bench.length,
+      benchmark_mean_bps: mean(bench),
+      benchmark_median_bps: median(bench),
+      excess_mean_bps: mean(excess),
+      excess_median_bps: median(excess),
+      trades_beating_benchmark_pct: (100 * excess.filter((x) => x > 0).length) / Math.max(excess.length, 1),
+    },
+    remove_best_symbol: { removed: bestSym[0], its_total_net_bps: bestSym[1],
+      share_of_total_pct: (100 * bestSym[1]) / (totalNet || 1), remaining: withoutSym },
+    remove_best_year: { removed: bestYear[0], its_total_net_bps: bestYear[1],
+      share_of_total_pct: (100 * bestYear[1]) / (totalNet || 1), remaining: withoutYear },
+    matched_null: matchedNull(bySymbol, train, emaCache, benchByTs),
+    per_year: Object.fromEntries(Object.entries(byYear).map(([k, v]) => [k, { n: v.length, total_bps: v.reduce((a, b) => a + b, 0), mean_bps: mean(v) }])),
+    prior_check: {
+      expected_gross_bps: FROZEN.prior_expectation_bps,
+      measured_gross_bps: all.gross_mean_bps,
+      difference_bps: all.gross_mean_bps - FROZEN.prior_expectation_bps,
+      standard_errors_from_prior: all.detectable_bps
+        ? (all.gross_mean_bps - FROZEN.prior_expectation_bps) / (all.detectable_bps / 3) : null,
+    },
+  };
+}
+
 export function toCsv(r) {
   const header = 'metric,key,n,distinct_pct,tie_pct,max_min_ratio,p05,p50,p95,degenerate';
   const c = (v) => (v === null || v === undefined ? '' : typeof v === 'number' ? v.toFixed(6) : v);
@@ -453,7 +728,7 @@ Usage:
 Stage 0 is a sample audit and computes NO PnL. Holdout and forward stay sealed.`;
 
 export function parseArgs(argv) {
-  const opts = { bars: null, out: null, help: false };
+  const opts = { bars: null, out: null, stage1: false, help: false };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '-h' || arg === '--help') { opts.help = true; continue; }
@@ -465,6 +740,7 @@ export function parseArgs(argv) {
     };
     if (arg === '--bars') opts.bars = next();
     else if (arg === '--out') opts.out = next();
+    else if (arg === '--stage1') opts.stage1 = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
   return opts;
@@ -490,8 +766,10 @@ export function main(argv) {
   }
   if (opts.help || !opts.bars) { process.stdout.write(`${USAGE}\n`); return opts.help ? 0 : 64; }
 
-  const r = stage0(loadBars(opts.bars));
-  process.stdout.write(`${JSON.stringify({
+  const world = loadBars(opts.bars);
+  const s0 = stage0(world);
+  const r = opts.stage1 ? { ...s0, stage1: stage1(world, s0) } : s0;
+  process.stdout.write(`${JSON.stringify(opts.stage1 ? r.stage1 : {
     task: r.task, verdict: r.verdict, closure_reason: r.closure_reason,
     universe_size: r.universe_size, total_events: r.total_events, span: r.span,
     events_per_year: r.events_per_year, sealed_events_available: r.sealed_events_available,
