@@ -1,0 +1,231 @@
+{
+  "task": "TASK-AH-053",
+  "stage": 0,
+  "label": "DISCOVERY_NOT_PROOF",
+  "promising_count": 0,
+  "frozen": {
+    "task": "TASK-AH-053",
+    "stage": 0,
+    "timeframe": "5m",
+    "bar_ms": 300000,
+    "universe": [
+      "AAVEUSDT",
+      "ADAUSDT",
+      "ARBUSDT",
+      "BTCUSDT",
+      "DOGEUSDT",
+      "ENAUSDT",
+      "ETHUSDT",
+      "HYPEUSDT",
+      "LINKUSDT",
+      "NEARUSDT",
+      "SOLUSDT",
+      "SUIUSDT",
+      "UNIUSDT",
+      "WLDUSDT",
+      "XLMUSDT",
+      "XRPUSDT"
+    ],
+    "vol_burst_min": 1.5,
+    "vol_burst_window": 20,
+    "vol_expansion_min": 1.2,
+    "atr_window": 14,
+    "breakout_lookback_bars": 24,
+    "declared_direction": "WITH_THE_BREAK",
+    "entry_reference": "BREAKING_BAR_CLOSE",
+    "hard_stop_pct": 1,
+    "time_stop_bars": 9,
+    "horizons_bars": [
+      3,
+      6,
+      9
+    ],
+    "primary_horizon_bars": 9,
+    "cost_bps_roundtrip": 16,
+    "double_cost_bps_roundtrip": 32,
+    "superseded_cost_bps_roundtrip": 11,
+    "train_fraction": 0.55,
+    "min_events_per_oos_segment": 30,
+    "power_target_t": 3,
+    "prior_expectation_bps": 8.27
+  },
+  "sealed_segments_untouched": true,
+  "total_events": 17662,
+  "events_per_symbol": {
+    "AAVEUSDT": 1394,
+    "ADAUSDT": 1381,
+    "ARBUSDT": 1384,
+    "BTCUSDT": 1521,
+    "DOGEUSDT": 61,
+    "ENAUSDT": 1392,
+    "ETHUSDT": 1509,
+    "HYPEUSDT": 88,
+    "LINKUSDT": 1414,
+    "NEARUSDT": 1395,
+    "SOLUSDT": 223,
+    "SUIUSDT": 1438,
+    "UNIUSDT": 1378,
+    "WLDUSDT": 1400,
+    "XLMUSDT": 1390,
+    "XRPUSDT": 294
+  },
+  "train_events": 9714,
+  "train_symbols": 12,
+  "train_days": 99,
+  "sealed_events_available": 7948,
+  "direction_split": {
+    "LONG": 4505,
+    "SHORT": 5209
+  },
+  "bucket_balance": {
+    "vol_burst": {
+      "key": "vol_burst",
+      "n": 9714,
+      "distinct": 9714,
+      "distinct_pct": 100,
+      "tie_pct": 0,
+      "bucket_sizes": [
+        1943,
+        1943,
+        1943,
+        1943,
+        1942
+      ],
+      "max_min_ratio": 1.0005149330587024,
+      "degenerate": false,
+      "p05": 1.6309011555326787,
+      "p50": 3.1140693660246797,
+      "p95": 12.109226820338426
+    },
+    "vol_expansion": {
+      "key": "vol_expansion",
+      "n": 9714,
+      "distinct": 9564,
+      "distinct_pct": 98.45583693638048,
+      "tie_pct": 1.5441630636195183,
+      "bucket_sizes": [
+        1943,
+        1943,
+        1943,
+        1943,
+        1942
+      ],
+      "max_min_ratio": 1.0005149330587024,
+      "degenerate": false,
+      "p05": 1.2923076923076813,
+      "p50": 1.9947521009945322,
+      "p95": 3.9498432601880933
+    }
+  },
+  "horizons": [
+    {
+      "horizon_bars": 3,
+      "horizon_minutes": 15,
+      "n": 9714,
+      "gross_mean_bps": -0.5633912450515307,
+      "gross_median_bps": -5.439710060988201,
+      "sd_bps": 58.45162669971989,
+      "t_stat": -0.9499757986209441,
+      "detectable_bps": 1.7791755722705513,
+      "share_beyond_cost_pct": 26.46695491043854,
+      "net_mean_bps": -16.56339124505153,
+      "clears_cost": false
+    },
+    {
+      "horizon_bars": 6,
+      "horizon_minutes": 30,
+      "n": 9714,
+      "gross_mean_bps": -3.4955811381751865,
+      "gross_median_bps": -7.671869024674649,
+      "sd_bps": 74.99300161906304,
+      "t_stat": -4.594070971553366,
+      "detectable_bps": 2.282669005215594,
+      "share_beyond_cost_pct": 30.028824377187565,
+      "net_mean_bps": -19.495581138175186,
+      "clears_cost": false
+    },
+    {
+      "horizon_bars": 9,
+      "horizon_minutes": 45,
+      "n": 9714,
+      "gross_mean_bps": -3.2897862331037384,
+      "gross_median_bps": -7.867159222320064,
+      "sd_bps": 90.66930725166402,
+      "t_stat": -3.57607345452782,
+      "detectable_bps": 2.7598310898270833,
+      "share_beyond_cost_pct": 32.79802347127857,
+      "net_mean_bps": -19.28978623310374,
+      "clears_cost": false
+    }
+  ],
+  "primary": {
+    "horizon_bars": 9,
+    "horizon_minutes": 45,
+    "n": 9714,
+    "gross_mean_bps": -3.2897862331037384,
+    "gross_median_bps": -7.867159222320064,
+    "sd_bps": 90.66930725166402,
+    "t_stat": -3.57607345452782,
+    "detectable_bps": 2.7598310898270833,
+    "share_beyond_cost_pct": 32.79802347127857,
+    "net_mean_bps": -19.28978623310374,
+    "clears_cost": false
+  },
+  "burst_profile": [
+    {
+      "quintile": 0,
+      "n": 1943,
+      "mean_bps": -4.337753941588316,
+      "t_stat": -2.5609606721267557,
+      "mean_burst": 1.7642817110951652
+    },
+    {
+      "quintile": 1,
+      "n": 1943,
+      "mean_bps": -6.083340647677161,
+      "t_stat": -3.1972048208081483,
+      "mean_burst": 2.3590199251567823
+    },
+    {
+      "quintile": 2,
+      "n": 1943,
+      "mean_bps": -5.597189746478009,
+      "t_stat": -2.9009924889240435,
+      "mean_burst": 3.138713690421207
+    },
+    {
+      "quintile": 3,
+      "n": 1943,
+      "mean_bps": -4.389209079701436,
+      "t_stat": -2.1904564575850167,
+      "mean_burst": 4.523781898440898
+    },
+    {
+      "quintile": 4,
+      "n": 1942,
+      "mean_bps": 3.962294664181171,
+      "t_stat": 1.5076719075518665,
+      "mean_burst": 12.082392948344182
+    }
+  ],
+  "realised_with_stops": {
+    "n": 9714,
+    "mean_bps": -2.804815451144967,
+    "median_bps": -9.197776810710433,
+    "net_mean_bps": -18.804815451144968,
+    "stopped_out_pct": 15.822524191887997
+  },
+  "at_double_cost": -35.28978623310374,
+  "at_superseded_floor": -14.289786233103738,
+  "prior_expectation_bps": 8.27,
+  "cost_floor_bps": 16,
+  "verdict": "STAGE_0_INFEASIBLE",
+  "closure_reason": "gross mean -3.29 bps against a 16 bps floor, a shortfall of 19.29 bps",
+  "prior_check": {
+    "expected_bps": 8.27,
+    "measured_bps": -3.2897862331037384,
+    "difference_bps": -11.559786233103738,
+    "standard_errors_from_prior": -12.565754051811933,
+    "prior_falsified_upward": false
+  }
+}

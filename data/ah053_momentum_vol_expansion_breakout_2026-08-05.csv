@@ -1,0 +1,9 @@
+metric,horizon_bars,horizon_min,n,gross_mean_bps,gross_median_bps,t_stat,detectable_bps,share_beyond_cost_pct,net_mean_bps
+horizon,3,15,9714,-0.5634,-5.4397,-0.9500,1.7792,26.4670,-16.5634
+horizon,6,30,9714,-3.4956,-7.6719,-4.5941,2.2827,30.0288,-19.4956
+horizon,9,45,9714,-3.2898,-7.8672,-3.5761,2.7598,32.7980,-19.2898
+burst_quintile,0,,1943,-4.3378,,-2.5610,,,
+burst_quintile,1,,1943,-6.0833,,-3.1972,,,
+burst_quintile,2,,1943,-5.5972,,-2.9010,,,
+burst_quintile,3,,1943,-4.3892,,-2.1905,,,
+burst_quintile,4,,1942,3.9623,,1.5077,,,

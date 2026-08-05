@@ -5286,6 +5286,57 @@
       "fixture_flag": false,
       "source_of_record": "B7 reconnaissance on EDGE.DATA.HL_CASCADE, 2026-08-05",
       "notes": "This was the last directional target on the open-directions register, and it was the only surviving hypothesis whose data had been collected on purpose for it. Under the criterion set before the run -- reversion below 16 bps or noise closes the loop -- the directional-alpha research programme is complete. The mirror at 15 minutes is the single unresolved figure at 1.28 standard errors from the floor, and it must not be chased: it is a non-primary horizon of a non-primary event set selected after the fact, which is exactly the selection CD.SELECTION_ON_INSAMPLE_RANK measured to be worthless. Recorded separately as a useful by-product: the mark-oracle gap carries a standard deviation of 13.06 bps, an order of magnitude wider than the perp-spot basis at 1.4 to 1.7 bps on majors, so the two are different objects and LAW.BASIS.LIQUID_PERP_BELOW_COST does not speak to this one."
+    },
+    {
+      "record_type": "closure_decision",
+      "decision_id": "CD.VOL_EXPANSION_BREAKOUT",
+      "subject": "FAM.MOMENTUM_VOL_EXPANSION_BREAKOUT",
+      "subject_kind": "FAMILY",
+      "disposition": "CLOSED_MEASURED",
+      "authority": "CHIEF_SCIENTIST",
+      "decisive_measurement": "The balance gate passed first -- vol_burst 100 percent distinct with a bucket ratio of 1.0005 and a range from 1.63 to 12.11 -- so the sort is real and the measurement stands. Over 9,714 non-overlapping events on 16 symbols and 99 days, entering WITH a volume-burst break of the 24-bar extreme returns -3.29 bps at 45 minutes with t=-3.58, and -3.50 bps at 30 minutes with t=-4.59. The detectable size at t=3 is 2.76 bps, so this is a resolved negative in the direction opposite to the one declared: the break reverts rather than continues. Under the frozen exits, a 1 percent stop and a 45-minute time stop, the realised mean is -2.80 bps with 15.8 percent stopped out. The burst-size profile is not monotone, and the largest bursts at 12.08x flip to +3.96 bps at t=1.51, unresolved and still a quarter of the floor.",
+      "decisive_metric": {
+        "train_events": 9714,
+        "sealed_events": 7948,
+        "symbols": 16,
+        "train_days": 99,
+        "gross_45m_bps": -3.29,
+        "gross_45m_t": -3.58,
+        "gross_30m_bps": -3.5,
+        "gross_30m_t": -4.59,
+        "detectable_at_t3_bps": 2.76,
+        "realised_with_stops_bps": -2.8,
+        "stopped_out_pct": 15.8,
+        "burst_quintile_means_bps": [
+          -4.34,
+          -6.08,
+          -5.6,
+          -4.39,
+          3.96
+        ],
+        "balance_ratio": 1.0005,
+        "cost_floor_bps": 16,
+        "shortfall_bps": 19.29,
+        "prior_expectation_bps": 8.27,
+        "standard_errors_from_prior": -12.6
+      },
+      "reopen_criterion": "Not on this construction at any threshold: the effect is resolved negative at t=-3.58 and a different burst or expansion cut is a parameter search. A reopen would require a DIFFERENT event definition that preserves the single-participant property -- the tick-level parent reconstruction of AH-046 rather than a five-minute bar -- together with a pre-declared expectation stating why aggregation would not destroy it this time. The mirror, fading the break at +3.29 bps, does not qualify: it is a fifth of the floor and it was discovered on train after the opposite direction was declared.",
+      "supersedes": [
+        "TASK-AH-053"
+      ],
+      "law_ids": [
+        "LAW.FLOW.SWEEP_CONTINUATION_SATURATES"
+      ],
+      "constraint_ids": [],
+      "task_id": "TASK-AH-053",
+      "decided_at": "2026-08-05",
+      "evidence_paths": [
+        "tasks/results/TASK-AH-053-MOMENTUM-VOL-EXPANSION-BREAKOUT-V0-RESULT.md",
+        "reference/AH053_MOMENTUM_VOL_EXPANSION_BREAKOUT_PROTOCOL_2026-08-05.md"
+      ],
+      "fixture_flag": false,
+      "source_of_record": "TASK-AH-053 Stage 0 on 5m bars, 2026-08-05",
+      "notes": "The pre-recorded expectation was FALSIFIED, and downward. The task recorded +8.27 bps before the engine existed, taken from LAW.FLOW.SWEEP_CONTINUATION_SATURATES; the measurement is -3.29, which is 12.6 standard errors below the prior. The saturation law does not carry from tick-level parent sweeps to bar-level volume bursts and the sign inverts. The mechanism is that a parent sweep is ONE participant crossing levels inside 100 ms and its continuation is that participant own impact still resolving, whereas a five-minute bar is an aggregate of many participants including everyone fading the move. The two events resemble each other only in description. This is the first pre-registered expectation in the programme to be falsified, which is the reason recording it in advance was worth the effort."
     }
   ]
 }
