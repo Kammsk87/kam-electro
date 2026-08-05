@@ -1,0 +1,86 @@
+{
+ "module": "EXECUTION_GATEWAY",
+ "label": "PAIRED_ENTRY_MEASUREMENT_NOT_A_PASSPORT",
+ "promising_count": 0,
+ "frozen": {
+  "module": "EXECUTION_GATEWAY",
+  "policy": "VETO_MEANS_WAIT",
+  "law": "LAW.EXEC.FLOW_DEPTH_AGREEMENT_PREDICTS_ADVERSE",
+  "intents": [
+   "LONG",
+   "SHORT"
+  ],
+  "wait_cap_snapshots": 3,
+  "neighbour_caps": [
+   1,
+   6
+  ],
+  "at_cap": "FORCED_EXECUTION",
+  "max_price_age_ms": 30000,
+  "intent_notional_usd": 200,
+  "control_draws": 200,
+  "control_seed": 77077,
+  "floor_as_of": "2026-08-05",
+  "prior_expectation_bps_per_intent": 0.03
+ },
+ "by_cap": {
+  "1": {
+   "cap": 1,
+   "symbols": 10,
+   "n": 2298658,
+   "mean_improvement_bps": 0.04915224663853693,
+   "se_bps": 0.0014834045024556823,
+   "t_stat": 33.134756269897046,
+   "detectable_bps": 0.004450213507367047,
+   "wait_rate_pct": 15.355785854181004,
+   "mean_improvement_on_waited_bps": 0.3207510980867112,
+   "mean_wait_ms": 9540.357396121648,
+   "forced_pct": 2.249964979566338,
+   "share_improved_pct": 4.710879130344749,
+   "control_mean_bps": 0.0009180610411818008
+  },
+  "3": {
+   "cap": 3,
+   "symbols": 10,
+   "n": 2298448,
+   "mean_improvement_bps": 0.05882550416784034,
+   "se_bps": 0.0016164607225344354,
+   "t_stat": 36.39154564523431,
+   "detectable_bps": 0.004849382167603306,
+   "wait_rate_pct": 15.348052250910179,
+   "mean_improvement_on_waited_bps": 0.3825907777439799,
+   "mean_wait_ms": 11229.707907439342,
+   "forced_pct": 0.04172380667302458,
+   "share_improved_pct": 4.75607888453426,
+   "control_mean_bps": 0.001491158445093706
+  },
+  "6": {
+   "cap": 6,
+   "symbols": 10,
+   "n": 2298428,
+   "mean_improvement_bps": 0.059129613509201435,
+   "se_bps": 0.0016197360379004678,
+   "t_stat": 36.50570964997874,
+   "detectable_bps": 0.004859208113701404,
+   "wait_rate_pct": 15.347315643561599,
+   "mean_improvement_on_waited_bps": 0.3843683639315342,
+   "mean_wait_ms": 11259.018870455828,
+   "forced_pct": 0.00026104798584075726,
+   "share_improved_pct": 4.756511842006797,
+   "control_mean_bps": -0.00032276982555681934
+  }
+ },
+ "cost_audit": {
+  "floor_bps": 16,
+  "citation": "10.45 fee + 5.56 execution, schedule BOTALIN.FEE.SCHEDULE",
+  "cancels_in_paired_difference": true
+ },
+ "prior_expectation_bps": 0.03,
+ "verdict": "GATE_IMPROVES_ENTRY",
+ "closure_reason": null,
+ "prior_check": {
+  "expected_bps": 0.03,
+  "measured_bps": 0.05882550416784034,
+  "standard_errors_from_prior": 17.832480409820953
+ }
+}
