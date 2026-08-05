@@ -1,0 +1,318 @@
+{
+  "task": "TASK-AH-054",
+  "stage": 0,
+  "label": "SAMPLE_AUDIT_NO_PNL",
+  "promising_count": 0,
+  "frozen": {
+    "task": "TASK-AH-054",
+    "stage": 0,
+    "bar_ms": 14400000,
+    "day_ms": 86400000,
+    "universe_size": 30,
+    "excluded_symbols": [
+      "TACUSDT",
+      "VANRYUSDT"
+    ],
+    "benchmark": "BTCUSDT",
+    "market_filter_sma_days": 50,
+    "relative_strength_days": 7,
+    "relative_strength_quantile": 0.8,
+    "breakout_lookback_bars": 18,
+    "vol_burst_min": 1.3,
+    "vol_burst_window": 20,
+    "declared_direction": "LONG",
+    "entry_reference": "BREAKING_4H_CLOSE",
+    "hard_stop_pct": -5,
+    "ema_exit_period": 20,
+    "timeout_bars": 42,
+    "leverage": 1,
+    "cost_bps_roundtrip": 16,
+    "double_cost_bps_roundtrip": 32,
+    "measured_funding_bps_per_hold": 0.8,
+    "train_fraction": 0.55,
+    "min_events": 100,
+    "min_events_per_oos_segment": 30,
+    "prior_expectation_bps": 181.3
+  },
+  "sealed_segments_untouched": true,
+  "universe": [
+    {
+      "symbol": "BTCUSDT",
+      "median_daily_turnover": 5854118783.2342,
+      "bars": 7875
+    },
+    {
+      "symbol": "ETHUSDT",
+      "median_daily_turnover": 2435539584.8543,
+      "bars": 7875
+    },
+    {
+      "symbol": "SOLUSDT",
+      "median_daily_turnover": 1042955111.556,
+      "bars": 7875
+    },
+    {
+      "symbol": "XRPUSDT",
+      "median_daily_turnover": 315494033.05575,
+      "bars": 7875
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "median_daily_turnover": 191839694.89897,
+      "bars": 7875
+    },
+    {
+      "symbol": "HYPEUSDT",
+      "median_daily_turnover": 183123305.37683,
+      "bars": 3648
+    },
+    {
+      "symbol": "WIFUSDT",
+      "median_daily_turnover": 156081158.30345,
+      "bars": 5622
+    },
+    {
+      "symbol": "SUIUSDT",
+      "median_daily_turnover": 121226650.539,
+      "bars": 7140
+    },
+    {
+      "symbol": "ENAUSDT",
+      "median_daily_turnover": 83569004.2684,
+      "bars": 5131
+    },
+    {
+      "symbol": "ADAUSDT",
+      "median_daily_turnover": 77844718.4369,
+      "bars": 7875
+    },
+    {
+      "symbol": "LINKUSDT",
+      "median_daily_turnover": 72215010.59,
+      "bars": 7875
+    },
+    {
+      "symbol": "AVAXUSDT",
+      "median_daily_turnover": 69792485.2775,
+      "bars": 7875
+    },
+    {
+      "symbol": "ONDOUSDT",
+      "median_daily_turnover": 64288246.59185,
+      "bars": 5551
+    },
+    {
+      "symbol": "WLDUSDT",
+      "median_daily_turnover": 57401162.712799996,
+      "bars": 6649
+    },
+    {
+      "symbol": "NEARUSDT",
+      "median_daily_turnover": 57185503.7164,
+      "bars": 7875
+    },
+    {
+      "symbol": "POPCATUSDT",
+      "median_daily_turnover": 54159617.8409,
+      "bars": 5161
+    },
+    {
+      "symbol": "BNBUSDT",
+      "median_daily_turnover": 52038112.186500005,
+      "bars": 7875
+    },
+    {
+      "symbol": "LTCUSDT",
+      "median_daily_turnover": 51592310.063,
+      "bars": 7875
+    },
+    {
+      "symbol": "TRUMPUSDT",
+      "median_daily_turnover": 46924817.797,
+      "bars": 3385
+    },
+    {
+      "symbol": "ARBUSDT",
+      "median_daily_turnover": 44097516.525145,
+      "bars": 7386
+    },
+    {
+      "symbol": "TIAUSDT",
+      "median_daily_turnover": 43703679.928,
+      "bars": 6053
+    },
+    {
+      "symbol": "OPUSDT",
+      "median_daily_turnover": 42923852.55783,
+      "bars": 7875
+    },
+    {
+      "symbol": "GALAUSDT",
+      "median_daily_turnover": 39758261.728135005,
+      "bars": 7875
+    },
+    {
+      "symbol": "VIRTUALUSDT",
+      "median_daily_turnover": 38194407.7632,
+      "bars": 3853
+    },
+    {
+      "symbol": "INJUSDT",
+      "median_daily_turnover": 37548761.8216,
+      "bars": 7875
+    },
+    {
+      "symbol": "APTUSDT",
+      "median_daily_turnover": 36373862.406734996,
+      "bars": 7875
+    },
+    {
+      "symbol": "SEIUSDT",
+      "median_daily_turnover": 36108482.45883,
+      "bars": 6512
+    },
+    {
+      "symbol": "BCHUSDT",
+      "median_daily_turnover": 32905176.172000002,
+      "bars": 7875
+    },
+    {
+      "symbol": "AAVEUSDT",
+      "median_daily_turnover": 32607507.6989,
+      "bars": 7875
+    },
+    {
+      "symbol": "XAUTUSDT",
+      "median_daily_turnover": 30083065.78949,
+      "bars": 2935
+    }
+  ],
+  "universe_size": 30,
+  "dropped_symbols": [
+    {
+      "symbol": "BIRBUSDT",
+      "why": "NO_TURNOVER"
+    },
+    {
+      "symbol": "ELSAUSDT",
+      "why": "NO_TURNOVER"
+    },
+    {
+      "symbol": "TACUSDT",
+      "why": "BASIS_DISPERSION"
+    },
+    {
+      "symbol": "TRIAUSDT",
+      "why": "NO_TURNOVER"
+    },
+    {
+      "symbol": "VANRYUSDT",
+      "why": "BASIS_DISPERSION"
+    }
+  ],
+  "total_events": 464,
+  "events_per_symbol": {
+    "SOLUSDT": 20,
+    "OPUSDT": 14,
+    "LTCUSDT": 11,
+    "BTCUSDT": 22,
+    "BNBUSDT": 19,
+    "INJUSDT": 24,
+    "APTUSDT": 13,
+    "GALAUSDT": 12,
+    "XRPUSDT": 16,
+    "ADAUSDT": 15,
+    "DOGEUSDT": 16,
+    "LINKUSDT": 18,
+    "AAVEUSDT": 24,
+    "NEARUSDT": 12,
+    "ARBUSDT": 14,
+    "AVAXUSDT": 12,
+    "BCHUSDT": 18,
+    "ETHUSDT": 18,
+    "WLDUSDT": 13,
+    "SUIUSDT": 20,
+    "TIAUSDT": 15,
+    "SEIUSDT": 17,
+    "WIFUSDT": 17,
+    "ONDOUSDT": 16,
+    "POPCATUSDT": 13,
+    "ENAUSDT": 17,
+    "VIRTUALUSDT": 12,
+    "HYPEUSDT": 13,
+    "XAUTUSDT": 11,
+    "TRUMPUSDT": 2
+  },
+  "events_per_year": {
+    "2023": 108,
+    "2024": 152,
+    "2025": 131,
+    "2026": 73
+  },
+  "train_events": 255,
+  "sealed_events_available": 209,
+  "span": {
+    "first": "2023-02-20",
+    "last": "2026-08-03"
+  },
+  "diagnostics": {
+    "bars_considered": 202301,
+    "rejected_market_filter": 93279,
+    "rejected_relative_strength": 85760,
+    "rejected_trigger": 22061,
+    "rejected_overlap": 737,
+    "bull_days": 713,
+    "days_with_filter": 1264
+  },
+  "bucket_balance": {
+    "relative_strength": {
+      "key": "relative_strength",
+      "n": 464,
+      "distinct": 443,
+      "distinct_pct": 95.47413793103448,
+      "tie_pct": 4.525862068965517,
+      "bucket_sizes": [
+        93,
+        93,
+        93,
+        93,
+        92
+      ],
+      "max_min_ratio": 1.0108695652173914,
+      "degenerate": false,
+      "p05": -0.008420065467421134,
+      "p50": 0.07319226247782296,
+      "p95": 0.34135682628597663
+    },
+    "vol_burst": {
+      "key": "vol_burst",
+      "n": 464,
+      "distinct": 464,
+      "distinct_pct": 100,
+      "tie_pct": 0,
+      "bucket_sizes": [
+        93,
+        93,
+        93,
+        93,
+        92
+      ],
+      "max_min_ratio": 1.0108695652173914,
+      "degenerate": false,
+      "p05": 1.3659357760259019,
+      "p50": 2.07546385715255,
+      "p95": 5.079107450298235
+    }
+  },
+  "spacing_bars": {
+    "n": 434,
+    "min": 43,
+    "median": 224,
+    "mean": 398.17511520737327
+  },
+  "prior_expectation_bps": 181.3,
+  "cost_bps": 16.8,
+  "pnl_computed": false,
+  "verdict": "STAGE_0_PASS",
+  "closure_reason": null
+}

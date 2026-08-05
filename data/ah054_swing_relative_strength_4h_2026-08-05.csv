@@ -1,0 +1,7 @@
+metric,key,n,distinct_pct,tie_pct,max_min_ratio,p05,p50,p95,degenerate
+balance,relative_strength,464,95.474138,4.525862,1.010870,-0.008420,0.073192,0.341357,false
+balance,vol_burst,464,100.000000,0.000000,1.010870,1.365936,2.075464,5.079107,false
+events_per_year,2023,108,,,,,,,
+events_per_year,2024,152,,,,,,,
+events_per_year,2025,131,,,,,,,
+events_per_year,2026,73,,,,,,,
