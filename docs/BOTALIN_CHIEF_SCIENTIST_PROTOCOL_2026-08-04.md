@@ -107,6 +107,11 @@ The Chief Scientist maintains, in the registry rather than in prose:
    against the whole registry mechanically;
 3. the list of constants that currently bind, and whether each has a derivation.
 
+Closures are held as `closure_decision` records and are queryable. Clauses 1 and 3 have no
+record type, so they live in **`docs/BOTALIN_OPEN_DIRECTIONS_REGISTER_2026-08-05.md`**, which
+is the human-readable face of the registry plus the part the schema cannot hold: what is open,
+and why it is the only thing open. It is updated whenever a decision is added.
+
 ## 6. Reopening
 
 A reopen is a new task with a new identity that cites the `closure_decision` it answers and
