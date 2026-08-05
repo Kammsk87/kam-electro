@@ -1578,7 +1578,7 @@ test('a measured closure must point at something measured', () => {
 
 test('the seed registry closes methods as well as families', () => {
   const reg = seedCatalog.records.closure_decisions;
-  assert(reg.length === 9, `expected nine seed decisions, got ${reg.length}`);
+  assert(reg.length === 10, `expected ten seed decisions, got ${reg.length}`);
   const methods = reg.filter((d) => d.subject_kind === 'METHOD');
   assert(methods.length === 4,
     'a programme that only ever closes strategies keeps rediscovering the same way of being wrong');
@@ -1601,7 +1601,7 @@ test('underpowered and measured closures are never conflated in the seed', () =>
 
 test('a data-blocked route names the data that would lift it, not merely that it is blocked', () => {
   const blocked = seedCatalog.records.closure_decisions.filter((d) => d.disposition === 'DATA_BLOCKED');
-  assert(blocked.length === 2, `expected two data-blocked routes, got ${blocked.length}`);
+  assert(blocked.length === 3, `expected three data-blocked routes, got ${blocked.length}`);
   for (const d of blocked) {
     assert(d.subject_kind === 'DATA_ROUTE', `${d.decision_id}: a blocked route is not a family verdict`);
     // The decisive measurement of a DATA_BLOCKED entry is a fact about the archive, so it must
@@ -1615,7 +1615,7 @@ test('a data-blocked route names the data that would lift it, not merely that it
 
 test('query "closures" orders measured before underpowered and reports both criteria', () => {
   const rows = runQuery(seedCatalog, 'closures', {});
-  assert(rows.length === 9, 'every decision is returned');
+  assert(rows.length === 10, 'every decision is returned');
   const firstUnder = rows.findIndex((d) => d.disposition === 'CLOSED_UNDERPOWERED');
   const lastMeasured = rows.map((d) => d.disposition).lastIndexOf('CLOSED_MEASURED');
   assert(lastMeasured < firstUnder,

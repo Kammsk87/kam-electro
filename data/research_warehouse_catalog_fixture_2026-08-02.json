@@ -5169,6 +5169,42 @@
       "fixture_flag": false,
       "source_of_record": "TASK-AH-046 out-of-sample result, reclassified by the direction triage 2026-08-05",
       "notes": "This closes a METHOD in one use and confirms it in another, which is why it is recorded rather than left implicit. It matches Cont, Kukanov and Stoikov exactly: order flow imbalance explains the repricing happening NOW, with a slope inversely proportional to depth. From that it follows that stepping into the move is costly -- which is the guard -- and it does not follow that the next move is predictable, which is AH-046. The programme measured both halves independently before reading the paper. OFI is hereby fixed as a filtering instrument in the guard lane and may not be proposed again as a direction source without satisfying the reopen criterion."
+    },
+    {
+      "record_type": "closure_decision",
+      "decision_id": "CD.NEWS_LANE",
+      "subject": "GAP.NEWS.TAGGER_V2",
+      "subject_kind": "DATA_ROUTE",
+      "disposition": "DATA_BLOCKED",
+      "authority": "CHIEF_SCIENTIST",
+      "decisive_measurement": "The causal timestamp check PASSED and the lane is blocked anyway. first_seen_at is present and populated on 100 percent of 227 forward-lab events, written as a mandatory field by news_recorder.mjs, which is live. Three further findings each close the lane independently. (1) Detection delay, recorded per event as detect_delay_ms, has a median of 12.2 minutes: only 10.7 percent of events are seen within a minute and 21.9 percent within five, with p75 at 401 minutes and p95 at 1,169. The p05 is NEGATIVE at -464 minutes, confirming on live data the future-dated published_at already recorded against this source. (2) Joinability to our market data is 1 event of 94: of 104 symbols extracted from mechanism events only AERGOUSDT exists in the 40-symbol tick archive, because 75 of the 94 are new listings and a newly listed symbol has no prior history by construction. (3) The symbol extractor is broken -- the most frequent extracted token is \"UTC\" at five occurrences, alongside \"00AM\", \"APPSTOCK\", \"CBK\", \"FLIP\", \"OL\", parsed out of title text such as \"at 10:00AM UTC\".",
+      "decisive_metric": {
+        "first_seen_at_populated_pct": 100,
+        "forward_events": 187,
+        "detect_delay_median_min": 12.2,
+        "detect_delay_p75_min": 401,
+        "detect_delay_p95_min": 1169.4,
+        "share_under_1_min_pct": 10.7,
+        "share_under_5_min_pct": 21.9,
+        "negative_delay_present": true,
+        "mechanism_events_with_symbols": 94,
+        "joinable_to_tick_archive": 1,
+        "distinct_symbols_extracted": 104,
+        "symbols_present_in_archive": 1,
+        "hist_archive_first_seen_at_populated_pct": 0
+      },
+      "reopen_criterion": "All three, together, and the third is the one that decides. (1) SYMBOL EXTRACTION: zero junk tokens in the symbols field, verified against a symbol registry with a measured false-positive rate; \"UTC\" and \"00AM\" must not appear. (2) UNIVERSE COVERAGE: more than 30 percent of mechanism events joinable to the local tick archive. Note this is near self-defeating for listings, which have no prior history by construction, so the reachable subset is delistings and margin changes on symbols already recorded. (3) ECONOMIC THRESHOLD: direct evidence that the residual price move remaining AFTER our actual measured detection delay, taken at the p50 of the ingest lag rather than an assumed one, still exceeds the audited 16 bps round trip. A faster feed does not qualify on its own; the reopen must show the money that survives the delay we actually have.",
+      "supersedes": [],
+      "law_ids": [],
+      "constraint_ids": [],
+      "task_id": "TASK-007",
+      "decided_at": "2026-08-05",
+      "evidence_paths": [
+        "reference/NEWS_CAUSAL_TIMESTAMP_AUDIT_2026-08-05.md"
+      ],
+      "fixture_flag": false,
+      "source_of_record": "read-only audit of /mnt/data-vol/news-lab/events.jsonl and the historical archive, 2026-08-05",
+      "notes": "The check we set in advance was the wrong check, and saying so is the point of recording this. first_seen_at was treated as the blocker and it is present; the lane dies on delay, joinability and extraction quality instead. The three are not independent: removing the delay leaves nothing to join, fixing the extractor moves joinable events from one to about two, and widening the recorded universe still cannot give a new listing a price history. The historical archive is separately unusable and honestly self-labelled -- 1,251 rows carrying first_seen_at=null with not_forward=true and not_tradeable_timing=true on every one."
     }
   ]
 }
