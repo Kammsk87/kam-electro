@@ -459,14 +459,28 @@ export function parseGuardFile(text) {
   return out.sort((a, b) => a.ts - b.ts);
 }
 
+/**
+ * Accepts either the raw JSONL print stream or the reduced `ts px` form produced by the
+ * server-side stream filter. Both are parsed here rather than adding a decompression import,
+ * which would widen the module's import surface for no analytical gain.
+ */
 export function parseTickFile(text) {
   const out = [];
   for (const line of text.split('\n')) {
     if (!line) continue;
-    const t = /"ts":(\d+)/.exec(line);
-    const p = /"px":([0-9.]+)/.exec(line);
-    if (!t || !p) continue;
-    out.push({ ts: +t[1], px: +p[1] });
+    if (line.charCodeAt(0) === 123) {          // '{' -> JSONL
+      const t = /"ts":(\d+)/.exec(line);
+      const p = /"px":([0-9.]+)/.exec(line);
+      if (!t || !p) continue;
+      out.push({ ts: +t[1], px: +p[1] });
+      continue;
+    }
+    const sp = line.indexOf(' ');
+    if (sp <= 0) continue;
+    const ts = +line.slice(0, sp);
+    const px = +line.slice(sp + 1);
+    if (!Number.isFinite(ts) || !Number.isFinite(px) || ts <= 0 || px <= 0) continue;
+    out.push({ ts, px });
   }
   return out.sort((a, b) => a.ts - b.ts);
 }
@@ -481,7 +495,7 @@ export function loadData(dir) {
       out[g[1]] ??= {};
       out[g[1]].snapshots = parseGuardFile(readFileSync(join(root, f), 'utf8'));
     }
-    const t = /^([A-Z0-9]+)\.ticks\.jsonl$/.exec(f);
+    const t = /^([A-Z0-9]+)\.ticks\.(jsonl|txt)$/.exec(f);
     if (t) {
       out[t[1]] ??= {};
       out[t[1]].ticks = parseTickFile(readFileSync(join(root, f), 'utf8'));

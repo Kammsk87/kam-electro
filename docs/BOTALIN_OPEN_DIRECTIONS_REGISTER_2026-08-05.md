@@ -72,9 +72,19 @@ there.
 observations, `null_test`, `oos` and `remove_best` all PASS. The only record in the catalogue
 with three green checks.
 
-**Blocked on:** a second, non-overlapping archive span of at least 10 days per out-of-sample
-segment, per the law's own review criterion. Recorders are running. This costs waiting, not
-work.
+**G3 PASSED on 2026-08-05** — the first G3 pass in the programme's history. 2,122,951 filled
+intents, every point on the staleness axis resolved from t = 18.94 to t = 5.51, both controls
+clear: the ALLOW mean is −1.614 bps against a +0.50 limit and the veto rate is 16.2 percent.
+Detail in `tasks/results/G3-GUARD-EXECUTABLE-REPLAY-FULL-RUN-RESULT.md`.
+
+**That is not replication, and the blocking condition is unchanged.** The run uses the SAME
+26-day archive that produced the law. It establishes that the effect survives executable
+mechanics — spread crossing, depth limits, tick-resolution entry, realistic staleness — on the
+data it was found in, and says nothing about whether it recurs.
+
+**Still blocked on:** a second, non-overlapping archive span of at least 10 days per
+out-of-sample segment, per the law's own review criterion. Recorders are running. This costs
+waiting, not work.
 
 **Gate definition is already written** — `docs/BOTALIN_G3_PROTOCOL_FOR_GUARDS_2026-08-05.md`.
 G3 as stated in the gate battery asks for expectancy positive net of all costs; a guard has no
@@ -104,14 +114,21 @@ Net = Signal − 16.0 bps (round trip) + 0.715 bps (guard)
   per_executed_gain = mean(ALLOW) − mean(ALL) = veto_rate × separation
   ```
 
-  At the measured veto rate of **18.8 percent**, a separation of 0.715 bps is worth about
-  **0.134 bps per executed intent**. Under the staleness retention measured on the harness —
-  **27 percent at the 50 percent offset**, not the 54 percent the one-symbol pilot suggested —
-  that becomes roughly **0.036 bps**.
+  **Measured on the full archive, 2,122,951 filled intents across 10 symbols and 26 days:**
 
-  So the honest arithmetic is `Net = Signal − 16.0 + 0.04`, and the guard is **0.2 percent of
-  one round trip**, not 4.5. Both earlier figures in this section overstated it; the error is
+  | | |
+  |---|---:|
+  | separation at ideal fill (the law's headline) | 0.715 bps |
+  | separation under execution mechanics, zero offset | 0.5235 bps |
+  | × veto rate 16.2 % → per executed intent | 0.0855 bps |
+  | × 54 % staleness retention at realistic decision age | **0.0451 bps** |
+
+  So the honest arithmetic is `Net = Signal − 16.00 + 0.045`, and the guard is **0.28 percent
+  of one round trip**, not 4.5. Both earlier figures in this section overstated it; the error is
   recorded rather than quietly replaced because the roadmap was being sized against them.
+
+  The one-symbol run that preceded this put retention at 27 percent and was itself unresolved;
+  the full run puts it at 54 percent, matching the pilot's original shape indication exactly.
 
 **What the guard is.** An incremental reduction in execution friction for a strategy that
 already pays for itself. On a candidate like AH-054, whose gross is measured in hundreds of

@@ -217,6 +217,11 @@ test('guard rows and tick rows are parsed and sorted', () => {
   assert(g[0].ask_depth_next === 6, 'the ninth field is the next ask depth');
   const t = parseTickFile('{"ts":200,"px":1.5}\n{"ts":100,"px":1.4}\nbroken\n');
   assert(t.length === 2 && t[0].ts === 100, 'ticks sorted, malformed lines dropped');
+  // The reduced form the server-side filter emits must parse identically, so the harness can
+  // read a 26-day span without a decompression import widening its surface.
+  const r = parseTickFile('200 1.5\n100 1.4\n0 5\nbad line here\n');
+  assert(r.length === 2 && r[0].ts === 100 && r[0].px === 1.4, `reduced form parses, got ${JSON.stringify(r)}`);
+  assert(!r.some((x) => x.ts === 0), 'a zero timestamp is not a tick');
 });
 
 group('CLI and output');
