@@ -5205,6 +5205,42 @@
       "fixture_flag": false,
       "source_of_record": "read-only audit of /mnt/data-vol/news-lab/events.jsonl and the historical archive, 2026-08-05",
       "notes": "The check we set in advance was the wrong check, and saying so is the point of recording this. first_seen_at was treated as the blocker and it is present; the lane dies on delay, joinability and extraction quality instead. The three are not independent: removing the delay leaves nothing to join, fixing the extractor moves joinable events from one to about two, and widening the recorded universe still cannot give a new listing a price history. The historical archive is separately unusable and honestly self-labelled -- 1,251 rows carrying first_seen_at=null with not_forward=true and not_tradeable_timing=true on every one."
+    },
+    {
+      "record_type": "closure_decision",
+      "decision_id": "CD.FUNDING_VELOCITY",
+      "subject": "FAM.FUNDING_VELOCITY_AND_CLEARING_WINDOWS",
+      "subject_kind": "FAMILY",
+      "disposition": "CLOSED_MEASURED",
+      "authority": "CHIEF_SCIENTIST",
+      "decisive_measurement": "Three declared numbers on 35,029 60-second snapshots over 232 assets, universe the top 30 by median notional volume. (1) Movement in the 30 minutes either side of the 8-hour funding settlement is 60.75 bps against 64.14 in matched control windows -- a difference of -3.38 bps at t=-1.23, so settlement windows move if anything LESS, against a rebalancing thesis that predicts more. An independent recomputation on BTC alone in a different language gave +0.84 bps, equally indistinguishable from zero. (2) Funding velocity IS orthogonal to funding level, within-asset Spearman +0.073 with no asset above 0.5, so the conditioner is genuinely independent information. (3) Forward 60-minute move by velocity quintile reaches at most 6.07 bps in absolute terms against a 16 bps floor, is not monotone, and carries a q4-q0 spread of -4.47 bps.",
+      "decisive_metric": {
+        "settlement_window_bps": 60.75,
+        "control_window_bps": 64.14,
+        "settlement_minus_control_bps": -3.38,
+        "settlement_t": -1.23,
+        "settlements_used": 73,
+        "independent_btc_recheck_bps": 0.84,
+        "velocity_vs_level_spearman": 0.073,
+        "assets_above_half_rho_pct": 0,
+        "max_abs_quintile_mean_bps": 6.07,
+        "quintile_spread_bps": -4.47,
+        "cost_floor_bps": 16,
+        "velocity_observations": 34950,
+        "approx_standard_error_bps": 2
+      },
+      "reopen_criterion": "Only at a materially longer measurement horizon than 30 minutes, and only with a velocity construct that does not degenerate. At 30 minutes this funding series has roughly two states rather than five: it is quantised and mean-reverting, so 60 percent of observations tie even when velocity is computed as a slope over the window rather than an endpoint difference. A reopen must first demonstrate that its chosen horizon yields balanced buckets, reporting the tie fraction, before any return is measured. Re-running the same 30-minute construct on a longer archive does not qualify: the observation count is already large enough to have answered.",
+      "supersedes": [],
+      "law_ids": [],
+      "constraint_ids": [],
+      "task_id": "TASK-AH-052",
+      "decided_at": "2026-08-05",
+      "evidence_paths": [
+        "reference/HL_CASCADE_FUNDING_CUTOFF_2026-08-05.md"
+      ],
+      "fixture_flag": false,
+      "source_of_record": "HL_CASCADE express cutoff, 2026-08-05",
+      "notes": "CLOSED_MEASURED and not CLOSED_UNDERPOWERED, which contradicts the prediction made the previous day. The archive spans only 25 days and carries 73 settlements, so underpowered was the expected verdict; but 34,950 velocity observations give standard errors near 2 bps, placing a 16 bps effect roughly eight standard errors from what was measured. Short span did not mean small sample. Waiting for the recorder to reach its designed 30 days would add 20 percent to a sample that has already answered. This closes funding VELOCITY and the settlement window; it does not touch open interest, the oracle-mark gap, or the exchange-reported premium field, which is a distinct quantity from mark minus oracle. The open-interest hypothesis is the one the recorder was built for -- its header states the design thesis as cascade equals OI collapse plus oracle/mark divergence."
     }
   ]
 }
