@@ -1537,7 +1537,9 @@ test('the seed laws are correctly typed and none overclaims its status', () => {
 test('the catalogue summary separates identities from empirical laws', () => {
   const s = seedCatalog.law_catalogue;
   assert(s.identities === 1 && s.empirical === 6, `unexpected split ${JSON.stringify(s)}`);
-  assert(s.constraints === 2 && s.constraints_confirmed === 2, 'constraint counts');
+  // One of the two is now RESOLVED: the fee schedule exists and the floor is derived from it
+  // by a shared module, so the constraint no longer blocks. Confirmed counts only the live ones.
+  assert(s.constraints === 2 && s.constraints_confirmed === 1, 'constraint counts');
   assert(s.by_status.proven === 1 && s.by_status.observed === 6, 'status breakdown');
   assert(s.by_status.replicated === undefined, 'nothing in the seed claims replication');
 });

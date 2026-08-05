@@ -830,32 +830,31 @@
     {
       "record_type": "data_source",
       "source_id": "GAP.COST.FEE_SCHEDULE",
-      "title": "GAP -- the account fee schedule as a machine-readable, versioned source",
+      "title": "Account fee schedule, derived from realised fees on the closed-position ledger",
       "evidence_type": "REFERENCE_DOC",
       "owner_system": "botalin-edge",
-      "host_scope": "EXTERNAL_VENUE",
-      "retained_path": "NOT_PROVISIONED",
-      "path_kind": "NOT_APPLICABLE",
+      "host_scope": "REPO_RESIDENT",
+      "retained_path": "data/botalin_fee_schedule_2026-08-05.json",
+      "path_kind": "FILE",
       "run_id": null,
-      "time_span_start": null,
-      "time_span_end": null,
+      "time_span_start": "2025-11-05T00:00:00Z",
+      "time_span_end": "2026-07-28T00:00:00Z",
       "symbols": [],
       "timeframes": [
         "static"
       ],
-      "schema_fingerprint": "required:venue+tier+taker_rate+maker_rate+effective_from",
-      "write_ownership": "UNKNOWN",
-      "read_only_status": "UNKNOWN",
-      "verification_status": "MISSING",
-      "evidence_grade": "SECONDARY_DOC",
+      "schema_fingerprint": "venue+tier+effective_from+basis+measurement+derived_floor",
+      "write_ownership": "SERVER_ANALYSIS",
+      "read_only_status": "READ_ONLY",
+      "verification_status": "VERIFIED_READ_ONLY",
+      "evidence_grade": "DERIVED_PRIMARY",
       "fixture_flag": false,
       "known_gaps": [
-        "No committed file in this repository records the taker or maker rate at our tier.",
-        "The 11 bps research constant is hardcoded independently in six engines with no derivation and no cited source.",
-        "The only realistic all-in figure in the repository is a prose sentence: Bybit VIP0 about 0.160 RT.",
-        "The maker rate is required to calibrate an execution simulator and is not recoverable from any committed dataset."
+        "Per-leg taker and maker rates could not be separated: the closed-PnL export carries one combined fee and no per-leg order type, so the four realised clusters at 7.26, 10.34, 13.62 and 19.98 bps cannot be decomposed.",
+        "Rates are expressed against ENTRY notional; fees are charged on both legs, so a position whose price moved carries an exit fee on a different notional.",
+        "The monthly median moves from 13.63 in 2025-11 to 7.74 in 2026-01 and back to 13.60 in 2026-07, a change in behaviour, tariff or instrument mix the export cannot distinguish."
       ],
-      "source_of_record": "reference/BOTALIN_COST_MODEL_AUDIT_2026-08-04.md"
+      "source_of_record": "derived 2026-08-05 from 1,220 non-liquidated closed positions; see reference/COST_MODEL_FEE_SCHEDULE_2026-08-05.md"
     }
   ],
   "experiments": [
@@ -4885,10 +4884,13 @@
         "BOTALIN_RESEARCH_SUMMARY_FOR_EXTERNAL_AI_2026-07-18.md:276 -- conservative taker model 0.250 RT was harsher than the real Bybit VIP0 of about 0.160 RT.",
         "docs/BOTALIN_HANDOFF_2026-07-13_REV6.md:17 -- forensics over 29 valid round trips: taker slip +4.46 bps, spread 1.1 bps, maker slip -1.1 bps, adverse under 2 bps, reconciled to the cent.",
         "Same line records the adopted live rule: taker only when expected edge exceeds 0.13 percent per round trip.",
-        "Whether the 1.1 bps spread is already contained inside the 4.46 bps slippage depends on the unrecorded reference price, so the audit adopts the reconciled 16 bps rather than publishing a new sum."
+        "Whether the 1.1 bps spread is already contained inside the 4.46 bps slippage depends on the unrecorded reference price, so the audit adopts the reconciled 16 bps rather than publishing a new sum.",
+        "RESOLVED 2026-08-05. The schedule now exists as a versioned record at data/botalin_fee_schedule_2026-08-05.json and the floor is derived in one shared module, scripts/analysis/cost_model.mjs, which refuses to return a bare number: every value carries its schedule entry, its fee and execution components, and their sources.",
+        "Measured rather than transcribed: realised fees over 1,220 non-liquidated closed positions give a notional-weighted round trip of 9.13 bps and a per-position median of 10.45, against total fees of $444.30 on $486,643 of notional.",
+        "The audited 16 bps floor is confirmed as 10.45 fee plus 5.56 execution, and is now known to be a CENTRAL figure rather than a conservative one: the measured all-in median is 16.01, the p75 is 19.19 and the p95 is 25.56."
       ],
-      "consequence": "Re-evaluation of all six closed results at 13 and 16 bps deepens every closure and reopens none; the closest approach, the AH-048 sweep continuation at 900s, falls from 81 percent of the floor to 69 and then 56 percent. The existing record therefore stands without re-running. Future tasks must use 16 bps single-leg and 32 bps two-leg, retaining 11/22 only as an optimistic bound for comparison against the historical record. The maker escape route does not open this: the spread is narrower than the maker fee on most liquid symbols, and our own maker-fill probe measured -1.07 bps before fees at t=-9.07.",
-      "status": "confirmed",
+      "consequence": "Re-evaluation of all six closed results at 13 and 16 bps deepens every closure and reopens none; the closest approach, the AH-048 sweep continuation at 900s, falls from 81 percent of the floor to 69 and then 56 percent. The existing record therefore stands without re-running. Future tasks must use 16 bps single-leg and 32 bps two-leg, retaining 11/22 only as an optimistic bound for comparison against the historical record. The maker escape route does not open this: the spread is narrower than the maker fee on most liquid symbols, and our own maker-fill probe measured -1.07 bps before fees at t=-9.07. RESOLVED for future work: the floor is derived from a versioned schedule by a shared module as of 2026-08-05. The six engines keep their frozen constants so their published numbers stay reproducible. One thing the resolution added rather than confirmed: the superseded 11 bps sat at the MEDIAN realised fee, not above it, so it was never conservative even as a fee-only figure -- a quarter of positions paid more than 13.6 bps in fees alone.",
+      "status": "resolved",
       "review_criterion": "Resolved only by committing a versioned fee schedule carrying venue, tier, taker rate, maker rate and effective_from, and by deriving the floor from it in one shared module rather than six independent constants. A change of fee tier or venue reopens this record rather than closing it.",
       "task_id": "TASK-AH-010",
       "evidence_paths": [

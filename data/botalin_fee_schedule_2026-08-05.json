@@ -1,0 +1,67 @@
+{
+  "schedule_id": "BOTALIN.FEE.SCHEDULE",
+  "schema_version": "1.0.0",
+  "generated_for": "GAP.COST.FEE_SCHEDULE",
+  "note": "Rates are DERIVED FROM REALISED FEES on the operator's own closed positions, not transcribed from a published tariff page. A published rate states what should have been charged; this states what was. Where the two disagree the measurement wins, because the measurement is what a backtest has to clear.",
+  "entries": [
+    {
+      "venue": "bybit",
+      "instrument_class": "PERPETUAL_AND_MIXED",
+      "tier": "AS_TRADED_2025_11_TO_2026_07",
+      "effective_from": "2025-11-05",
+      "effective_to": null,
+      "basis": "REALISED",
+      "measurement": {
+        "source": "closed-position ledger, fee field over entry notional",
+        "positions": 1220,
+        "liquidations_excluded": 18,
+        "total_fees_usd": 444.3,
+        "total_notional_usd": 486643,
+        "notional_weighted_roundtrip_bps": 9.13,
+        "per_position_roundtrip_bps": {
+          "p05": 7.207,
+          "p25": 8.024,
+          "p50": 10.452,
+          "p75": 13.632,
+          "p95": 20.0,
+          "mean": 11.639
+        },
+        "clusters_bps": [
+          { "centre": 7.26, "n": 204, "median_hold_min": 8.8 },
+          { "centre": 10.34, "n": 110, "median_hold_min": 4.2 },
+          { "centre": 13.62, "n": 407, "median_hold_min": 1.3 },
+          { "centre": 19.98, "n": 86, "median_hold_min": 0.0 }
+        ]
+      },
+      "taker_bps_per_leg": null,
+      "maker_bps_per_leg": null,
+      "undetermined": [
+        "The per-leg taker and maker rates cannot be separated from this export. The closed-PnL record carries a single combined fee and no per-leg order type, so the four clusters at 7.26, 10.34, 13.62 and 19.98 bps are consistent with different order-type mixes and possibly different instrument classes, and the mapping is not recoverable.",
+        "Rates are expressed against ENTRY notional. Fees are charged on both legs, so a position whose price moved carries an exit-leg fee on a different notional; this inflates or deflates the ratio by roughly the size of the move.",
+        "The monthly median moves from 13.63 in 2025-11 to 7.74 in 2026-01 and back to 13.60 in 2026-07, which is a change in behaviour, tariff, or instrument mix that this export cannot distinguish."
+      ]
+    }
+  ],
+  "derived_floor": {
+    "note": "The floor a research task must clear. Fee is measured here; execution is measured elsewhere and cited.",
+    "fee_roundtrip_bps": 10.45,
+    "fee_basis": "median realised, per position",
+    "execution_roundtrip_bps": 5.56,
+    "execution_basis": "fill forensics over 29 reconciled round trips: taker slippage 4.46 bps plus spread 1.10 bps",
+    "execution_source": "docs/BOTALIN_HANDOFF_2026-07-13_REV6.md#17",
+    "single_leg_roundtrip_bps": 16.0,
+    "two_leg_roundtrip_bps": 32.0,
+    "stress_multiplier": 2.0,
+    "superseded_bps": 11.0,
+    "superseded_note": "Fees only, no execution component, and it matched the median realised fee rather than a conservative one. Retained solely for comparison against results published before 2026-08-04."
+  },
+  "conservatism_check": {
+    "note": "16 bps is a central figure, not a conservative one, and tasks should know which they are using.",
+    "median_all_in_bps": 16.01,
+    "p75_all_in_bps": 19.19,
+    "p95_all_in_bps": 25.56,
+    "detail": "Adding the measured 5.56 bps execution component to the realised fee distribution puts the median all-in at 16.0, the p75 at 19.2 and the p95 at 25.6. A quarter of positions paid more than 13.6 bps in fees alone, which exceeds the entire superseded 11 bps floor."
+  },
+  "review_criterion": "Replace, do not amend, on any of: a change of venue, a change of fee tier, or a published tariff carrying dated per-leg taker and maker rates that would let the four clusters be decomposed. A new entry is appended with its own effective_from; existing entries are never rewritten, so a result computed under an old schedule stays reproducible.",
+  "source_of_record": "derived from the closed-position ledger on 2026-08-05, cross-referenced against the fill forensics and the 2026-08-04 cost audit"
+}
