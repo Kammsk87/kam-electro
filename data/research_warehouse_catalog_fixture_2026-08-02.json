@@ -536,7 +536,7 @@
     "Joining them requires a verified symbol mapping between the legacy Bybit universe and the Hyperliquid universe."
    ],
    "source_of_record": "BOTALIN_STRATEGY_STATUS_INVENTORY_2026-07-29.md#32,#33",
-   "notes": "Superseded in part. The remaining gap is joinability and sub-minute OI, not the absence of a liquidation feed."
+   "notes": "Superseded in part. The remaining gap is joinability and sub-minute OI, not the absence of a liquidation feed. MEASURED 2026-08-06: no liquidation subscription exists anywhere on the research host -- a search for allLiquidation, /v5/market/liquidation and forceOrder across every script and library returns zero hits, so the flag has never been recorded and Bybit publishes it on WebSocket only, with no REST history to backfill. Open interest IS recorded, by oi_forward_recorder.mjs, but at 258 rows per day -- one every 5.6 minutes -- against the 5-15 second window a cascade detector needs, so it is 20-70x too coarse. Closing this gap is forward collection plus roughly 140 days of it, the bar set by the mirror event in CD.OI_COLLAPSE_REVERSION. Routed here from TASK-AH-055, which was not built: its OI leg is closed (primary refuted at 7.3 se, mirror 1.28 se from the floor on 25 of the required 140 days) and its impulse leg is closed (CD.SWEEP_CONTINUATION, 8.27 bps best band against a 16 bps floor). The only untested element is conditioning on FORCED flow, which needs this feed."
   },
   {
    "record_type": "data_source",
