@@ -82,6 +82,32 @@ expectancy, so it was literally unpassable. G3 for a guard is a **paired replay 
 exhaustive synthetic intent stream**, with and without the veto, under identical execution
 mechanics. The measured object is the per-executed-intent difference, never a P&L.
 
+### What a guard is worth, and what it is not
+
+Recorded 2026-08-05 because the roadmap for an execution layer was being built on the wrong
+arithmetic, and the wrong arithmetic here leads to a bad decision rather than a small error.
+
+**The relation is additive, not multiplicative.**
+
+```
+Net = Signal − 16.0 bps (round trip) + 0.715 bps (guard)
+```
+
+- A signal with **zero** edge, passed through the guard, returns **−15.3 bps**. It does not
+  become profitable. The guard cannot rescue a null signal, and no amount of execution work
+  changes that, because the guard's measured saving is **4.5 percent of one round trip**.
+- Under the staleness curve the retained saving at realistic decision age is roughly **54
+  percent**, so about **+0.4 bps** in practice.
+
+**What the guard is.** An incremental reduction in execution friction for a strategy that
+already pays for itself. On a candidate like AH-054, whose gross is measured in hundreds of
+basis points, 0.4 to 0.7 bps a trade compounds meaningfully across hundreds of trades. It is a
+margin improvement, never a load-bearing element.
+
+**The consequence for sequencing.** An execution layer is worth building *after* a signal
+clears its own floor, not instead of finding one. Any proposal of the form "the guard turns a
+weak signal into a profitable one" is refused on this arithmetic.
+
 ### Staleness, and the L2 decision
 
 This is the crux of G3 and it is quantified.
@@ -117,6 +143,37 @@ headline, t = 1.92 even at offset 0, and its five rows share snapshots and state
 shape indication, not a curve to quote.
 
 ---
+
+## 2b. AH-054 — measured, concentrated, and deliberately not spent
+
+Stage 0 passed and Stage 1 ran on train only. Recorded here rather than in section 3 because the
+family is **not closed** — it is waiting on time.
+
+| | |
+|---|---:|
+| train trades | 255 |
+| net mean | **+309.6 bps**, t = 2.36 |
+| net median | −405.1 bps |
+| win rate / payoff | 30.6 % / **4.67** |
+| matched null | +15.5 bps, p95 +101.9 — **beaten clearly** |
+| pre-registered prior | +181.3 bps vs +325.9 measured, **1.1 se** |
+
+It fails on one thing: **2024 carries 92.8 percent of the total net**, and removing it takes
+t from 2.36 to 0.44 on the remaining 108 trades.
+
+**Why the sealed segment is not being spent, and why re-partitioning is not a way around it.**
+Events fall 108 / 152 / 131 / 73 across 2023–2026, and the 55 percent boundary lands inside
+2024. Extending train to cover three years means moving 2025 out of the sealed segment — which
+is spending the holdout under another name. It would leave 73 events of one partial year as the
+only independent evidence, down from 209.
+
+Re-partitioning does not create data. It moves a boundary, and the boundary is the whole value.
+
+**The blocking condition is calendar time, not analysis.** The archive keeps accumulating. In
+six months the sealed segment is a genuinely independent two-year test across 2025 and 2026
+rather than a thinner one, and the question it answers — does the effect survive outside 2024 —
+is exactly the question that failed on train. Waiting makes the test stronger; spending it now
+makes it weaker.
 
 ## 3. Closed, with what would reopen each
 
