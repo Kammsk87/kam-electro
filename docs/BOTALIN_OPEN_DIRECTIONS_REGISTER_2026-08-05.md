@@ -95,9 +95,23 @@ Net = Signal − 16.0 bps (round trip) + 0.715 bps (guard)
 
 - A signal with **zero** edge, passed through the guard, returns **−15.3 bps**. It does not
   become profitable. The guard cannot rescue a null signal, and no amount of execution work
-  changes that, because the guard's measured saving is **4.5 percent of one round trip**.
-- Under the staleness curve the retained saving at realistic decision age is roughly **54
-  percent**, so about **+0.4 bps** in practice.
+  changes that.
+- **Corrected 2026-08-05 by the G3 harness, downward by a further order of magnitude.** The
+  0.715 bps figure is the ALLOW-versus-VETO *separation*, not what a trade receives. What a
+  trade receives is
+
+  ```
+  per_executed_gain = mean(ALLOW) − mean(ALL) = veto_rate × separation
+  ```
+
+  At the measured veto rate of **18.8 percent**, a separation of 0.715 bps is worth about
+  **0.134 bps per executed intent**. Under the staleness retention measured on the harness —
+  **27 percent at the 50 percent offset**, not the 54 percent the one-symbol pilot suggested —
+  that becomes roughly **0.036 bps**.
+
+  So the honest arithmetic is `Net = Signal − 16.0 + 0.04`, and the guard is **0.2 percent of
+  one round trip**, not 4.5. Both earlier figures in this section overstated it; the error is
+  recorded rather than quietly replaced because the roadmap was being sized against them.
 
 **What the guard is.** An incremental reduction in execution friction for a strategy that
 already pays for itself. On a candidate like AH-054, whose gross is measured in hundreds of
