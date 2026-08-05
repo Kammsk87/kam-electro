@@ -1,0 +1,120 @@
+{
+ "module": "EXECUTION_GATEWAY",
+ "label": "PAIRED_ENTRY_MEASUREMENT_NOT_A_PASSPORT",
+ "promising_count": 0,
+ "frozen": {
+  "module": "EXECUTION_GATEWAY",
+  "policy": "VETO_MEANS_WAIT",
+  "law": "LAW.EXEC.FLOW_DEPTH_AGREEMENT_PREDICTS_ADVERSE",
+  "intents": [
+   "LONG",
+   "SHORT"
+  ],
+  "wait_cap_snapshots": 3,
+  "neighbour_caps": [
+   1,
+   6
+  ],
+  "at_cap": "FORCED_EXECUTION",
+  "max_price_age_ms": 30000,
+  "intent_notional_usd": 200,
+  "control_draws": 200,
+  "control_seed": 77077,
+  "floor_as_of": "2026-08-05",
+  "prior_expectation_bps_per_intent": 0.03
+ },
+ "by_cap": {
+  "1": {
+   "cap": 1,
+   "symbols": 9,
+   "n": 401789,
+   "mean_improvement_bps": 0.04845638633308982,
+   "se_bps": 0.002470196185444068,
+   "t_stat": 19.616412096587702,
+   "detectable_bps": 0.007410588556332204,
+   "wait_rate_pct": 15.574592634442457,
+   "mean_improvement_on_waited_bps": 0.3378331161738888,
+   "mean_wait_ms": 9369.210497567823,
+   "forced_pct": 2.3763716776716137,
+   "share_improved_pct": 4.639002063272016,
+   "control_mean_bps": 0.00012757633273119358
+  },
+  "3": {
+   "cap": 3,
+   "symbols": 9,
+   "n": 401773,
+   "mean_improvement_bps": 0.05910451959787916,
+   "se_bps": 0.002706100512646525,
+   "t_stat": 21.84121370276666,
+   "detectable_bps": 0.008118301537939574,
+   "wait_rate_pct": 15.571230520716922,
+   "mean_improvement_on_waited_bps": 0.40588556194058895,
+   "mean_wait_ms": 11101.313972998125,
+   "forced_pct": 0.044054727420707714,
+   "share_improved_pct": 4.720824943438211,
+   "control_mean_bps": 0.0001508201281940657
+  },
+  "6": {
+   "cap": 6,
+   "symbols": 9,
+   "n": 401769,
+   "mean_improvement_bps": 0.059157300541288906,
+   "se_bps": 0.002707915283568932,
+   "t_stat": 21.846067674363052,
+   "detectable_bps": 0.008123745850706797,
+   "wait_rate_pct": 15.570389950444161,
+   "mean_improvement_on_waited_bps": 0.4051180591216142,
+   "mean_wait_ms": 11128.13794284001,
+   "forced_pct": 0,
+   "share_improved_pct": 4.718134052154348,
+   "control_mean_bps": 0.004697997951987885
+  }
+ },
+ "cost_audit": {
+  "floor_bps": 16,
+  "citation": "10.45 fee + 5.56 execution, schedule BOTALIN.FEE.SCHEDULE",
+  "cancels_in_paired_difference": true
+ },
+ "prior_expectation_bps": 0.03,
+ "verdict": "GATE_IMPROVES_ENTRY",
+ "closure_reason": null,
+ "prior_check": {
+  "expected_bps": 0.03,
+  "measured_bps": 0.05910451959787916,
+  "standard_errors_from_prior": 10.7551509863968
+ },
+ "replication_context": {
+  "span": "2026-08-02T00:00Z..2026-08-05T16:32Z",
+  "days": 3.5,
+  "in_sample_span": "2026-07-10..2026-08-01T23:59Z",
+  "overlap": "none, adjacent",
+  "symbols_note": "AERGOUSDT absent: not quoted after 2026-07-25; in-sample figures below are recomputed on the same 9 symbols",
+  "in_sample_matched": {
+   "1": {
+    "mean_improvement_bps": 0.04924596627880122,
+    "t_stat": 34.02637455909514,
+    "se_bps": 0.0014472880792302315,
+    "n": 2222583,
+    "control_mean_bps": 0.00006668642659912604
+   },
+   "3": {
+    "mean_improvement_bps": 0.05925974703598428,
+    "t_stat": 37.41513496095938,
+    "se_bps": 0.0015838442677760895,
+    "n": 2222387,
+    "control_mean_bps": -0.0021186792680452224
+   },
+   "6": {
+    "mean_improvement_bps": 0.05959060819044676,
+    "t_stat": 37.542757857168866,
+    "se_bps": 0.0015872730612161944,
+    "n": 2222368,
+    "control_mean_bps": -0.0008603537283513926
+   }
+  },
+  "difference_at_frozen_cap_bps": -0.00015522743810512246,
+  "difference_t": -0.049505979325312054,
+  "law_status": "observed - unchanged; review_criterion requires 10 days, this span is 3.5",
+  "checkable_on": "2026-08-12"
+ }
+}

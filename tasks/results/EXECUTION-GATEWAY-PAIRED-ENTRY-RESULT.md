@@ -32,9 +32,17 @@ snapshot.
 | forced at the cap | 2.25 % | **0.04 %** | 0.0003 % |
 | **random-wait control** | 0.0009 | **0.0015** | −0.0003 |
 
-**The gate beats its control by a factor of 39.** Waiting on its own returns 0.0015 bps; waiting
-*when the predicate says to* returns 0.0588. That is the measurement that matters — without the
-control, short-horizon mean reversion would have been credited to the gate.
+**The control is indistinguishable from zero; the gate is not.** Waiting on its own returns
+0.0015 bps, inside one standard error of zero; waiting *when the predicate says to* returns
+0.0588 at t = 36.4. That is the measurement that matters — without the control, short-horizon
+mean reversion would have been credited to the gate.
+
+> **Correction, 2026-08-05.** This section first read "the gate beats its control by a factor of
+> 39." That ratio is not a sound statistic. Its denominator is a quantity consistent with zero,
+> so the ratio is unstable in both magnitude and sign — recomputing the same in-sample run on the
+> nine symbols that survive into the forward span puts the control at −0.0021 and the "ratio" at
+> −28. The defensible claim is the one now stated: the control cannot be distinguished from zero
+> and the effect can. Nothing else in this document changes.
 
 All ten symbols are positive, from 0.0125 (AMAT) to 0.1282 (BILL).
 
@@ -88,6 +96,12 @@ and 19.19 could have moved this number.
 **It is not replication.** The run uses the same 26-day archive that produced
 `LAW.EXEC.FLOW_DEPTH_AGREEMENT_PREDICTS_ADVERSE`. It establishes that a wait policy built on that
 predicate improves entry prices on the data the predicate was found in.
+
+> **Followed up 2026-08-05.** A genuinely non-overlapping span, 2026-08-02..05, has since been
+> run with this code unchanged and reproduces the result: +0.0591 bps at t = 21.8 against
+> +0.0593 on the composition-matched in-sample span, a difference of t = −0.05. See
+> `EXECUTION-GATEWAY-FORWARD-REPLICATION-RESULT.md`. The span is 3.5 days and the law's
+> pre-registered bar is 10, so the law's status is unchanged.
 
 **It is not a strategy.** The intent stream is synthetic and exhaustive by design, so that the
 gate's value cannot be entangled with any signal's quality. Connecting a real signal layer is a
