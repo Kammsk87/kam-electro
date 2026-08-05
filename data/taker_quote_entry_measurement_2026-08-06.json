@@ -1,0 +1,192 @@
+{
+ "module": "TAKER_QUOTE_ENTRY_MEASUREMENT",
+ "frozen": {
+  "module": "TAKER_QUOTE_ENTRY_MEASUREMENT",
+  "wait_cap_snapshots": 3,
+  "wait_cap_ms": 30000,
+  "prior_expectation_bps": 0.02,
+  "prior_range_bps": [
+   0,
+   0.04
+  ],
+  "prior_basis": "vetoed states are liquidity withdrawal, which widens the quote, so waiting pays part of the print gain back as spread"
+ },
+ "symbols": 9,
+ "pooled": {
+  "n": 573595,
+  "mean_bps": 0.07682424600094037,
+  "se_bps": 0.0021592259590536215,
+  "t_stat": 35.57953056224466
+ },
+ "spread_only_control": {
+  "n": 573584,
+  "mean_bps": 0.0747325615024989,
+  "se_bps": 0.003727258567125858,
+  "t_stat": 20.0502755997758
+ },
+ "guard_vs_spread_control": {
+  "difference_bps": 0.002091684498441465,
+  "se_bps": 0.004307518214524942,
+  "t": 0.4855892405488408,
+  "control_share_of_guard": 0.9727731203711929,
+  "verdict": "PREDICATE_INDISTINGUISHABLE_FROM_SPREAD_RULE"
+ },
+ "verdict": "TAKER_GAIN_SURVIVES",
+ "prior_check": {
+  "expected_bps": 0.02,
+  "expected_range_bps": [
+   0,
+   0.04
+  ],
+  "measured_bps": 0.07682424600094037,
+  "inside_prior_range": false
+ },
+ "wait_time_bound_check": {
+  "cap_ms": 30000,
+  "waits_exceeding_cap": 697,
+  "note": "the gateway counts snapshots, not milliseconds; this reports how often that differs"
+ },
+ "per_symbol": [
+  {
+   "symbol": "AAVEUSDT",
+   "n": 63730,
+   "mean_bps": 0.11204207462541439,
+   "se_bps": 0.005707840369055761,
+   "t_stat": 19.629503872048428,
+   "wait_rate_pct": 18.917307390553898,
+   "forced_pct": 0.039227993095873215,
+   "mean_wait_ms": 11673.31502986065,
+   "waits_over_30s": 117,
+   "waits_over_30s_pct": 0.9704711347047114,
+   "mean_spread_at_veto_bps": 1.0900927276763153,
+   "mean_spread_at_fill_bps": 1.0902642969095746,
+   "rejects": {}
+  },
+  {
+   "symbol": "ADAUSDT",
+   "n": 63732,
+   "mean_bps": 0.1719997294623311,
+   "se_bps": 0.009398093598030259,
+   "t_stat": 18.301555274825144,
+   "wait_rate_pct": 19.345069980543528,
+   "forced_pct": 0.09728236992405699,
+   "mean_wait_ms": 12086.57101143645,
+   "waits_over_30s": 190,
+   "waits_over_30s_pct": 1.5410820017844107,
+   "mean_spread_at_veto_bps": 5.2619140691117,
+   "mean_spread_at_fill_bps": 5.2610473444008585,
+   "rejects": {}
+  },
+  {
+   "symbol": "AMATUSDT",
+   "n": 63733,
+   "mean_bps": 0.019385485752817778,
+   "se_bps": 0.004071109088446249,
+   "t_stat": 4.761721027774351,
+   "wait_rate_pct": 2.7819183154723612,
+   "forced_pct": 0.003138091726421163,
+   "mean_wait_ms": 10686.527918781725,
+   "waits_over_30s": 5,
+   "waits_over_30s_pct": 0.2820078962210942,
+   "mean_spread_at_veto_bps": 15.226397744688267,
+   "mean_spread_at_fill_bps": 14.736611839648743,
+   "rejects": {
+    "RAN_OUT_OF_ARCHIVE": 1
+   }
+  },
+  {
+   "symbol": "ARBUSDT",
+   "n": 63731,
+   "mean_bps": 0.07057335262964608,
+   "se_bps": 0.005067940104646462,
+   "t_stat": 13.925451203525867,
+   "wait_rate_pct": 15.913762533147134,
+   "forced_pct": 0.03608918736564623,
+   "mean_wait_ms": 11599.356438572273,
+   "waits_over_30s": 72,
+   "waits_over_30s_pct": 0.7099191480970223,
+   "mean_spread_at_veto_bps": 1.3134831462397187,
+   "mean_spread_at_fill_bps": 1.3525131923089901,
+   "rejects": {
+    "RAN_OUT_OF_ARCHIVE": 1
+   }
+  },
+  {
+   "symbol": "AVAXUSDT",
+   "n": 63732,
+   "mean_bps": 0.07837648278131014,
+   "se_bps": 0.0059454407480775216,
+   "t_stat": 13.182619439383606,
+   "wait_rate_pct": 17.49827402246909,
+   "forced_pct": 0.047072114479382414,
+   "mean_wait_ms": 11646.988791248206,
+   "waits_over_30s": 127,
+   "waits_over_30s_pct": 1.1388091822094693,
+   "mean_spread_at_veto_bps": 1.514018101136917,
+   "mean_spread_at_fill_bps": 1.5140068132355395,
+   "rejects": {}
+  },
+  {
+   "symbol": "B3USDT",
+   "n": 63734,
+   "mean_bps": 0.036357637050620076,
+   "se_bps": 0.004654430754110443,
+   "t_stat": 7.811403578947168,
+   "wait_rate_pct": 4.537609439231807,
+   "forced_pct": 0.001569021244547651,
+   "mean_wait_ms": 10717.718533886584,
+   "waits_over_30s": 9,
+   "waits_over_30s_pct": 0.3112033195020747,
+   "mean_spread_at_veto_bps": 9.531747844853475,
+   "mean_spread_at_fill_bps": 9.236300036650919,
+   "rejects": {}
+  },
+  {
+   "symbol": "BILLUSDT",
+   "n": 63734,
+   "mean_bps": 0.06767559519410689,
+   "se_bps": 0.008804482737077122,
+   "t_stat": 7.6864930303189585,
+   "wait_rate_pct": 10.12018702733235,
+   "forced_pct": 0.020397276179119465,
+   "mean_wait_ms": 11256.195968992248,
+   "waits_over_30s": 42,
+   "waits_over_30s_pct": 0.6511627906976745,
+   "mean_spread_at_veto_bps": 6.263798922919855,
+   "mean_spread_at_fill_bps": 6.03126394300272,
+   "rejects": {}
+  },
+  {
+   "symbol": "BNBUSDT",
+   "n": 63733,
+   "mean_bps": 0.055424879258644796,
+   "se_bps": 0.0028797939280381705,
+   "t_stat": 19.24612685616794,
+   "wait_rate_pct": 14.825914361476785,
+   "forced_pct": 0.029811871401001052,
+   "mean_wait_ms": 11517.998624193036,
+   "waits_over_30s": 74,
+   "waits_over_30s_pct": 0.7831516562599217,
+   "mean_spread_at_veto_bps": 1.6958014214026145,
+   "mean_spread_at_fill_bps": 1.6950859114517975,
+   "rejects": {
+    "RAN_OUT_OF_ARCHIVE": 1
+   }
+  },
+  {
+   "symbol": "BSBUSDT",
+   "n": 63736,
+   "mean_bps": 0.07958660500688847,
+   "se_bps": 0.008450453327827335,
+   "t_stat": 9.418027876067885,
+   "wait_rate_pct": 12.707104305259195,
+   "forced_pct": 0.021965608133550897,
+   "mean_wait_ms": 11358.916039017162,
+   "waits_over_30s": 61,
+   "waits_over_30s_pct": 0.7531794048647982,
+   "mean_spread_at_veto_bps": 2.2470365634906484,
+   "mean_spread_at_fill_bps": 2.132770256920083,
+   "rejects": {}
+  }
+ ]
+}
