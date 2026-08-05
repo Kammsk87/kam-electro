@@ -139,6 +139,61 @@ margin improvement, never a load-bearing element.
 clears its own floor, not instead of finding one. Any proposal of the form "the guard turns a
 weak signal into a profitable one" is refused on this arithmetic.
 
+### Liquidity-bounded staleness — the mechanism is confirmed, the threshold is refused
+
+Measured 2026-08-05 across 10 symbols on the full G3 run. Recorded because a plausible universe
+rule was about to be adopted from it, and the data does not support that rule.
+
+**Confirmed: staleness has two components and a feed upgrade touches only one.**
+
+```
+staleness = feed latency + inter-trade arrival time
+```
+
+Spearman of trade rate against median staleness at zero offset: **ρ = −0.939** across ten
+symbols. On `AMATUSDT`, at 0.06 trades per second, a trade prints once every sixteen seconds; no
+feed however fast can execute a decision earlier than the next counterparty arrives.
+
+| symbol | trades/s | staleness | separation | retention @ 5 s |
+|---|---:|---:|---:|---:|
+| AAVE | 1.22 | 3,044 ms | 0.3101 | **33 %** |
+| ARB | 0.97 | 4,090 | 0.4525 | 41 % |
+| ADA | 0.77 | 5,360 | 0.2896 | 35 % |
+| AVAX | 0.66 | 4,523 | 0.3673 | 44 % |
+| BILL | 0.44 | 4,371 | 1.1222 | 58 % |
+| BNB | 0.39 | 5,968 | 0.3915 | 57 % |
+| BSB | 0.23 | 6,876 | 1.0285 | 73 % |
+| B3 | 0.17 | 7,371 | 0.9196 | 71 % |
+| AERGO | 0.11 | 7,095 | 1.2083 | **78 %** |
+| AMAT | 0.06 | 8,884 | **−0.1167** | 50 % |
+
+**Refused: a minimum trade-rate filter for the guard universe.** The proposal was to exclude
+symbols below 1.0 trades per second on the grounds that the guard degrades there. Two things
+are wrong with it.
+
+- It inverts the measured relation. Trade rate against retention at the 50 percent offset is
+  **ρ = −0.782**: the *illiquid* symbols retain the guard's edge **better**. AERGO keeps 78
+  percent where AAVE keeps 33. The mechanism is obvious once measured — on a symbol that trades
+  twice a minute, five seconds contains almost no information, so the state the guard read has
+  not moved on. Separation against trade rate is ρ = −0.261, also the wrong sign for the rule.
+- At a 1.0 threshold exactly **one** of ten symbols survives — AAVE at 1.22. ARB sits at 0.97
+  and ADA at 0.77.
+
+**What the evidence actually supports.** Only `AMATUSDT` shows a negative separation, at
+t = −0.41, and it is the single most illiquid name in the set. That is **one observation at one
+extreme**, not a threshold. Setting a universe rule from it would be fitting a boundary to a
+single point.
+
+**What would justify a threshold.** A trade-rate sweep on a universe wide enough to place the
+sign change, with the separation resolved on both sides of it. The present ten symbols cannot
+do that: nine are positive and one is negative.
+
+**Consequence for the L2 decision.** A direct feed reduces the latency term only, so its value
+is concentrated where that term is the binding one — the liquid core. On thin names the binding
+term is the inter-trade interval and no feed changes it. That sharpens the earlier claim in
+this section: the feed upgrade is worth arguing for on liquid symbols, and is close to
+worthless on illiquid ones, for reasons that have nothing to do with the feed.
+
 ### Staleness, and the L2 decision
 
 This is the crux of G3 and it is quantified.
