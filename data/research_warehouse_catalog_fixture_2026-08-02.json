@@ -5241,6 +5241,51 @@
       "fixture_flag": false,
       "source_of_record": "HL_CASCADE express cutoff, 2026-08-05",
       "notes": "CLOSED_MEASURED and not CLOSED_UNDERPOWERED, which contradicts the prediction made the previous day. The archive spans only 25 days and carries 73 settlements, so underpowered was the expected verdict; but 34,950 velocity observations give standard errors near 2 bps, placing a 16 bps effect roughly eight standard errors from what was measured. Short span did not mean small sample. Waiting for the recorder to reach its designed 30 days would add 20 percent to a sample that has already answered. This closes funding VELOCITY and the settlement window; it does not touch open interest, the oracle-mark gap, or the exchange-reported premium field, which is a distinct quantity from mark minus oracle. The open-interest hypothesis is the one the recorder was built for -- its header states the design thesis as cascade equals OI collapse plus oracle/mark divergence."
+    },
+    {
+      "record_type": "closure_decision",
+      "decision_id": "CD.OI_COLLAPSE_REVERSION",
+      "subject": "FAM.OI_COLLAPSE_ON_RISE",
+      "subject_kind": "FAMILY",
+      "disposition": "CLOSED_MEASURED",
+      "authority": "CHIEF_SCIENTIST",
+      "decisive_measurement": "The degeneracy check passed cleanly -- worst quintile imbalance 1.06 against 16.08 for funding velocity, with dOI 96.4 percent distinct over 1,050,870 observations -- so the event study ran on a non-degenerate sort. It refuted the declared direction. Over 283 non-overlapping events on 29 assets, shorting a rising price whose open interest collapsed returned -5.80 bps at 5 minutes with t=-1.93: the price CONTINUED upward rather than reverting, the same shape as TASK-AH-048. Standard error is 3.00 bps, so a +16 bps reversion sits 7.3 standard errors from the measurement and is excluded. Severity quintiles are not monotone and the largest OI collapses give the least reversion (+4.55). Conditioning on a top-quintile mark-oracle gap made it worse, -8.69 bps at t=-2.32.",
+      "decisive_metric": {
+        "degeneracy_worst_quintile_ratio": 1.06,
+        "funding_comparison_ratio": 16.08,
+        "doi_distinct_pct": 96.4,
+        "events": 283,
+        "assets": 29,
+        "primary_5m_bps": -5.8,
+        "primary_5m_t": -1.93,
+        "primary_se_bps": 3,
+        "standard_errors_to_floor": 7.3,
+        "severity_quintiles_bps": [
+          -10.81,
+          -14.94,
+          0.03,
+          -7.83,
+          4.55
+        ],
+        "gap_conditioned_bps": -8.69,
+        "mirror_15m_bps": 9.82,
+        "mirror_15m_t": 2.03,
+        "mirror_se_bps": 4.84,
+        "mirror_se_to_floor": 1.28,
+        "cost_floor_bps": 16
+      },
+      "reopen_criterion": "Only on the mirror event -- price DOWN with open interest collapsing, traded long -- and only at roughly five to six times the present sample, on the order of 140 days rather than 25, which is what it takes to bring the standard error from 4.84 to about 2.06 and separate +9.82 from the 16 bps floor at t=3. A reopen must ALSO show a monotone severity profile, which the present sample does not have. Re-running the declared primary is a silent retry: its direction is excluded at 7.3 standard errors. Waiting for the recorder to reach its designed 30 days adds 20 percent and does not qualify.",
+      "supersedes": [],
+      "law_ids": [],
+      "constraint_ids": [],
+      "task_id": "TASK-AH-052",
+      "decided_at": "2026-08-05",
+      "evidence_paths": [
+        "reference/B7_OI_COLLAPSE_RECONNAISSANCE_2026-08-05.md"
+      ],
+      "fixture_flag": false,
+      "source_of_record": "B7 reconnaissance on EDGE.DATA.HL_CASCADE, 2026-08-05",
+      "notes": "This was the last directional target on the open-directions register, and it was the only surviving hypothesis whose data had been collected on purpose for it. Under the criterion set before the run -- reversion below 16 bps or noise closes the loop -- the directional-alpha research programme is complete. The mirror at 15 minutes is the single unresolved figure at 1.28 standard errors from the floor, and it must not be chased: it is a non-primary horizon of a non-primary event set selected after the fact, which is exactly the selection CD.SELECTION_ON_INSAMPLE_RANK measured to be worthless. Recorded separately as a useful by-product: the mark-oracle gap carries a standard deviation of 13.06 bps, an order of magnitude wider than the perp-spot basis at 1.4 to 1.7 bps on majors, so the two are different objects and LAW.BASIS.LIQUID_PERP_BELOW_COST does not speak to this one."
     }
   ]
 }

@@ -1578,7 +1578,7 @@ test('a measured closure must point at something measured', () => {
 
 test('the seed registry closes methods as well as families', () => {
   const reg = seedCatalog.records.closure_decisions;
-  assert(reg.length === 11, `expected eleven seed decisions, got ${reg.length}`);
+  assert(reg.length === 12, `expected twelve seed decisions, got ${reg.length}`);
   const methods = reg.filter((d) => d.subject_kind === 'METHOD');
   assert(methods.length === 4,
     'a programme that only ever closes strategies keeps rediscovering the same way of being wrong');
@@ -1615,7 +1615,7 @@ test('a data-blocked route names the data that would lift it, not merely that it
 
 test('query "closures" orders measured before underpowered and reports both criteria', () => {
   const rows = runQuery(seedCatalog, 'closures', {});
-  assert(rows.length === 11, 'every decision is returned');
+  assert(rows.length === 12, 'every decision is returned');
   const firstUnder = rows.findIndex((d) => d.disposition === 'CLOSED_UNDERPOWERED');
   const lastMeasured = rows.map((d) => d.disposition).lastIndexOf('CLOSED_MEASURED');
   assert(lastMeasured < firstUnder,

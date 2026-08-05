@@ -13,7 +13,20 @@ State as of 2026-08-05. Eleven closures.
 
 ---
 
-## 1. The single alpha target
+## 1. The single alpha target — CLOSED 2026-08-05
+
+> **Status: the directional-alpha research loop is complete.** B7 was reconnoitred the same day
+> this register was written and closed as `CD.OI_COLLAPSE_REVERSION`, `CLOSED_MEASURED`. The
+> declared short direction was refuted — price *continued* after an OI collapse on a rising
+> price, −5.80 bps at t = −1.93, placing a +16 bps reversion 7.3 standard errors away. The
+> degeneracy check passed first, at a quintile ratio of 1.06, so this is a measurement and not a
+> collapsed sort. One figure is unresolved and must not be chased: the mirror event at 15
+> minutes, +9.82 bps with the floor 1.28 standard errors away, a non-primary horizon of a
+> non-primary set selected after the fact. Full detail in
+> `reference/B7_OI_COLLAPSE_RECONNAISSANCE_2026-08-05.md`.
+>
+> **Section 2 is now the whole programme.** The section below is retained as written, because
+> the reasoning that selected B7 is what a future reader needs in order to judge the closure.
 
 ### B7 — open-interest collapse on a rising price
 
