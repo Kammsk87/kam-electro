@@ -1,0 +1,169 @@
+{
+ "module": "FUNDING_PRE_CLEARING_IMPULSE",
+ "frozen": {
+  "module": "FUNDING_PRE_CLEARING_IMPULSE",
+  "hypothesis_id": "HYP.FUNDING_PRE_CLEARING_IMPULSE",
+  "settlement_hours_utc": [
+   0,
+   8,
+   16
+  ],
+  "window_start_s": -60,
+  "window_end_s": -5,
+  "max_price_age_ms": 5000,
+  "funding_max_age_ms": 1800000,
+  "high_fr_threshold": 0.0003,
+  "prior_range_bps": [
+   0.5,
+   2.5
+  ],
+  "cost_floor_bps": 16,
+  "resolve_at_t": 3
+ },
+ "symbols": 5,
+ "primary": {
+  "label": "PRIMARY_ALL_SETTLEMENTS_SIGNED",
+  "settlement": {
+   "n": 69,
+   "mean": -0.21579986018972236,
+   "se": 0.5840650514806441,
+   "t": -0.36947915243799506,
+   "clusters": 69,
+   "symbol_events": 186
+  },
+  "control": {
+   "n": 476,
+   "mean": -0.10733137971197367,
+   "se": 0.22419522709035944,
+   "t": -0.4787406989209227,
+   "clusters": 476,
+   "symbol_events": 1104
+  },
+  "comparison": {
+   "difference_bps": -0.1084684804777487,
+   "se_bps": 0.6256160837216266,
+   "t": -0.173378663528754
+  },
+  "verdicts": {
+   "physics": "UNRESOLVED",
+   "economics": "UNRESOLVED"
+  }
+ },
+ "secondary": {
+  "label": "SECONDARY_HIGH_FR_DECLARED_UNDERPOWERED",
+  "settlement": {
+   "n": 0,
+   "mean": null,
+   "se": null,
+   "t": null,
+   "clusters": 0,
+   "symbol_events": 0
+  },
+  "control": {
+   "n": 3,
+   "mean": 3.0592890641533437,
+   "se": 0.39406602597975754,
+   "t": 7.763392077627351,
+   "clusters": 3,
+   "symbol_events": 3
+  },
+  "comparison": {
+   "difference_bps": null,
+   "t": null
+  },
+  "verdicts": {
+   "physics": "UNRESOLVED",
+   "economics": "UNRESOLVED"
+  }
+ },
+ "prior_check": {
+  "registered_range_bps": [
+   0.5,
+   2.5
+  ],
+  "measured_bps": -0.1084684804777487,
+  "inside_range": false
+ },
+ "rejects": {
+  "NO_START_PRICE": 838,
+  "NO_END_PRICE": 605,
+  "ZERO_OR_BAD_RATE": 6
+ },
+ "per_symbol": [
+  {
+   "symbol": "AAVEUSDT",
+   "settlement": {
+    "n": 44,
+    "mean": 0.9398699286261928,
+    "se": 0.8687798518482963,
+    "t": 1.0818274924615885
+   },
+   "control": {
+    "n": 303,
+    "mean": -0.6632576461667674,
+    "se": 0.35758152693256257,
+    "t": -1.8548431510329484
+   }
+  },
+  {
+   "symbol": "ADAUSDT",
+   "settlement": {
+    "n": 34,
+    "mean": -1.5322771362378065,
+    "se": 1.0947861081274761,
+    "t": -1.3996132439592386
+   },
+   "control": {
+    "n": 199,
+    "mean": 0.08971634546037793,
+    "se": 0.5348687545608767,
+    "t": 0.16773525223778382
+   }
+  },
+  {
+   "symbol": "ARBUSDT",
+   "settlement": {
+    "n": 46,
+    "mean": 1.5965701871883426,
+    "se": 1.167409422595939,
+    "t": 1.367618040668277
+   },
+   "control": {
+    "n": 251,
+    "mean": 0.3129983044379261,
+    "se": 0.5047179147492481,
+    "t": 0.6201450261448093
+   }
+  },
+  {
+   "symbol": "AVAXUSDT",
+   "settlement": {
+    "n": 36,
+    "mean": -2.5292647342661483,
+    "se": 0.7777788116677542,
+    "t": -3.251907478480631
+   },
+   "control": {
+    "n": 209,
+    "mean": 0.38839020808638103,
+    "se": 0.3639018155735614,
+    "t": 1.0672939553055607
+   }
+  },
+  {
+   "symbol": "BNBUSDT",
+   "settlement": {
+    "n": 26,
+    "mean": -1.1880031238429738,
+    "se": 0.5176408911135257,
+    "t": -2.295033379776847
+   },
+   "control": {
+    "n": 142,
+    "mean": -0.20666756021895005,
+    "se": 0.2759079565191067,
+    "t": -0.7490453078131448
+   }
+  }
+ ]
+}
