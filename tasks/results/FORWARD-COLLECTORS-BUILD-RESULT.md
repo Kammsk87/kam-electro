@@ -1,7 +1,7 @@
 # Two forward collectors for `GAP.OI_LIQ.FINE_GRAIN` — BUILD RESULT
 
-**Status: `BUILT_AND_SMOKE_TESTED_LOCALLY. NOT INSTALLED ON THE HOST.`**
-**Tests 22/22. Installation needs explicit authorization — see §6.**
+**Status: `DEPLOYED AND COLLECTING` since 2026-08-06 11:43 UTC.**
+**Tests 22/22. Installed under explicit operator authorization — see §7.**
 
 ## What was verified against the live venue before either file was written
 
@@ -86,6 +86,48 @@ The bar remains what `CD.OI_COLLAPSE_REVERSION` set for the mirror event: roughl
 against the 25 we have. Starting today makes that reachable around **late December 2026**. Nothing
 about building the collectors shortens it — collection is the only thing that ever could, which is
 exactly why it should start now rather than after the next hypothesis needs it.
+
+## Deployment, 2026-08-06 11:43 UTC
+
+Authorized explicitly by the operator. Two units, `Restart=always`, `RestartSec=5`, user
+`botalin`, both keyless and public-data only:
+
+- `botalin-liquidation-recorder.service` — `node --experimental-websocket`
+- `botalin-oi10s-recorder.service`
+
+**First verification, on live data:**
+
+| open interest | |
+|---|---|
+| cycles / failures | 18 / **0** |
+| median inter-cycle gap | **10,002 ms** — on grid |
+| request latency, median | 396 ms |
+| rows per cycle | 36 of 37 |
+| BTC open-interest values | **18 distinct in 18 cycles** |
+
+Every single cycle carried new information. That is the premise of the whole build confirmed
+directly rather than inferred: the 5.6-minute recorder was discarding thirty-three observations
+out of every thirty-four.
+
+**The `missing` counter earned itself in the first four minutes.** It reported 1, and the absent
+symbol is `AERGOUSDT` — the same symbol that vanished from the book archive on 2026-07-25 and
+forced the forward replication onto nine symbols. The recorder found that independently, from the
+venue, without being told. Had missing symbols been silently dropped, a delisting would have
+entered the archive as unchanging open interest.
+
+| liquidations | |
+|---|---|
+| records in ~4 minutes | 4 real + 1 heartbeat |
+| feed latency, median | **257 ms** |
+
+```json
+{"ingest_ts":1786016650496,"exchange_ts":1786016650239,"frame_ts":1786016650413,
+ "symbol":"LINKUSDT","S":"Sell","price":8.256,"qty":66.7,"size_usd":550.6752,"topic_type":"snapshot"}
+```
+
+`S` is stored verbatim, as designed. And the 257 ms median latency is worth keeping: against the
+staleness curve measured yesterday, a decision made on 257 ms-old information retains roughly
+92 percent of its value, against 50 percent on the 10-second poll.
 
 ## Files
 
