@@ -1603,7 +1603,11 @@ test('underpowered and measured closures are never conflated in the seed', () =>
 
 test('a data-blocked route names the data that would lift it, not merely that it is blocked', () => {
   const blocked = seedCatalog.records.closure_decisions.filter((d) => d.disposition === 'DATA_BLOCKED');
-  assert(blocked.length === 3, `expected three data-blocked routes, got ${blocked.length}`);
+  // Two, not three: CD.CROSS_EXCHANGE_LEADLAG moved to CLOSED_MEASURED on 2026-08-06 when
+  // clause (c) was measured and failed, so the route is now closed on measurement rather
+  // than blocked on data. This line is a census of the fixture; the property assertions
+  // that follow are the test's actual content and are unchanged.
+  assert(blocked.length === 2, `expected two data-blocked routes, got ${blocked.length}`);
   for (const d of blocked) {
     assert(d.subject_kind === 'DATA_ROUTE', `${d.decision_id}: a blocked route is not a family verdict`);
     // The decisive measurement of a DATA_BLOCKED entry is a fact about the archive, so it must
