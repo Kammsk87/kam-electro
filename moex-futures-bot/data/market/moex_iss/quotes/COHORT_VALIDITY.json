@@ -1,0 +1,30 @@
+{
+  "cohort_id": "MX003.TRACK_A.BR_QUOTES",
+  "task": "TASK-MX-003-MOEX-QUOTE-AND-SPREAD-MEASUREMENT-V0",
+  "note": "Per-day validity against the stopping rule frozen in the task file. A day is counted only if it carries usable coverage of both sessions. Days are never repaired, back-filled or spliced; an incomplete day is excluded and the collection simply runs longer.",
+  "rule_reference": "at least 15 distinct trading days; at least 2 distinct front-contract expiries; both main and evening session represented on at least 10 of those days",
+  "days": [
+    {
+      "date": "2026-08-06",
+      "status": "PARTIAL_START",
+      "counts_toward_15": false,
+      "records": 2696,
+      "sessions_observed": ["EVENING_SESSION", "CLOSED"],
+      "reason": "collector started at 22:07 MSK; the day was already almost over. Start-up fragment, not a covered day."
+    },
+    {
+      "date": "2026-08-07",
+      "status": "INVALID_DAY_INCOMPLETE_COVERAGE",
+      "counts_toward_15": false,
+      "records": 6616,
+      "sessions_observed": ["CLOSED", "EVENING_SESSION", "MAIN_SESSION(56 records)"],
+      "gap_minutes": 521,
+      "gap_window_msk": "06:23 - 15:04",
+      "reason": "an 8.7-hour interruption swallowed the whole main session; 56 records against roughly 6000 expected. Cause: host sleep, compounded by transient URLError backoff. Excluded from the cohort.",
+      "evidence": "data/market/moex_iss/quotes_collector.log"
+    }
+  ],
+  "valid_day_count": 0,
+  "remediation": "collector restarted 2026-08-07 under `caffeinate -i`, which holds the host awake for the life of the process. Storage layout unchanged, so the restart introduces no schema discontinuity.",
+  "policy": "No day is spliced from fragments. If the host sleeps again, that day is excluded and the end date moves. The stopping rule is not weakened to fit the calendar."
+}

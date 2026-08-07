@@ -1,0 +1,37 @@
+{
+  "ledger_id": "BR_holdout_ledger_20260722",
+  "symbol": "BR_last_trade_return_stitched@MOEX_ISS",
+  "timeframe": "TIME_FRAME_D",
+  "dataset": "moex_iss_continuous",
+  "continuous_method": "sticky_volume_leader_last_trade_return_stitched",
+  "holdout_bars": 252,
+  "holdout_start_ts": "2025-10-15T05:00:00+05:00",
+  "holdout_end_ts": "2026-07-19T05:00:00+05:00",
+  "spent_checks": [
+    {
+      "spent_at_report": "data/reports/holdout_candidate_20260720_001532.md",
+      "family": "mean_reversion_sma",
+      "params": {
+        "lookback": 20,
+        "threshold_pct": 2.0
+      },
+      "cost_bps": 25.0,
+      "broker_fee_rub_per_contract": 5.0,
+      "exclude_roll_window_bars": 3,
+      "verdict": "holdout_fail",
+      "holdout_return_pct": -6.48,
+      "holdout_benchmark_return_pct": 68.71,
+      "holdout_excess_return_pct": -75.19,
+      "reject_family_neighborhood": true,
+      "notes": "Same-family and neighboring mean-reversion SMA ideas must not be routed to focused/holdout on this spent holdout period."
+    }
+  ],
+  "quarantined_families": [
+    "mean_reversion_sma"
+  ],
+  "policy": {
+    "holdout_reuse_allowed": false,
+    "same_family_same_holdout_route": "quarantined_after_holdout_fail",
+    "next_access_requires": "structurally_new_mechanism_or_new_calendar_holdout"
+  }
+}

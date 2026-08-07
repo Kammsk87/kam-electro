@@ -4,5 +4,39 @@
 __pycache__/
 .pycache/
 *.pyc
+
+# Raw market data and databases stay out of git: 17 MB and growing, and a
+# collector appends to them continuously.
 data/*
 !data/.gitkeep
+
+# Curated evidence is tracked. Task results in tasks/results/ cite these paths as
+# their evidence; if they are not in the repository, a fresh clone cannot verify
+# any conclusion the project has reached. Rule adopted 2026-08-07.
+#
+# A parent directory must be re-included before anything inside it can be, hence
+# the un-ignore / re-ignore / un-ignore sequence below.
+!data/specs/
+!data/specs/**
+
+!data/reports/
+data/reports/*
+!data/reports/*.md
+!data/reports/*.json
+
+# Machine-generated run artefacts stay out: 849 files across factory,
+# idea_autopilot, permutation_control and backtests, regenerated on every run and
+# summarised into the curated reports above.
+data/reports/factory/
+data/reports/idea_autopilot/
+data/reports/permutation_control/
+data/reports/backtests/
+
+# The cohort validity register is a research decision record, not market data.
+!data/market/
+data/market/*
+!data/market/moex_iss/
+data/market/moex_iss/*
+!data/market/moex_iss/quotes/
+data/market/moex_iss/quotes/*
+!data/market/moex_iss/quotes/COHORT_VALIDITY.json
