@@ -1,0 +1,137 @@
+{
+  "schedule_id": "MOEX.FORTS.FEE.SCHEDULE",
+  "schema_version": "1.0.0",
+  "venue": "MOEX_FORTS",
+  "generated_for": "TASK-MX-001-MOEX-COST-MODEL-AND-STAGE0-FEASIBILITY-V0",
+  "note": "Exchange fees here are TRANSCRIBED FROM THE VENUE'S OWN CONTRACT PARAMS, retained locally in data/market/moex_iss/params/. They are what MOEX publishes it will charge per contract per side. They are not realised fees from an executed ledger, because no MOEX trade has ever been executed by this project. That is a weaker basis than Botalin's realised-fee schedule and the difference is recorded in `undetermined`.",
+
+  "cost_algebra": {
+    "note": "FORTS charges a flat rouble fee per contract per side. Basis points are DERIVED, never primitive: the same contract costs a different number of bps at a different price. Any caller wanting bps must supply a reference price.",
+    "contract_notional_rub": "price * (stepprice / minstep)",
+    "roundtrip_fee_rub": "legs * 2 * fee_per_contract_rub",
+    "bps": "roundtrip_rub / contract_notional_rub * 10000"
+  },
+
+  "entries": [
+    {
+      "instrument": "BR",
+      "instrument_class": "COMMODITY_FUTURE_DELIVERABLE_CASH_SETTLED",
+      "tier": "ISS_PUBLISHED_PARAMS_2026_08",
+      "effective_from": "2026-08-06",
+      "effective_to": null,
+      "basis": "PUBLISHED_VENUE_PARAMS",
+      "source": "data/market/moex_iss/params/security={BRQ6,BRU6,BRV6}/params.parquet",
+      "measurement": {
+        "securities": ["BRQ6", "BRU6", "BRV6"],
+        "minstep": 0.01,
+        "stepprice_rub": 7.83987,
+        "rub_per_price_point": 783.987,
+        "buysellfee_rub_per_contract_per_side": {"BRQ6": 8.99, "BRU6": 8.87, "BRV6": 8.75},
+        "scalperfee_rub_per_contract_per_side": {"BRQ6": 4.5, "BRU6": 4.44, "BRV6": 4.38},
+        "initialmargin_rub_per_contract": {"BRQ6": 14446.65, "BRU6": 16009.16, "BRV6": 15676.19},
+        "conservative_buysellfee_rub": 8.99,
+        "conservative_scalperfee_rub": 4.5,
+        "reference_price": 88.33,
+        "reference_notional_rub": 69250,
+        "reference_single_leg_roundtrip_fee_bps": 2.6,
+        "reference_single_leg_roundtrip_scalper_fee_bps": 1.3,
+        "reference_margin_pct_of_notional": 20.9
+      }
+    },
+    {
+      "instrument": "GD",
+      "instrument_class": "COMMODITY_FUTURE_CASH_SETTLED",
+      "tier": "ISS_PUBLISHED_PARAMS_2026_08",
+      "effective_from": "2026-08-06",
+      "effective_to": null,
+      "basis": "PUBLISHED_VENUE_PARAMS",
+      "source": "data/market/moex_iss/params/security=GDU6/params.parquet",
+      "measurement": {
+        "securities": ["GDU6"],
+        "minstep": 0.1,
+        "stepprice_rub": 7.83987,
+        "rub_per_price_point": 78.3987,
+        "buysellfee_rub_per_contract_per_side": {"GDU6": 41.79},
+        "scalperfee_rub_per_contract_per_side": {"GDU6": 20.9},
+        "initialmargin_rub_per_contract": {"GDU6": 29315.62},
+        "conservative_buysellfee_rub": 41.79,
+        "conservative_scalperfee_rub": 20.9,
+        "reference_price": 4034.7,
+        "reference_notional_rub": 316315,
+        "reference_single_leg_roundtrip_fee_bps": 2.64,
+        "reference_single_leg_roundtrip_scalper_fee_bps": 1.32,
+        "reference_margin_pct_of_notional": 9.3
+      }
+    },
+    {
+      "instrument": "GLDRUBF",
+      "instrument_class": "PERPETUAL_STYLE_FUTURE_WITH_SWAPRATE",
+      "tier": "ISS_PUBLISHED_PARAMS_2026_08",
+      "effective_from": "2026-08-06",
+      "effective_to": null,
+      "basis": "PUBLISHED_VENUE_PARAMS",
+      "source": "data/market/moex_iss/params/security=GLDRUBF/params.parquet",
+      "measurement": {
+        "securities": ["GLDRUBF"],
+        "minstep": 0.1,
+        "stepprice_rub": 0.1,
+        "rub_per_price_point": 1.0,
+        "buysellfee_rub_per_contract_per_side": {"GLDRUBF": 1.34},
+        "scalperfee_rub_per_contract_per_side": {"GLDRUBF": 0.67},
+        "initialmargin_rub_per_contract": {"GLDRUBF": 1114.73},
+        "conservative_buysellfee_rub": 1.34,
+        "conservative_scalperfee_rub": 0.67,
+        "reference_price": 10103.4,
+        "reference_notional_rub": 10103,
+        "reference_single_leg_roundtrip_fee_bps": 2.65,
+        "reference_single_leg_roundtrip_scalper_fee_bps": 1.33,
+        "reference_margin_pct_of_notional": 11.0
+      },
+      "carry_warning": "This instrument has a daily SWAPRATE. Fee is only part of its cost; holding cost is a separate, larger term and is NOT in this schedule. See data/reports/gldrubf_funding_impact_20260719_204436.md. Do not use this entry as an all-in cost for any multi-day GLDRUBF hypothesis."
+    }
+  ],
+
+  "execution_bases": {
+    "NONE": {
+      "note": "Fees only. Explicitly not a tradeable-realistic floor. Permitted for arithmetic sanity checks and for isolating the fee term; a Stage 0 verdict may not be issued on this basis.",
+      "roundtrip_ticks_per_leg": 0
+    },
+    "TICK_FLOOR": {
+      "note": "THEORETICAL LOWER BOUND. Assumes the bid-ask spread equals one minimum price step and that a round trip crosses it once in total per leg. The true spread is at least this and usually wider, especially away from the front contract. Any report quoting a TICK_FLOOR result must label it a lower bound.",
+      "roundtrip_ticks_per_leg": 1
+    },
+    "TICK_FLOOR_STRESS": {
+      "note": "Crosses the full one-tick spread on entry and again on exit, per leg. Still a bound derived from tick size, not a measurement of the book.",
+      "roundtrip_ticks_per_leg": 2
+    },
+    "MEASURED": {
+      "note": "UNAVAILABLE. data/market/finam/orderbook/ contains zero files and no MOEX quote-tick source has ever been collected. Requesting this basis raises rather than substituting a proxy.",
+      "available": false
+    }
+  },
+
+  "stress_multiplier": 2.0,
+
+  "undetermined": [
+    "Broker commission is absent entirely. Only the exchange leg is here. A Finam/BCS per-contract tariff would add to every number in this schedule and could plausibly equal or exceed the exchange fee on a retail tariff. Every floor produced from this schedule is therefore a LOWER BOUND on the true all-in cost even before execution is considered.",
+    "No measured bid-ask spread exists for any MOEX instrument in this project. data/market/finam/orderbook/ is empty. The TICK_FLOOR bases are arithmetic from minstep, not observations of a book. The measured leg-3 liquidity (median 741 lots and 49 mln RUB per day, 2024+) makes a one-tick spread implausible away from the front contract.",
+    "No slippage measurement exists, because no order has ever been placed. The execution component that Botalin measured at 5.56 bps from 29 reconciled round trips has no MOEX counterpart.",
+    "The scalper/non-scalper split is a real FORTS distinction but the exact qualification rule as applied by the clearing house is not verified here. Treating a hypothesis as scalper-rated requires proving every round trip closes intraday.",
+    "Margin funding is not a fee and is not in derived_floor. Initial margin is 9-24% of notional depending on instrument; at a double-digit rouble rate the carrying cost of a multi-day position is material and must be modelled separately per horizon.",
+    "Evening-session and clearing-session mechanics, and any per-clearing-session fee treatment, are not represented.",
+    "Tax is not represented."
+  ],
+
+  "review_criterion": "Replace, do not amend. Append a new entry with its own effective_from on any of: a change of published venue params; the arrival of a broker tariff; the first measured bid-ask spread; the first reconciled executed round trip. Existing entries are never rewritten so results computed under an older schedule stay reproducible.",
+
+  "supersedes": {
+    "note": "The values this schedule replaces for work from 2026-08-06 onward.",
+    "prior_cost_bps_sweep": [0, 10, 25, 50],
+    "prior_robust_min_cost_bps": 25,
+    "prior_source": "configs/idea_space/brent_v1.json and configs/experiments/brent_research_v1.json",
+    "prior_basis": "none - no derivation was recorded for any of the four values",
+    "retrofit_policy": "Results published before 2026-08-06 keep their frozen constants so they remain reproducible. This schedule binds new work only."
+  },
+
+  "source_of_record": "derived on 2026-08-06 from MOEX ISS contract params retained at data/market/moex_iss/params/, cross-checked against last close and open interest in data/research.duckdb table moex_iss_futures_history as of tradedate 2026-07-17"
+}

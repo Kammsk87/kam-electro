@@ -1,0 +1,148 @@
+{
+  "schedule_id": "MOEX.FORTS.FEE.SCHEDULE",
+  "schema_version": "1.1.0",
+  "venue": "MOEX_FORTS",
+  "generated_for": "TASK-MX-002-FORTS-BROKER-TARIFF-AND-SPREAD-MARGIN-MEASUREMENT-V0",
+  "supersedes_file": "moex_forts_fee_schedule_2026-08-06.json",
+  "supersedes_note": "The 2026-08-06 file is NOT modified and stays readable, so TASK-MX-001 results remain reproducible under the schedule they were computed with. This revision adds the broker component and the calendar-spread margining rule.",
+
+  "note": "Exchange fees are transcribed from the venue's own contract params retained locally. The broker component is an OPERATOR ATTESTATION, not a document: no tariff page was ever obtained, because the broker returns HTTP 403 to automated fetches. The margining rule is published venue methodology; its numeric interest-rate-risk parameter was not obtained and is bounded rather than measured.",
+
+  "evidence_bases": {
+    "REALISED": "measured from executed round trips; unavailable, no MOEX order has ever been placed",
+    "PUBLISHED_BROKER_TARIFF": "the broker's own dated published rate for the account's tier; NOT ACHIEVED",
+    "PUBLISHED_VENUE_PARAMS": "read from exchange/clearing-house publications",
+    "OPERATOR_ATTESTED": "stated by the operator from direct knowledge of their own account, with no document filed; stronger than hearsay, weaker than a publication, and the account holder is the only party who can know the tier",
+    "INFERRED_BOUND": "derived from a published rule as a bound rather than a value",
+    "ASSUMED": "not admissible"
+  },
+
+  "cost_algebra": {
+    "note": "FORTS charges a flat rouble fee per contract per side. Basis points are DERIVED, never primitive.",
+    "contract_notional_rub": "price * (stepprice / minstep)",
+    "exchange_fee_roundtrip_rub_TRADE_OUT": "legs * 2 * buysellfee",
+    "exchange_fee_roundtrip_rub_EXPIRY_SETTLE": "legs * buysellfee (entry) + (legs-1) * buysellfee + exercisefee (exit, near leg settles)",
+    "broker_fee_roundtrip_rub": "legs * 2 * broker_fee_per_side",
+    "bps": "roundtrip_rub / contract_notional_rub * 10000"
+  },
+
+  "entries": [
+    {
+      "instrument": "BR",
+      "instrument_class": "COMMODITY_FUTURE_CASH_SETTLED",
+      "tier": "ISS_PARAMS_PLUS_OPERATOR_BROKER_2026_08",
+      "effective_from": "2026-08-06",
+      "effective_to": null,
+      "basis": "PUBLISHED_VENUE_PARAMS+OPERATOR_ATTESTED",
+      "source": "data/market/moex_iss/params/security={BRQ6,BRU6,BRV6}/params.parquet; broker component from operator statement 2026-08-06",
+      "measurement": {
+        "securities": ["BRQ6", "BRU6", "BRV6"],
+        "minstep": 0.01,
+        "stepprice_rub": 7.83987,
+        "rub_per_price_point": 783.987,
+        "buysellfee_rub_per_contract_per_side": {"BRQ6": 8.99, "BRU6": 8.87, "BRV6": 8.75},
+        "scalperfee_rub_per_contract_per_side": {"BRQ6": 4.5, "BRU6": 4.44, "BRV6": 4.38},
+        "exercisefee_rub_per_contract": {"BRQ6": 3.0, "BRU6": 2.95, "BRV6": 2.92},
+        "initialmargin_rub_per_contract": {"BRQ6": 14446.65, "BRU6": 16009.16, "BRV6": 15676.19},
+        "conservative_buysellfee_rub": 8.99,
+        "conservative_scalperfee_rub": 4.5,
+        "conservative_exercisefee_rub": 3.0,
+        "reference_price": 88.33,
+        "reference_notional_rub": 69250
+      },
+      "broker": {
+        "entity": "Finam",
+        "plan_stated": "ЕДП / Трейдер",
+        "fee_rub_per_contract_per_side": 0.45,
+        "tier_stated": "retail, up to ~100 contracts per day",
+        "basis": "OPERATOR_ATTESTED",
+        "attested_on": "2026-08-06",
+        "charged_on_expiry_settlement": null,
+        "caveats": [
+          "No tariff document was filed. zaoik.finam.ru and broker.finam.ru both return HTTP 403 to automated fetches; the pages are public in a browser.",
+          "A secondary source associated the 0.45 RUB rate with the Finam «Инвестор» plan, while the operator states «ЕДП / Трейдер». The plan attribution is unconfirmed. The rate itself is far below every breakeven in the frozen frontier, so the verdict is insensitive to which plan is correct.",
+          "The same secondary sources indicate the rate varies with both daily turnover and end-of-day net assets. A single figure therefore describes one tier, not the tariff.",
+          "Whether the broker charges its fee on a contract that settles at expiry rather than being traded out is UNKNOWN. The model charges it conservatively on all legs and sides."
+        ]
+      }
+    }
+  ],
+
+  "margining": {
+    "note": "Calendar-spread margin is not a discount anyone selects. It is one of two published rules.",
+    "basis": "PUBLISHED_VENUE_PARAMS",
+    "sources": [
+      "https://www.nationalclearingcentre.ru/catalog/030902",
+      "https://www.moex.com/s206",
+      "https://www.moex.com/ru/derivatives/parameters.aspx"
+    ],
+    "retrieved_on": "2026-08-06",
+    "rules": {
+      "NETTO": {
+        "blocked": "величина процентного риска",
+        "applies_to_BR": "through the second monthly expiration, i.e. the front/second pair",
+        "numeric_parameter": null,
+        "numeric_parameter_status": "NOT_OBTAINED - the NCC static-parameters page is client-rendered and yields no values to a plain fetch"
+      },
+      "POLUNETTO": {
+        "blocked": "the greater of the two legs' initial margin, not the sum",
+        "applies_to_BR": "expirations beyond the second"
+      },
+      "SUM": {
+        "blocked": "the sum of both legs' initial margin",
+        "applies_to_BR": "never; this is the no-netting case and was what TASK-MX-001 conservatively charged"
+      }
+    },
+    "rule_in_force_for_front_second": "NETTO",
+    "computation_rule_used": "POLUNETTO",
+    "computation_rule_basis": "INFERRED_BOUND",
+    "computation_rule_justification": "NETTO applies to the nearer, most-correlated expirations and blocks interest-rate risk instead of a leg's full margin. A netting regime reserved for the most-correlated pairs that produced a HIGHER margin than semi-netting would be incoherent. POLUNETTO is therefore used as an upper bound on the front/second funding cost. It is a bound, not a measurement, and must not be presented as the realised margin.",
+    "polunetto_margin_rub_BRQ6_BRU6": 16009.16,
+    "sum_margin_rub_BRQ6_BRU6": 30455.81,
+    "bound_reduction_vs_sum_pct": 47.4
+  },
+
+  "execution_bases": {
+    "NONE": {
+      "note": "Fees only. Not a tradeable-realistic floor. A Stage 0 verdict may not be issued on this basis.",
+      "roundtrip_ticks_per_leg": 0
+    },
+    "TICK_FLOOR": {
+      "note": "THEORETICAL LOWER BOUND. Assumes the bid-ask spread equals one minimum price step, crossed once in total per leg. Any report quoting it must label it a lower bound.",
+      "roundtrip_ticks_per_leg": 1
+    },
+    "TICK_FLOOR_STRESS": {
+      "note": "Crosses the full one-tick spread on entry and again on exit, per leg. Still arithmetic from tick size, not a measurement of the book.",
+      "roundtrip_ticks_per_leg": 2
+    },
+    "MEASURED": {
+      "note": "UNAVAILABLE. data/market/finam/orderbook/ contains zero files and no MOEX quote-tick source has ever been collected.",
+      "available": false
+    }
+  },
+
+  "exit_routes": {
+    "TRADE_OUT": {"note": "Both legs closed by trading. The default.", "near_leg_settles": false},
+    "EXPIRY_SETTLE": {
+      "note": "The near leg is allowed to settle at expiry, paying exercisefee instead of buysellfee. Cheaper in fees and materially different in risk: the leg fixes at the final settlement price, the position surrenders its choice of exit timing, and what remains is an outright far leg rather than a spread. Must be claimed explicitly.",
+      "near_leg_settles": true
+    }
+  },
+
+  "stress_multiplier": 2.0,
+
+  "undetermined": [
+    "No measured bid-ask spread exists for any MOEX instrument in this project. data/market/finam/orderbook/ is empty. The TICK_FLOOR bases are arithmetic from minstep, not observations of a book. With the broker and margin components now closed, THIS IS THE BINDING UNKNOWN for the calendar contour.",
+    "No slippage measurement exists, because no order has ever been placed.",
+    "The numeric interest-rate risk under NETTO was not obtained; POLUNETTO is used as a bound and can only overstate the funding cost.",
+    "Whether the broker fee is charged on a leg that settles at expiry is unknown; it is charged conservatively.",
+    "The broker tariff has no filed document and its plan attribution is unconfirmed.",
+    "The scalper/non-scalper qualification rule as applied by the clearing house is not verified.",
+    "Evening-session and clearing-session fee treatment is not represented.",
+    "Tax is not represented."
+  ],
+
+  "review_criterion": "Replace, do not amend. Append a new entry on any of: a change of published venue params; a filed broker tariff document; the first measured bid-ask spread; the first reconciled executed round trip; the numeric NETTO interest-rate risk.",
+
+  "source_of_record": "ISS contract params retained at data/market/moex_iss/params/; NCC and MOEX margining methodology retrieved 2026-08-06 and filed at data/specs/moex_forts_spread_margin_2026.md; broker component attested by the operator on 2026-08-06 with the failure to obtain a document recorded at data/specs/broker_forts_tariff_2026.NOT_OBTAINED.md"
+}
