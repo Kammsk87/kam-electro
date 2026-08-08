@@ -74,9 +74,27 @@ median has earned a protocol, not a position». That is exactly what happened.
   mean **−116.68 ₽**. The better half was the earlier half.
 - **Remove-best-day** moves the 5d net mean from −33.99 to −60.48. A single day
   carried a quarter of the result.
-- **Remove-regime**: dropping backwardation leaves −59.81, dropping contango
-  leaves −48.37. 164 of 185 trades were in backwardation, so the rule was mostly
-  trading one regime.
+- **Remove-regime** — corrected 2026-08-08, see the note below. Per-regime net
+  means at the tick floor:
+
+  | timeout | contango | backwardation | overall |
+  |---|---:|---:|---:|
+  | 3d | **−189.43 ₽** (n=25) | −8.17 ₽ (n=172) | −31.17 ₽ |
+  | 5d | −44.13 ₽ (n=21) | −32.69 ₽ (n=164) | −33.99 ₽ |
+
+  The losses concentrate in **contango**, not backwardation. At the 3d timeout
+  twenty-five contango trades averaging −189 ₽ dragged down a hundred and
+  seventy-two backwardation trades averaging −8 ₽.
+
+  **Correction.** The first version of this section quoted −59.81 and −48.37 as
+  the remove-regime figures alongside a −33.99 baseline. Those two numbers came
+  from the `TICK_FLOOR_STRESS` run and the baseline from `TICK_FLOOR`; mixing the
+  two cost bases made a weighted average that cannot exist. It also framed
+  backwardation as the failing regime when it was the better one. The table above
+  is the corrected figure at a single cost basis. The verdict is unchanged — both
+  regimes lose money at every timeout — but the direction of the regime effect
+  was reported backwards and anything built on that reading would have been built
+  on a mistake.
 - **Return distribution**: skew −4.15, raw kurtosis 28.8. A 62% win rate with a
   left tail that heavy is the classic payoff trap — many small wins, a few
   destroying losses.
