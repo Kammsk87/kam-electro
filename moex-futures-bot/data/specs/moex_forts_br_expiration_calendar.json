@@ -1,0 +1,451 @@
+{
+  "calendar_id": "MOEX.FORTS.BR.EXPIRATIONS",
+  "schema_version": "1.0.0",
+  "basis": "PUBLISHED_VENUE_PARAMS",
+  "source": "https://iss.moex.com/iss/securities/{secid}.json, description block, LSTTRADE",
+  "retrieved_on": "2026-08-09",
+  "note": "Authoritative last trading dates. Consumed by strategies/brent_carry.py, which requires expiry_dates explicitly and raises without them. Deriving the date from the last day a contract happened to trade mislabels any contract still alive at the end of a sample.",
+  "validation_policy": "Deviations from the modal pattern are REPORTED, never rejected. The obvious rule - last trading day is the first trading day of the contract's own month - fails for at least BRU6, which is BR-9.26 with LSTTRADE 2026-08-31 while 2026-09-01 is an ordinary Tuesday. A validator built on the assumed rule would reject authoritative venue data.",
+  "pattern_counts": {
+    "prior_month": 3,
+    "own_month": 48
+  },
+  "deviations_from_own_month": [
+    {
+      "secid": "BRF3",
+      "name": "Фьючерсный контракт BR-1.23",
+      "lsttrade": "2022-12-30",
+      "contract_month": "2023-01",
+      "relation": "prior_month"
+    },
+    {
+      "secid": "BRF4",
+      "name": "Фьючерсный контракт BR-1.24",
+      "lsttrade": "2023-12-29",
+      "contract_month": "2024-01",
+      "relation": "prior_month"
+    },
+    {
+      "secid": "BRU6",
+      "name": "Фьючерсный контракт BR-9.26",
+      "lsttrade": "2026-08-31",
+      "contract_month": "2026-09",
+      "relation": "prior_month"
+    }
+  ],
+  "expirations": {
+    "BRF3": "2022-12-30",
+    "BRF4": "2023-12-29",
+    "BRF5": "2025-01-03",
+    "BRF6": "2026-01-05",
+    "BRF7": "2027-01-04",
+    "BRG3": "2023-02-01",
+    "BRG4": "2024-02-01",
+    "BRG5": "2025-02-03",
+    "BRG6": "2026-02-02",
+    "BRG7": "2027-02-01",
+    "BRH3": "2023-03-01",
+    "BRH4": "2024-03-01",
+    "BRH5": "2025-03-03",
+    "BRH6": "2026-03-02",
+    "BRH7": "2027-03-01",
+    "BRJ3": "2023-04-03",
+    "BRJ4": "2024-04-01",
+    "BRJ5": "2025-04-01",
+    "BRJ6": "2026-04-01",
+    "BRK3": "2023-05-02",
+    "BRK4": "2024-05-02",
+    "BRK5": "2025-05-02",
+    "BRK6": "2026-05-04",
+    "BRN3": "2023-07-03",
+    "BRN4": "2024-07-01",
+    "BRN5": "2025-07-01",
+    "BRN6": "2026-07-01",
+    "BRQ3": "2023-08-01",
+    "BRQ4": "2024-08-01",
+    "BRQ5": "2025-08-01",
+    "BRQ6": "2026-08-03",
+    "BRU2": "2022-09-01",
+    "BRU3": "2023-09-01",
+    "BRU4": "2024-09-02",
+    "BRU5": "2025-09-01",
+    "BRU6": "2026-08-31",
+    "BRV2": "2022-10-03",
+    "BRV3": "2023-10-02",
+    "BRV4": "2024-10-01",
+    "BRV5": "2025-10-01",
+    "BRV6": "2026-10-01",
+    "BRX2": "2022-11-01",
+    "BRX3": "2023-11-01",
+    "BRX4": "2024-11-01",
+    "BRX5": "2025-11-03",
+    "BRX6": "2026-11-02",
+    "BRZ2": "2022-12-01",
+    "BRZ3": "2023-12-01",
+    "BRZ4": "2024-12-02",
+    "BRZ5": "2025-12-01",
+    "BRZ6": "2026-12-01"
+  },
+  "detail": {
+    "BRF3": {
+      "secid": "BRF3",
+      "name": "Фьючерсный контракт BR-1.23",
+      "lsttrade": "2022-12-30",
+      "lstdeldate": "2022-12-30",
+      "assetcode": "BR"
+    },
+    "BRF4": {
+      "secid": "BRF4",
+      "name": "Фьючерсный контракт BR-1.24",
+      "lsttrade": "2023-12-29",
+      "lstdeldate": "2023-12-29",
+      "assetcode": "BR"
+    },
+    "BRF5": {
+      "secid": "BRF5",
+      "name": "Фьючерсный контракт BR-1.25",
+      "lsttrade": "2025-01-03",
+      "lstdeldate": "2025-01-03",
+      "assetcode": "BR"
+    },
+    "BRF6": {
+      "secid": "BRF6",
+      "name": "Фьючерсный контракт BR-1.26",
+      "lsttrade": "2026-01-05",
+      "lstdeldate": "2026-01-05",
+      "assetcode": "BR"
+    },
+    "BRF7": {
+      "secid": "BRF7",
+      "name": "Фьючерсный контракт BR-1.27",
+      "lsttrade": "2027-01-04",
+      "lstdeldate": "2027-01-04",
+      "assetcode": "BR"
+    },
+    "BRG3": {
+      "secid": "BRG3",
+      "name": "Фьючерсный контракт BR-2.23",
+      "lsttrade": "2023-02-01",
+      "lstdeldate": "2023-02-01",
+      "assetcode": "BR"
+    },
+    "BRG4": {
+      "secid": "BRG4",
+      "name": "Фьючерсный контракт BR-2.24",
+      "lsttrade": "2024-02-01",
+      "lstdeldate": "2024-02-01",
+      "assetcode": "BR"
+    },
+    "BRG5": {
+      "secid": "BRG5",
+      "name": "Фьючерсный контракт BR-2.25",
+      "lsttrade": "2025-02-03",
+      "lstdeldate": "2025-02-03",
+      "assetcode": "BR"
+    },
+    "BRG6": {
+      "secid": "BRG6",
+      "name": "Фьючерсный контракт BR-2.26",
+      "lsttrade": "2026-02-02",
+      "lstdeldate": "2026-02-02",
+      "assetcode": "BR"
+    },
+    "BRG7": {
+      "secid": "BRG7",
+      "name": "Фьючерсный контракт BR-2.27",
+      "lsttrade": "2027-02-01",
+      "lstdeldate": "2027-02-01",
+      "assetcode": "BR"
+    },
+    "BRH3": {
+      "secid": "BRH3",
+      "name": "Фьючерсный контракт BR-3.23",
+      "lsttrade": "2023-03-01",
+      "lstdeldate": "2023-03-01",
+      "assetcode": "BR"
+    },
+    "BRH4": {
+      "secid": "BRH4",
+      "name": "Фьючерсный контракт BR-3.24",
+      "lsttrade": "2024-03-01",
+      "lstdeldate": "2024-03-01",
+      "assetcode": "BR"
+    },
+    "BRH5": {
+      "secid": "BRH5",
+      "name": "Фьючерсный контракт BR-3.25",
+      "lsttrade": "2025-03-03",
+      "lstdeldate": "2025-03-03",
+      "assetcode": "BR"
+    },
+    "BRH6": {
+      "secid": "BRH6",
+      "name": "Фьючерсный контракт BR-3.26",
+      "lsttrade": "2026-03-02",
+      "lstdeldate": "2026-03-02",
+      "assetcode": "BR"
+    },
+    "BRH7": {
+      "secid": "BRH7",
+      "name": "Фьючерсный контракт BR-3.27",
+      "lsttrade": "2027-03-01",
+      "lstdeldate": "2027-03-01",
+      "assetcode": "BR"
+    },
+    "BRJ3": {
+      "secid": "BRJ3",
+      "name": "Фьючерсный контракт BR-4.23",
+      "lsttrade": "2023-04-03",
+      "lstdeldate": "2023-04-03",
+      "assetcode": "BR"
+    },
+    "BRJ4": {
+      "secid": "BRJ4",
+      "name": "Фьючерсный контракт BR-4.24",
+      "lsttrade": "2024-04-01",
+      "lstdeldate": "2024-04-01",
+      "assetcode": "BR"
+    },
+    "BRJ5": {
+      "secid": "BRJ5",
+      "name": "Фьючерсный контракт BR-4.25",
+      "lsttrade": "2025-04-01",
+      "lstdeldate": "2025-04-01",
+      "assetcode": "BR"
+    },
+    "BRJ6": {
+      "secid": "BRJ6",
+      "name": "Фьючерсный контракт BR-4.26",
+      "lsttrade": "2026-04-01",
+      "lstdeldate": "2026-04-01",
+      "assetcode": "BR"
+    },
+    "BRK3": {
+      "secid": "BRK3",
+      "name": "Фьючерсный контракт BR-5.23",
+      "lsttrade": "2023-05-02",
+      "lstdeldate": "2023-05-02",
+      "assetcode": "BR"
+    },
+    "BRK4": {
+      "secid": "BRK4",
+      "name": "Фьючерсный контракт BR-5.24",
+      "lsttrade": "2024-05-02",
+      "lstdeldate": "2024-05-02",
+      "assetcode": "BR"
+    },
+    "BRK5": {
+      "secid": "BRK5",
+      "name": "Фьючерсный контракт BR-5.25",
+      "lsttrade": "2025-05-02",
+      "lstdeldate": "2025-05-02",
+      "assetcode": "BR"
+    },
+    "BRK6": {
+      "secid": "BRK6",
+      "name": "Фьючерсный контракт BR-5.26",
+      "lsttrade": "2026-05-04",
+      "lstdeldate": "2026-05-04",
+      "assetcode": "BR"
+    },
+    "BRN3": {
+      "secid": "BRN3",
+      "name": "Фьючерсный контракт BR-7.23",
+      "lsttrade": "2023-07-03",
+      "lstdeldate": "2023-07-03",
+      "assetcode": "BR"
+    },
+    "BRN4": {
+      "secid": "BRN4",
+      "name": "Фьючерсный контракт BR-7.24",
+      "lsttrade": "2024-07-01",
+      "lstdeldate": "2024-07-01",
+      "assetcode": "BR"
+    },
+    "BRN5": {
+      "secid": "BRN5",
+      "name": "Фьючерсный контракт BR-7.25",
+      "lsttrade": "2025-07-01",
+      "lstdeldate": "2025-07-01",
+      "assetcode": "BR"
+    },
+    "BRN6": {
+      "secid": "BRN6",
+      "name": "Фьючерсный контракт BR-7.26",
+      "lsttrade": "2026-07-01",
+      "lstdeldate": "2026-07-01",
+      "assetcode": "BR"
+    },
+    "BRQ3": {
+      "secid": "BRQ3",
+      "name": "Фьючерсный контракт BR-8.23",
+      "lsttrade": "2023-08-01",
+      "lstdeldate": "2023-08-01",
+      "assetcode": "BR"
+    },
+    "BRQ4": {
+      "secid": "BRQ4",
+      "name": "Фьючерсный контракт BR-8.24",
+      "lsttrade": "2024-08-01",
+      "lstdeldate": "2024-08-01",
+      "assetcode": "BR"
+    },
+    "BRQ5": {
+      "secid": "BRQ5",
+      "name": "Фьючерсный контракт BR-8.25",
+      "lsttrade": "2025-08-01",
+      "lstdeldate": "2025-08-01",
+      "assetcode": "BR"
+    },
+    "BRQ6": {
+      "secid": "BRQ6",
+      "name": "Фьючерсный контракт BR-8.26",
+      "lsttrade": "2026-08-03",
+      "lstdeldate": "2026-08-03",
+      "assetcode": "BR"
+    },
+    "BRU2": {
+      "secid": "BRU2",
+      "name": "Фьючерсный контракт BR-9.22",
+      "lsttrade": "2022-09-01",
+      "lstdeldate": "2022-09-01",
+      "assetcode": "BR"
+    },
+    "BRU3": {
+      "secid": "BRU3",
+      "name": "Фьючерсный контракт BR-9.23",
+      "lsttrade": "2023-09-01",
+      "lstdeldate": "2023-09-01",
+      "assetcode": "BR"
+    },
+    "BRU4": {
+      "secid": "BRU4",
+      "name": "Фьючерсный контракт BR-9.24",
+      "lsttrade": "2024-09-02",
+      "lstdeldate": "2024-09-02",
+      "assetcode": "BR"
+    },
+    "BRU5": {
+      "secid": "BRU5",
+      "name": "Фьючерсный контракт BR-9.25",
+      "lsttrade": "2025-09-01",
+      "lstdeldate": "2025-09-01",
+      "assetcode": "BR"
+    },
+    "BRU6": {
+      "secid": "BRU6",
+      "name": "Фьючерсный контракт BR-9.26",
+      "lsttrade": "2026-08-31",
+      "lstdeldate": "2026-08-31",
+      "assetcode": "BR"
+    },
+    "BRV2": {
+      "secid": "BRV2",
+      "name": "Фьючерсный контракт BR-10.22",
+      "lsttrade": "2022-10-03",
+      "lstdeldate": "2022-10-03",
+      "assetcode": "BR"
+    },
+    "BRV3": {
+      "secid": "BRV3",
+      "name": "Фьючерсный контракт BR-10.23",
+      "lsttrade": "2023-10-02",
+      "lstdeldate": "2023-10-02",
+      "assetcode": "BR"
+    },
+    "BRV4": {
+      "secid": "BRV4",
+      "name": "Фьючерсный контракт BR-10.24",
+      "lsttrade": "2024-10-01",
+      "lstdeldate": "2024-10-01",
+      "assetcode": "BR"
+    },
+    "BRV5": {
+      "secid": "BRV5",
+      "name": "Фьючерсный контракт BR-10.25",
+      "lsttrade": "2025-10-01",
+      "lstdeldate": "2025-10-01",
+      "assetcode": "BR"
+    },
+    "BRV6": {
+      "secid": "BRV6",
+      "name": "Фьючерсный контракт BR-10.26",
+      "lsttrade": "2026-10-01",
+      "lstdeldate": "2026-10-01",
+      "assetcode": "BR"
+    },
+    "BRX2": {
+      "secid": "BRX2",
+      "name": "Фьючерсный контракт BR-11.22",
+      "lsttrade": "2022-11-01",
+      "lstdeldate": "2022-11-01",
+      "assetcode": "BR"
+    },
+    "BRX3": {
+      "secid": "BRX3",
+      "name": "Фьючерсный контракт BR-11.23",
+      "lsttrade": "2023-11-01",
+      "lstdeldate": "2023-11-01",
+      "assetcode": "BR"
+    },
+    "BRX4": {
+      "secid": "BRX4",
+      "name": "Фьючерсный контракт BR-11.24",
+      "lsttrade": "2024-11-01",
+      "lstdeldate": "2024-11-01",
+      "assetcode": "BR"
+    },
+    "BRX5": {
+      "secid": "BRX5",
+      "name": "Фьючерсный контракт BR-11.25",
+      "lsttrade": "2025-11-03",
+      "lstdeldate": "2025-11-03",
+      "assetcode": "BR"
+    },
+    "BRX6": {
+      "secid": "BRX6",
+      "name": "Фьючерсный контракт BR-11.26",
+      "lsttrade": "2026-11-02",
+      "lstdeldate": "2026-11-02",
+      "assetcode": "BR"
+    },
+    "BRZ2": {
+      "secid": "BRZ2",
+      "name": "Фьючерсный контракт BR-12.22",
+      "lsttrade": "2022-12-01",
+      "lstdeldate": "2022-12-01",
+      "assetcode": "BR"
+    },
+    "BRZ3": {
+      "secid": "BRZ3",
+      "name": "Фьючерсный контракт BR-12.23",
+      "lsttrade": "2023-12-01",
+      "lstdeldate": "2023-12-01",
+      "assetcode": "BR"
+    },
+    "BRZ4": {
+      "secid": "BRZ4",
+      "name": "Фьючерсный контракт BR-12.24",
+      "lsttrade": "2024-12-02",
+      "lstdeldate": "2024-12-02",
+      "assetcode": "BR"
+    },
+    "BRZ5": {
+      "secid": "BRZ5",
+      "name": "Фьючерсный контракт BR-12.25",
+      "lsttrade": "2025-12-01",
+      "lstdeldate": "2025-12-01",
+      "assetcode": "BR"
+    },
+    "BRZ6": {
+      "secid": "BRZ6",
+      "name": "Фьючерсный контракт BR-12.26",
+      "lsttrade": "2026-12-01",
+      "lstdeldate": "2026-12-01",
+      "assetcode": "BR"
+    }
+  },
+  "failures": [],
+  "resolved": 51,
+  "requested": 51
+}
