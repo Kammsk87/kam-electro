@@ -18,6 +18,11 @@ SRC_ROOT = PROJECT_ROOT / "src"
 sys.path.insert(0, str(PROJECT_ROOT / "tools"))
 sys.path.insert(0, str(SRC_ROOT))
 
+# The shared kernel lives above the venue adapter, and multiplicity correction
+# comes from it rather than being reimplemented here.
+REPO_ROOT = PROJECT_ROOT.parent
+sys.path.insert(0, str(REPO_ROOT))
+
 from generate_strategy_ideas import generate_ideas
 from moex_futures_bot.backtest import (
     Bar,
@@ -121,6 +126,12 @@ def main() -> int:
     finally:
         con.close()
 
+    # A smoke run is a test of the machinery, not a search for edge. Recording it
+    # in the real space would let every `--profile smoke` invocation deflate
+    # genuine research, so it gets its own space and its own family.
+    search_space = SEARCH_SPACE + (".smoke" if args.profile == "smoke" else "")
+    multiplicity = _apply_multiplicity(rows, run_id, config_path, search_space)
+
     idea_statuses = _idea_statuses(ideas, rows, config, holdout_ledger)
     summary = {
         "run_id": run_id,
@@ -128,6 +139,8 @@ def main() -> int:
         "ideas": len(ideas),
         "rows": len(rows),
         "failures": len(failures),
+        "multiplicity": multiplicity,
+        "screening_passes_before_deflation": multiplicity["passes_before_deflation"],
         "screening_passes": sum(1 for row in rows if row["verdict"] == "screening_pass"),
         "holdout_eligible": any(item["status"] == "holdout_eligible" for item in idea_statuses.values()),
         "paper_candidate": False,
@@ -145,6 +158,119 @@ def main() -> int:
     report_path.write_text(_markdown(config, summary, idea_statuses, rows, failures), encoding="utf-8")
     print(json.dumps({**summary, "report": str(report_path), "out_dir": str(out_dir)}, ensure_ascii=False, indent=2))
     return 1 if failures else 0
+
+
+#: Every autopilot row is recorded here, and the family a BH correction is taken
+#: over is this space, not the run in isolation.
+SEARCH_SPACE = "moex.br.directional_daily"
+
+#: Frozen in TASK-SK-002 before any corrected number existed.
+BH_Q_THRESHOLD = 0.10
+
+
+def _apply_multiplicity(
+    rows: list[dict[str, Any]],
+    run_id: str,
+    config_path: Path,
+    search_space: str = SEARCH_SPACE,
+) -> dict[str, Any]:
+    """Deflate this run's verdicts against the accumulated search, and record it.
+
+    Before this existed, `_verdict` passed a row at `excess_sign_test_p_value
+    <= 0.25` with no correction whatever. That threshold is why a single daily
+    run could report 390 screening passes: at p <= 0.25, roughly a quarter of
+    pure noise passes by construction.
+
+    The BH family is the run's p-values **plus every p-value already retained in
+    the same search space**, because multiplicity is a property of the whole
+    search and not of the batch that happens to be running. The family size is a
+    floor: historical rows that were never written with a p-value cannot join it.
+
+    A row that passed the raw screen but fails the deflated threshold is
+    downgraded to `screening_pass_deflated_away`. Its original verdict is kept in
+    `verdict_before_deflation` so no run is silently rewritten.
+    """
+    try:
+        from shared_kernel.p_value_deflation import benjamini_hochberg
+        from shared_kernel.trials_ledger import TRIAL_RECORD, TrialRecord, TrialsLedger
+    except ImportError:
+        # Absence of the kernel is not permission to skip the correction.
+        for row in rows:
+            row["verdict_before_deflation"] = row["verdict"]
+            row["verdict"] = "multiplicity_uncorrected"
+        return {
+            "status": "KERNEL_UNAVAILABLE",
+            "note": "shared_kernel not importable; every verdict is marked uncorrected rather than trusted",
+            "passes_before_deflation": sum(
+                1 for r in rows if r.get("verdict_before_deflation") == "screening_pass"
+            ),
+        }
+
+    ledger = TrialsLedger(REPO_ROOT / "data" / "trials_ledger.jsonl")
+    historical = [r.p_value for r in ledger.pvalue_family(search_space)]
+
+    current: list[float] = []
+    indexed: list[int] = []
+    for i, row in enumerate(rows):
+        p = row.get("excess_sign_test_p_value")
+        if isinstance(p, (int, float)) and 0.0 <= p <= 1.0:
+            current.append(float(p))
+            indexed.append(i)
+
+    passes_before = sum(1 for r in rows if r["verdict"] == "screening_pass")
+    if not current:
+        return {"status": "NO_PVALUES", "passes_before_deflation": passes_before}
+
+    family = current + historical
+    q_all = benjamini_hochberg(family)
+    q_current = q_all[: len(current)]
+
+    deflated_away = 0
+    for pos, i in enumerate(indexed):
+        row = rows[i]
+        row["bh_q_value"] = q_current[pos]
+        row["bh_family_size"] = len(family)
+        row["verdict_before_deflation"] = row["verdict"]
+        if row["verdict"] == "screening_pass" and q_current[pos] >= BH_Q_THRESHOLD:
+            row["verdict"] = "screening_pass_deflated_away"
+            deflated_away += 1
+
+    # One TRIAL_RECORD per row: each row is a distinct parameterisation whose
+    # result could have changed a decision about it. Recording per idea instead
+    # would understate the count by the size of the window and cost grid.
+    written = 0
+    for pos, i in enumerate(indexed):
+        row = rows[i]
+        try:
+            ledger.append(
+                TrialRecord(
+                    trial_id=f"{run_id}.{row['idea_id']}.{row['window']}.{row['cost_bps']}.{row['roll_window']}",
+                    record_type=TRIAL_RECORD,
+                    search_space=search_space,
+                    family=row["family"],
+                    task_id="TASK-SK-002.autopilot",
+                    evidence_path=str(config_path),
+                    params=row.get("idea_params", {}),
+                    p_value=current[pos],
+                    metrics={"bh_q_value": q_current[pos], "verdict": row["verdict"]},
+                )
+            )
+            written += 1
+        except Exception:  # noqa: BLE001 - a duplicate id must not abort a run
+            pass
+
+    return {
+        "status": "APPLIED",
+        "search_space": search_space,
+        "bh_q_threshold": BH_Q_THRESHOLD,
+        "family_size": len(family),
+        "family_size_note": "a floor: historical rows without a retained p-value cannot join",
+        "historical_pvalues_in_family": len(historical),
+        "passes_before_deflation": passes_before,
+        "passes_after_deflation": sum(1 for r in rows if r["verdict"] == "screening_pass"),
+        "deflated_away": deflated_away,
+        "trials_recorded": written,
+    }
 
 
 def _walk_fixed_idea(
