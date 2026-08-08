@@ -281,11 +281,54 @@ def _result(
         "exposure_pct": exposure_days / max(len(bars) - 1, 1) * 100,
         "win_rate_active_days_pct": win_rate * 100,
         "final_equity": equity,
+        # Higher moments of the return series, retained for the Deflated Sharpe
+        # Ratio (TASK-SK-002). Without them DSR is not computable and a run can
+        # only report DSR_UNAVAILABLE, which is not holdout-eligible. Kurtosis is
+        # RAW (normal == 3.0), not excess: the DSR formula expects the raw form
+        # and excess kurtosis silently inflates the statistic.
+        **_return_moments(returns),
         "uses_funding_rub": any(bar.funding_long_rub for bar in bars),
         "uses_exchange_fee_rub": any(bar.exchange_fee_rub for bar in bars),
         "uses_broker_fee_rub": any(bar.broker_fee_rub for bar in bars),
     }
     return BacktestResult(strategy_name, symbol, timeframe, params, metrics)
+
+
+def _return_moments(returns: list[float]) -> dict[str, float | int | None]:
+    """Sample size and higher moments of the return series, for DSR.
+
+    **Delegates to the shared kernel rather than reimplementing.** A local copy
+    of this arithmetic was written first and immediately reproduced a bug the
+    kernel had already been fixed for: a constant series leaves a residual
+    variance around 1e-34 from floating-point representation, sails past a
+    `variance <= 0` check, and yields a Sharpe of 7.2e15. One implementation, one
+    place to fix it.
+
+    Returns None for the moments rather than a plausible default when the series
+    cannot support them: every default flatters the statistic, and a DSR computed
+    from a guessed skew is worse than an honest DSR_UNAVAILABLE.
+
+    `sharpe_per_period` is deliberately NOT annualised. The DSR formula pairs the
+    Sharpe with T in the same periodicity; feeding it the annualised figure
+    alongside a count of days is the standard way to get a wrong number that
+    looks plausible.
+    """
+    empty = {"return_n_obs": len(returns), "return_skew": None,
+             "return_kurtosis": None, "sharpe_per_period": None}
+    try:
+        from shared_kernel.p_value_deflation import DeflationError, sharpe_moments
+    except ImportError:
+        return empty
+    try:
+        m = sharpe_moments(returns)
+    except DeflationError:
+        return empty
+    return {
+        "return_n_obs": m["n_obs"],
+        "return_skew": m["skew"],
+        "return_kurtosis": m["kurtosis"],   # raw: normal == 3.0
+        "sharpe_per_period": m["sharpe_per_period"],
+    }
 
 
 def _true_ranges(bars: list[Bar]) -> list[float]:
