@@ -11,17 +11,18 @@
   confirmation on data generated after the failure was recorded**. The failure
   was recorded 2026-08-08.
 
-## Status: DRAFT, not runnable
+## Status: PRE_REGISTERED_WAITING_FOR_OOS_COHORT
 
-Two things must exist before this may execute, and neither is a formality.
+The rule below is FROZEN. Two things must still be true before it may execute,
+and neither is a formality.
 
 1. **The confirmation window.** The rule may be developed on history, but its
    confirming evidence must come from data generated after 2026-08-08. The Track A
    quote cohort runs to 2026-10-01 and supplies exactly that window. Running the
    full task before then would produce a result the lifecycle cannot accept.
-2. **The rule must be frozen in this file before any backtest of it is run**,
-   as MX-006's was. The frozen-rule section below is deliberately incomplete; it
-   is filled in and committed *before* the first run, not after.
+2. **The rule was frozen in this file on 2026-08-08**, before any backtest,
+   as MX-006 was. Any edit to it after the first run voids the task; an edit
+   before the first run is legitimate and must be committed separately.
 
 ## The structural difference, stated precisely
 
@@ -59,20 +60,89 @@ If a regime condition is ever used, it must be motivated by a stated economic
 mechanism written down before the data is looked at, and confirmed on the
 post-2026-08-08 window. Not by this failure's residuals.
 
-## Frozen rule — TO BE COMPLETED BEFORE THE FIRST RUN
+## Frozen rule — FROZEN 2026-08-08, before the confirmation window exists
 
-Left deliberately blank. Filling it in after a run, or filling it in with
-parameters chosen by scanning MX-006's output, voids the task.
+Status: `PRE_REGISTERED_WAITING_FOR_OOS_COHORT`.
 
-    universe   BR front/second pair
-    feature    annualised roll yield, from features/term_structure.py
-    condition  <to be declared: the carry threshold and the DTE condition>
-    entry      <to be declared>
-    exit       <to be declared>
-    horizon    <to be declared, from the TASK-MX-002 breakeven table>
-    costs      cost_model rev2, two legs, non-scalper, TRADE_OUT, POLUNETTO;
-               TICK_FLOOR and TICK_FLOOR_STRESS both reported
-    identity   model_id br_carry_v0, reset_ts set at freeze time
+Frozen while the forward cohort is still physically being collected, so nobody
+— including the author — can have seen the data this rule will be confirmed on.
+That is the cleanest preregistration state available, and it expires the moment
+the cohort closes on 2026-10-01.
+
+```
+identity     model_id br_carry_v0, reset_ts 2026-08-08T00:00:00+00:00
+universe     BR front/second pair, hourly spread bars, both legs co-traded
+feature      annualised roll yield RY = (F1-F2)/F1 * 365/dt,
+             dt = calendar days between the two contracts' EXPIRIES
+             (features/term_structure.annualised_roll_yield)
+
+entry        long the spread  when RY <= q10_expanding(t) and DTE > 7
+             short the spread when RY >= q90_expanding(t) and DTE > 7
+exit         RY crosses back through q50_expanding(t), or timeout, whichever first
+timeout      5 trading days = 75 hourly bars at 15 bars/day
+dte filter   no new entry when the front leg has 7 or fewer TRADING DAYS to its
+             venue lasttradedate; open positions are closed at DTE = 7
+costs        cost_model rev2, two legs, non-scalper, TRADE_OUT, POLUNETTO margin;
+             TICK_FLOOR and TICK_FLOOR_STRESS both reported
+position     one at a time; a roll closes the position
+search space moex.br.calendar_spread.1h   (NOT a new space - see below)
+variants     exactly ONE. No grid over the quantile pair, the DTE cut, or the
+             timeout. A second variant is a second trial and is deflated as one.
+```
+
+### Three corrections to the proposed specification, and why each was necessary
+
+**1. Quantiles are expanding-window, not the sample's own p10/p90.**
+
+The proposal fixed the thresholds at RY < −0.58%/yr and RY > +34.30%/yr, and the
+exit at the median +8.47%/yr. Those three numbers are the p10, p90 and p50 **of
+the 2024+ sample this rule will be tested on**. No decision taken in 2024 could
+have known them. Using them as constants is look-ahead bias, and it is not
+repairable after a run.
+
+`q10_expanding(t)`, `q50_expanding(t)` and `q90_expanding(t)` are computed from
+RY observations **strictly before bar t**, with a warm-up of 500 bars before any
+entry is permitted. The rule's economic content is unchanged — trade the tails of
+the carry distribution — but each decision uses only what was knowable.
+
+**2. The timeout is 5 trading days, not 3.**
+
+The proposal derived 3 days from an OU half-life of 31.1 bars. That figure is the
+**contango** half-life, and contango is 1,253 of 10,613 bars — under 12% of the
+sample. The backwardation half-life, governing the other 88%, is 88.6 bars ≈ 5.9
+trading days. Choosing the horizon from the regime that governs an eighth of the
+data is choosing the number that suits.
+
+5 trading days is taken from the dominant regime, rounded down. It also sits
+inside the TASK-MX-002 breakeven table at 4.29 ticks per leg, which is the
+threshold the execution adapter is to be given.
+
+This is a judgement, not an error, and the operator may change it — **before the
+first run and by editing this file**, not afterwards.
+
+**3. The search space stays `moex.br.calendar_spread.1h`.**
+
+The proposal named a new space, `moex.br.calendar_spread.carry_1h`. That would
+reset the trial count to zero and escape the two trials already recorded.
+
+A new space per hypothesis makes every hypothesis a family of one, and the
+multiplicity correction evaporates — which is the failure mode the whole ledger
+exists to prevent. Same instrument pair, same mechanism family, same space. This
+rule will be deflated against 2 prior trials plus itself.
+
+### Units, stated because they have already caused one defect
+
+`DTE > 7` is **trading days** to the front leg's venue `lasttradedate`, not
+calendar days and not bars. MX-004's `dte_buckets` counts bars; this is a
+different quantity and the implementation must not reuse that function's units.
+
+### What the DTE filter costs
+
+Excluding the final week deliberately avoids the window where MX-001 measured
+**4.1× the dispersion**. That is a trade-off, not a free improvement: the rule is
+declining to trade where the spread moves most, in exchange for avoiding the roll
+and liquidity risk concentrated there. It must be reported as such, and the
+result must state how many entries the filter suppressed.
 
 ## Pre-registered kill conditions
 
