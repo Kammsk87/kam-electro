@@ -1,0 +1,192 @@
+{
+  "TICK_FLOOR.3d": {
+    "trades": 197,
+    "timeout_days": 3,
+    "execution_basis": "TICK_FLOOR",
+    "gross_mean_rub": 36.413609390863606,
+    "net_mean_rub": -31.17188939695366,
+    "net_total_rub": -6140.862211199871,
+    "win_rate_pct": 62.43654822335025,
+    "median_days_held": 1.0,
+    "exit_reasons": {
+      "roll": 19,
+      "z_reversion": 140,
+      "timeout": 38
+    },
+    "regimes": {
+      "CONTANGO": 25,
+      "BACKWARDATION": 172
+    },
+    "t_stat_gross": 0.6307960425592279,
+    "t_stat_net_DO_NOT_QUOTE": -0.5379455955871772,
+    "matched_null_mean": -0.9024605684771597,
+    "matched_null_p": 0.13786213786213786,
+    "matched_null_draws": 1000,
+    "net_mean_remove_best_day": -41.30271305374094,
+    "net_mean_remove_contango": -8.169195073642916,
+    "net_mean_remove_backwardation": -189.43042634133167,
+    "purged_train_n": 98,
+    "purged_test_n": 99,
+    "purged_dropped": 0,
+    "net_mean_purged_train": 30.62519437006854,
+    "net_mean_purged_test": -92.34476019663222,
+    "sharpe_per_trade": -0.03842468539908408,
+    "skew": -4.34978064693403,
+    "kurtosis": 30.98042751013742,
+    "n_obs": 197,
+    "dsr": 0.27339606800399385,
+    "dsr_citation": "DSR 0.2734 for SR -0.0384/period against E[max SR] 0.0011 from 2 trials (var across trials 4.60328e-06), T=197, skew -4.350, kurtosis 30.980"
+  },
+  "TICK_FLOOR.5d": {
+    "trades": 185,
+    "timeout_days": 5,
+    "execution_basis": "TICK_FLOOR",
+    "gross_mean_rub": 36.10577967567665,
+    "net_mean_rub": -33.99098651099002,
+    "net_total_rub": -6288.332504533154,
+    "win_rate_pct": 61.62162162162162,
+    "median_days_held": 1.0666666666666667,
+    "exit_reasons": {
+      "roll": 19,
+      "z_reversion": 156,
+      "timeout": 10
+    },
+    "regimes": {
+      "CONTANGO": 21,
+      "BACKWARDATION": 164
+    },
+    "t_stat_gross": 0.600979858694539,
+    "t_stat_net_DO_NOT_QUOTE": -0.5623761141880019,
+    "matched_null_mean": -1.3098939551351447,
+    "matched_null_p": 0.15784215784215785,
+    "matched_null_draws": 1000,
+    "net_mean_remove_best_day": -44.79783723840494,
+    "net_mean_remove_contango": -32.6929179317064,
+    "net_mean_remove_backwardation": -44.1282839873004,
+    "purged_train_n": 92,
+    "purged_test_n": 93,
+    "purged_dropped": 0,
+    "net_mean_purged_train": 33.742881095652926,
+    "net_mean_purged_test": -100.99653296057234,
+    "sharpe_per_trade": -0.04145891718533438,
+    "skew": -4.148867879776128,
+    "kurtosis": 28.7661987521966,
+    "n_obs": 185,
+    "dsr": 0.26430290469240036,
+    "dsr_citation": "DSR 0.2643 for SR -0.0415/period against E[max SR] 0.0011 from 2 trials (var across trials 4.60328e-06), T=185, skew -4.149, kurtosis 28.766"
+  },
+  "TICK_FLOOR_STRESS.3d": {
+    "trades": 197,
+    "timeout_days": 3,
+    "execution_basis": "TICK_FLOOR_STRESS",
+    "gross_mean_rub": 36.413609390863606,
+    "net_mean_rub": -46.851629396953655,
+    "net_total_rub": -9229.77099119987,
+    "win_rate_pct": 57.868020304568525,
+    "median_days_held": 1.0,
+    "exit_reasons": {
+      "roll": 19,
+      "z_reversion": 140,
+      "timeout": 38
+    },
+    "regimes": {
+      "CONTANGO": 25,
+      "BACKWARDATION": 172
+    },
+    "t_stat_gross": 0.6307960425592279,
+    "t_stat_net_DO_NOT_QUOTE": -0.8085370559102848,
+    "matched_null_mean": 0.8313047940609203,
+    "matched_null_p": 0.16483516483516483,
+    "matched_null_draws": 1000,
+    "net_mean_remove_best_day": -56.98245305374093,
+    "net_mean_remove_contango": -23.848935073642917,
+    "net_mean_remove_backwardation": -205.11016634133168,
+    "purged_train_n": 98,
+    "purged_test_n": 99,
+    "purged_dropped": 0,
+    "net_mean_purged_train": 14.945454370068546,
+    "net_mean_purged_test": -108.02450019663223,
+    "sharpe_per_trade": -0.0577526468507346,
+    "skew": -4.349780646934028,
+    "kurtosis": 30.980427510137407,
+    "n_obs": 197
+  },
+  "TICK_FLOOR_STRESS.5d": {
+    "trades": 185,
+    "timeout_days": 5,
+    "execution_basis": "TICK_FLOOR_STRESS",
+    "gross_mean_rub": 36.10577967567665,
+    "net_mean_rub": -49.67072651099004,
+    "net_total_rub": -9189.084404533158,
+    "win_rate_pct": 56.75675675675676,
+    "median_days_held": 1.0666666666666667,
+    "exit_reasons": {
+      "roll": 19,
+      "z_reversion": 156,
+      "timeout": 10
+    },
+    "regimes": {
+      "CONTANGO": 21,
+      "BACKWARDATION": 164
+    },
+    "t_stat_gross": 0.600979858694539,
+    "t_stat_net_DO_NOT_QUOTE": -0.8217952178326448,
+    "matched_null_mean": 1.0608827328648776,
+    "matched_null_p": 0.15284715284715283,
+    "matched_null_draws": 1000,
+    "net_mean_remove_best_day": -60.47757723840494,
+    "net_mean_remove_contango": -48.37265793170641,
+    "net_mean_remove_backwardation": -59.80802398730039,
+    "purged_train_n": 92,
+    "purged_test_n": 93,
+    "purged_dropped": 0,
+    "net_mean_purged_train": 18.06314109565293,
+    "net_mean_purged_test": -116.67627296057233,
+    "sharpe_per_trade": -0.06058354723799247,
+    "skew": -4.148867879776128,
+    "kurtosis": 28.76619875219661,
+    "n_obs": 185
+  },
+  "deflation": {
+    "MX006.br_calendar_zscore_v0.timeout3d": {
+      "raw_p": 0.13786213786213786,
+      "bh_q": 0.15784215784215785
+    },
+    "MX006.br_calendar_zscore_v0.timeout5d": {
+      "raw_p": 0.15784215784215785,
+      "bh_q": 0.15784215784215785
+    }
+  },
+  "_meta": {
+    "coverage": {
+      "hourly_slots_seen": 18438,
+      "bars_emitted": 16804,
+      "dropped_single_leg": 1591,
+      "dropped_no_pair_that_day": 43,
+      "dropped_unparseable": 0,
+      "skipped_other_asset": 16171,
+      "stale_drop_rate": 0.0865,
+      "distinct_pairs": 45
+    },
+    "bars_2024plus": 10613,
+    "search_space": "moex.br.calendar_spread.1h",
+    "trials_in_space_after_this_run": 2,
+    "sharpe_variance_across_trials": 4.603281266345841e-06,
+    "seed": 20260808,
+    "null_draws": 1000,
+    "rusfar_pct": 16.38,
+    "frozen_rule": {
+      "model_id": "br_calendar_zscore_v0",
+      "z_window_bars": 72,
+      "entry_abs_z": 2.0,
+      "exit_z": 0.0,
+      "timeouts_trading_days": [
+        3,
+        5
+      ],
+      "bars_per_trading_day": 15,
+      "pair": "front/second",
+      "one_position_at_a_time": true
+    }
+  }
+}
