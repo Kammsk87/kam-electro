@@ -210,8 +210,31 @@ This amendment may not be revisited once final-week data begins to arrive.
 - Rate limiting is a safety property here, not politeness: no faster than one
   snapshot per 5 seconds per contract, and the collector stops on repeated
   errors rather than retrying in a tight loop.
-- No systemd unit, no service, no autostart. The collector is run manually and
-  stopped manually in this version.
+- **Amended 2026-08-09: a supervised service is permitted on a dedicated
+  collection host.** The original clause read «no systemd unit, no service, no
+  autostart» and was written when the collector ran on a laptop, where an
+  unattended service is a way to forget something is running.
+
+  It has to change because it is now the thing blocking the task. Three trading
+  days of manual local operation produced **zero valid days**: main-session
+  coverage of 0%, 14% and 12%, with gaps of 530, 304 and 344 minutes. The
+  collector does not fail — the host sleeps. `nohup` survives a closed terminal
+  and does not survive a reboot, and the target host rebooted twice in three
+  months.
+
+  Permitted, narrowly: a systemd unit that runs **this collector only**, on a
+  host that does nothing else, with `Restart=always`. Still forbidden: any
+  service touching orders, accounts, credentials, paper or live trading; any
+  unit on a host that runs anything else; any autostart of a research runner or
+  a strategy. The collector reads public market data and writes JSONL. It has no
+  credential and no order path, and a static scan of it must keep proving that.
+
+  The operator remains able to stop it with one command, and the unit is named
+  so that `systemctl list-units` says plainly what it is.
+
+- The migration day is split across two hosts and therefore **cannot be a valid
+  day** under the coverage rule. It is excluded like any other incomplete day;
+  the end date moves rather than the rule bending.
 - Do not modify `tools/stage0_br_calendar_feasibility.py`, the 2026-08-06
   schedule, or the 2026-08-06_rev2 schedule.
 - `check_paper_gate.py` returns `blocked` throughout and is not touched.

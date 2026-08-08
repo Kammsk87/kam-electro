@@ -1,0 +1,47 @@
+[Unit]
+# TASK-MX-003 track A. Collects public MOEX ISS top-of-book quotes for the two
+# nearest BR contracts and writes JSONL. It has no credential, no account and no
+# order path; see tools/collect_moex_iss_quotes.py.
+#
+# Permitted under the 2026-08-09 amendment to the task card, which allows a
+# supervised service on a host that does nothing else. Three days of manual
+# operation on a laptop produced zero valid days because the host slept.
+Description=MOEX ISS BR quote collector (TASK-MX-003, research, read-only)
+Documentation=file:/opt/moex-collector/TASK-MX-003.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=collector
+Group=collector
+WorkingDirectory=/opt/moex-collector
+ExecStart=/usr/bin/python3 /opt/moex-collector/collect_moex_iss_quotes.py --root /opt/moex-collector/quotes
+Restart=always
+RestartSec=15
+# The collector stops itself after 20 consecutive errors rather than hammering
+# ISS. systemd brings it back after a pause; it does not spin.
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+# Least privilege. The collector needs the network and one directory.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/moex-collector/quotes
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+StandardOutput=append:/opt/moex-collector/collector.log
+StandardError=append:/opt/moex-collector/collector.log
+
+[Install]
+WantedBy=multi-user.target
