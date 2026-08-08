@@ -103,6 +103,33 @@ Declared before collection starts:
 No verdict is issued on a partial cohort. If collection is interrupted, the
 result reports coverage and stops.
 
+### What «represented» means — declared 2026-08-09, at zero valid days
+
+The stopping rule requires both sessions «represented» on at least 10 days and
+never said what that meant. Defined now, while the count of qualifying days is
+**zero**, so no threshold can be fitted to which days would pass.
+
+A **session is covered** on a day when both hold:
+
+- at least **90% of its 5-minute buckets** contain at least one snapshot, and
+- **no single gap exceeds 15 minutes**.
+
+A **day is valid** when MAIN and EVENING are both covered. Sessions are the
+boundaries in `execution/clearing_schedule.py`, `MOEX.FORTS.SCHEDULE.2026-08`:
+main 10:00–18:50 MSK excluding the 14:00–14:05 clearing, evening 19:05–23:50.
+
+Two thresholds and the reason for each. The 90% bucket rule tolerates the
+scattered single-snapshot losses that transient `URLError` retries produce. The
+15-minute gap rule exists because the 90% rule alone would pass a day that lost
+one continuous 45-minute block — and a 45-minute hole in the evening session is
+exactly where the spread widens, so a day that loses it would report an
+optimistic median while satisfying the letter of the coverage test.
+
+Enforced by `tools/check_quote_cohort.py`, which regenerates
+`data/market/moex_iss/quotes/COHORT_VALIDITY.json`. The register is derived, not
+hand-maintained: a hand-written one does not notice that two months produced no
+qualifying day.
+
 ### Amendment record — 3 expiries reduced to 2
 
 Amended 2026-08-07 on operator decision, **before any final-week data existed**.

@@ -1,30 +1,108 @@
 {
   "cohort_id": "MX003.TRACK_A.BR_QUOTES",
   "task": "TASK-MX-003-MOEX-QUOTE-AND-SPREAD-MEASUREMENT-V0",
-  "note": "Per-day validity against the stopping rule frozen in the task file. A day is counted only if it carries usable coverage of both sessions. Days are never repaired, back-filled or spliced; an incomplete day is excluded and the collection simply runs longer.",
-  "rule_reference": "at least 15 distinct trading days; at least 2 distinct front-contract expiries; both main and evening session represented on at least 10 of those days",
+  "generated_by": "tools/check_quote_cohort.py",
+  "note": "Derived, not hand-maintained. A hand-written register does not notice that two months produced no qualifying day.",
+  "criteria": {
+    "frozen_on": "2026-08-09, at zero valid days",
+    "bucket_minutes": 5,
+    "min_bucket_coverage": 0.9,
+    "max_gap_minutes": 15,
+    "sessions": {
+      "MAIN": [
+        "10:00:00",
+        "18:50:00"
+      ],
+      "EVENING": [
+        "19:05:00",
+        "23:50:00"
+      ]
+    }
+  },
+  "targets": {
+    "valid_days": 15,
+    "days_with_both_sessions": 10,
+    "distinct_front_expiries": 2
+  },
+  "non_trading_days_excluded": [],
+  "progress": {
+    "trading_days_collected": 3,
+    "non_trading_days_excluded": 0,
+    "valid_days": 0,
+    "days_with_both_sessions": 0,
+    "distinct_front_expiries_in_valid_days": [],
+    "stopping_rule_met": false
+  },
+  "policy": "No day is spliced from fragments. If the host sleeps, that day is excluded and the end date moves. The stopping rule is not weakened to fit the calendar.",
   "days": [
     {
       "date": "2026-08-06",
-      "status": "PARTIAL_START",
-      "counts_toward_15": false,
-      "records": 2696,
-      "sessions_observed": ["EVENING_SESSION", "CLOSED"],
-      "reason": "collector started at 22:07 MSK; the day was already almost over. Start-up fragment, not a covered day."
+      "valid": false,
+      "live_snapshots": 2696,
+      "stale_snapshots_ignored": 0,
+      "front_contracts": [
+        "BRU6"
+      ],
+      "sessions": {
+        "MAIN": {
+          "bucket_coverage": 0.0,
+          "max_gap_minutes": 530.0,
+          "snapshots": 0,
+          "covered": false
+        },
+        "EVENING": {
+          "bucket_coverage": 0.3684,
+          "max_gap_minutes": 182.1,
+          "snapshots": 2456,
+          "covered": false
+        }
+      }
     },
     {
       "date": "2026-08-07",
-      "status": "INVALID_DAY_INCOMPLETE_COVERAGE",
-      "counts_toward_15": false,
-      "records": 6616,
-      "sessions_observed": ["CLOSED", "EVENING_SESSION", "MAIN_SESSION(56 records)"],
-      "gap_minutes": 521,
-      "gap_window_msk": "06:23 - 15:04",
-      "reason": "an 8.7-hour interruption swallowed the whole main session; 56 records against roughly 6000 expected. Cause: host sleep, compounded by transient URLError backoff. Excluded from the cohort.",
-      "evidence": "data/market/moex_iss/quotes_collector.log"
+      "valid": false,
+      "live_snapshots": 3906,
+      "stale_snapshots_ignored": 6560,
+      "front_contracts": [
+        "BRU6"
+      ],
+      "sessions": {
+        "MAIN": {
+          "bucket_coverage": 0.1429,
+          "max_gap_minutes": 304.2,
+          "snapshots": 1254,
+          "covered": false
+        },
+        "EVENING": {
+          "bucket_coverage": 0.5614,
+          "max_gap_minutes": 29.5,
+          "snapshots": 2410,
+          "covered": false
+        }
+      }
+    },
+    {
+      "date": "2026-08-08",
+      "valid": false,
+      "live_snapshots": 6632,
+      "stale_snapshots_ignored": 2756,
+      "front_contracts": [
+        "BRU6"
+      ],
+      "sessions": {
+        "MAIN": {
+          "bucket_coverage": 0.1238,
+          "max_gap_minutes": 344.4,
+          "snapshots": 994,
+          "covered": false
+        },
+        "EVENING": {
+          "bucket_coverage": 0.7895,
+          "max_gap_minutes": 64.5,
+          "snapshots": 5278,
+          "covered": false
+        }
+      }
     }
-  ],
-  "valid_day_count": 0,
-  "remediation": "collector restarted 2026-08-07 under `caffeinate -i`, which holds the host awake for the life of the process. Storage layout unchanged, so the restart introduces no schema discontinuity.",
-  "policy": "No day is spliced from fragments. If the host sleeps again, that day is excluded and the end date moves. The stopping rule is not weakened to fit the calendar."
+  ]
 }
