@@ -84,7 +84,7 @@
     {
       "date": "2026-08-08",
       "valid": false,
-      "live_snapshots": 6632,
+      "live_snapshots": 7838,
       "stale_snapshots_ignored": 2756,
       "front_contracts": [
         "BRU6"
@@ -97,10 +97,10 @@
           "covered": false
         },
         "EVENING": {
-          "bucket_coverage": 0.7895,
-          "max_gap_minutes": 64.5,
-          "snapshots": 5278,
-          "covered": false
+          "bucket_coverage": 0.9649,
+          "max_gap_minutes": 14.0,
+          "snapshots": 6484,
+          "covered": true
         }
       }
     }
