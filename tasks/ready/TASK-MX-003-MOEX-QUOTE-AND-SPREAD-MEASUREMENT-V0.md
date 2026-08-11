@@ -130,6 +130,59 @@ Enforced by `tools/check_quote_cohort.py`, which regenerates
 hand-maintained: a hand-written one does not notice that two months produced no
 qualifying day.
 
+### Weekend sessions — declared 2026-08-11, at two valid days
+
+MOEX trades at the weekend. ISS returns `venue_tradedate` equal to the weekend
+date, `session` = `MAIN_SESSION`, and quotes that genuinely move — 380 distinct
+bid/offer pairs and 5,867 distinct `updatetime` values on 2026-08-09. The
+collector is not replaying Friday's book, and the day passes the coverage test on
+its own merit. It is a real trading day.
+
+It is not the same regime as a weekday, and the difference is structural rather
+than a matter of the spread being inconvenient:
+
+| day | | spread ticks per leg, mean | median | BRU6 `voltoday` |
+|---|---|---:|---:|---:|
+| 2026-08-07 | Fri | 1.58 | 1.50 | 688,981 |
+| 2026-08-09 | **Sun** | **3.26** | **3.50** | **69,818** |
+| 2026-08-10 | Mon | 1.46 | 1.50 | 709,883 |
+
+Volume is an order of magnitude lower. That is the criterion, and it would read
+the same way whichever direction the spread had moved.
+
+**The stopping rule does not change.** A weekend day that passes the coverage
+test counts toward the 15. Nothing is discarded and no threshold is refitted.
+
+**What changes is the reporting, not the rule.** The per-horizon verdict —
+`survives`, `CONDITIONAL`, `SPREAD_UNFEASIBLE` against the TASK-MX-002
+thresholds — is issued on the **weekday subsample**. Weekend days are reported as
+their own line, with their own spread distribution and their own day count. The
+result must show both, and must state how many days of each kind the cohort holds.
+
+Why this matters enough to declare: at the frozen 1d threshold of 1.90 ticks per
+leg, a weekday-only cohort measures 1.50 and the horizon survives, while a cohort
+of eleven weekdays and four weekend days averages 1.97 and the horizon closes.
+The mix, not the venue, would decide the verdict.
+
+**Declared with its own weakness stated.** This is not a blind rule. It is
+written after observing one complete weekend day, and it is written **before the
+cohort is complete and before any verdict exists** — that is what makes it
+admissible, not the pretence that the data was unseen. The weekend subsample is
+n=1: 2026-08-08 (Saturday) cannot supplement it, being both the migration day and
+a day whose laptop-side records were destroyed during a sync, leaving only 646
+server-side records from after 23:38 MSK.
+
+Consequences carried forward:
+
+- the weekend line is reported even if the two subsamples turn out to agree. A
+  segmentation announced in advance is not retracted because it proved
+  unnecessary; retracting it after the fact is the same fitting in reverse;
+- no weekend claim of any kind may be made until the weekend subsample reaches
+  at least 3 days. Below that it is reported as coverage, not as a measurement;
+- whether a rule may *trade* the weekend session is a different question from how
+  the spread is *measured*. It does not belong to this task; it is an execution
+  constraint and is declared in TASK-MX-007.
+
 ### Amendment record — 3 expiries reduced to 2
 
 Amended 2026-08-07 on operator decision, **before any final-week data existed**.
