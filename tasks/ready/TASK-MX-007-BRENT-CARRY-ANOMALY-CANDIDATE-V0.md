@@ -85,10 +85,48 @@ dte filter   no new entry when the front leg has 7 or fewer TRADING DAYS to its
 costs        cost_model rev2, two legs, non-scalper, TRADE_OUT, POLUNETTO margin;
              TICK_FLOOR and TICK_FLOOR_STRESS both reported
 position     one at a time; a roll closes the position
+sessions     WEEKDAY ONLY. No entry and no exit on a Saturday or a Sunday
+             session; a position open into the weekend is held, and its exit
+             condition is evaluated again at the Monday main session
 search space moex.br.calendar_spread.1h   (NOT a new space - see below)
 variants     exactly ONE. No grid over the quantile pair, the DTE cut, or the
              timeout. A second variant is a second trial and is deflated as one.
 ```
+
+### Edit record — weekend sessions excluded, 2026-08-11, before the first run
+
+The frozen rule was edited once. Recorded here because the freeze is worthless if
+edits are not.
+
+**State at the moment of the edit, so it can be audited.** No run of any kind had
+been executed: `run_mx007_carry.py` and `strategies/brent_carry.py` existed with
+synthetic tests only, `data/reports/` held no `mx007` artefact, and
+`data/trials_ledger.jsonl` held no record in this model's identity. The card's own
+condition — «an edit before the first run is legitimate and must be committed
+separately» — is satisfied, and this edit is committed on its own.
+
+**What was added.** A `sessions` clause restricting entries and exits to weekday
+sessions.
+
+**Why, measured rather than assumed.** MOEX trades at the weekend, and TASK-MX-003
+measured what that session actually is: BRU6 `voltoday` of 69,818 against 688,981
+on the preceding Friday, and a mean spread of 3.26 ticks per leg against 1.46–1.58
+on either weekday. The 5-day timeout this rule uses is priced against the
+TASK-MX-002 threshold of 4.29 ticks per leg; on 2026-08-09 the observed spread sat
+above that threshold **41% of the session**. Without this clause the rule would
+take entries in a regime whose crossing cost was never in the arithmetic that
+justified its horizon.
+
+**Why it is not a filter dressed as a constraint.** It selects nothing on the
+strategy's own outcomes: it was set before any run, it is derived from venue
+liquidity rather than from which trades won, and it removes the weekend
+symmetrically for longs and shorts. It does not touch the quantile pair, the DTE
+cut or the timeout, so it adds no variant and consumes no additional multiplicity.
+
+**What it costs, stated rather than glossed.** Weekend gaps become unhedged
+holding time: a position open on Friday evening carries through a session it
+cannot exit. The result must report how many positions were held across a weekend
+and what those weekends contributed to P&L, separately from weekday performance.
 
 ### Three corrections to the proposed specification, and why each was necessary
 
