@@ -1,6 +1,7 @@
 User-agent: *
 Disallow: /share/strategy-lab-7q4m2v/
 Allow: /
+Allow: /llms.txt
 
 Host: kamtok.ru
 Sitemap: https://kamtok.ru/sitemap.xml
