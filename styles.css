@@ -1119,7 +1119,7 @@ textarea:focus {
   color: #fff;
   background:
     linear-gradient(90deg, rgba(15, 20, 24, 0.92), rgba(15, 20, 24, 0.72) 48%, rgba(15, 20, 24, 0.32)),
-    url("assets/hero-switchgear.png") center / cover;
+    url("assets/hero-switchgear.webp") center / cover;
 }
 
 .landing-hero-content {
