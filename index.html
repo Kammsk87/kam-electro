@@ -878,6 +878,11 @@
           <h2>Написать в Telegram</h2>
           <p>Откройте наш Telegram и расскажите, какой щит или объект нужен. Можно приложить фото или проект. Чат не заполняется заранее: сообщение пишете вы.</p>
           <p>Без регистрации и без корзины.</p>
+          <div class="contact-actions">
+            <a class="button primary" href="https://t.me/kam_ekb" target="_blank" rel="noopener" data-goal="click_telegram_contact">Открыть Telegram</a>
+            <a class="button ghost" href="tel:+79120507100" data-goal="click_phone_contact">Позвонить</a>
+          </div>
+          <p class="form-status" role="status"><strong>Форма на сайте не принимает заявки.</strong> Напишите в Telegram или позвоните.</p>
           <div class="selected-task" data-selected-task hidden>
             <span>Выбрано</span>
             <strong data-selected-task-text></strong>
@@ -885,15 +890,8 @@
             <button class="link-button" type="button" data-clear-task>Сбросить</button>
             <p data-copy-note></p>
           </div>
-          <div class="contact-actions">
-            <a class="button primary" href="https://t.me/kam_ekb" target="_blank" rel="noopener" data-goal="click_telegram_contact">Открыть Telegram</a>
-            <a class="button ghost" href="tel:+79120507100" data-goal="click_phone_contact">Позвонить</a>
-          </div>
-          <p class="form-unavailable"><strong>Форма на сайте не отправляет заявки.</strong> Напишите в Telegram или позвоните.</p>
         </div>
-        <details class="lead-fallback">
-          <summary>Или оставить заявку</summary>
-          <form class="lead-form" id="lead-form" name="lead" method="post" action="" onsubmit="return false" aria-disabled="true" data-metrika-goal-when-delivered="lead_form_submit">
+        <form class="lead-form" id="lead-form" name="lead" method="post" action="" hidden onsubmit="return false" aria-disabled="true" data-metrika-goal-when-delivered="lead_form_submit">
             <p class="form-note" data-form-note>Заявка с этой формы не доставляется и не считается отправленной. Хостинг GitHub Pages не принимает сообщения, отдельный приёмник не подключён. Кнопка выключена специально, чтобы не показывать ложный успех.</p>
             <fieldset disabled>
               <input type="hidden" name="form-name" value="lead">
@@ -936,9 +934,9 @@
               <button class="button primary" type="submit" disabled>Отправить заявку</button>
             </fieldset>
           </form>
-        </details>
         <div class="contact-copy">
           <p class="eyebrow">Заявка</p>
+          <p class="contact-path">Это не форма. Такие сведения можно написать в Telegram или сказать по телефону.</p>
           <h2>Пришлите вводные, и мы оценим электромонтаж объекта</h2>
           <p>
             Лучше всего приложить план, проект, фото объекта, список нагрузок или фото текущего щита.
