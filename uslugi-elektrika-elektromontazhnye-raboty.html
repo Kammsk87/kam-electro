@@ -28,8 +28,8 @@
       ym(109302641, "init", { ssr: true, webvisor: true, clickmap: true, accurateTrackBounce: true, trackLinks: true });
     </script>
     <noscript><div><img src="https://mc.yandex.ru/watch/109302641" style="position:absolute; left:-9999px;" alt=""></div></noscript>
-    <link rel="stylesheet" href="styles.css?v=20261020-1">
-    <script src="script.js" defer></script>
+    <link rel="stylesheet" href="styles.css?v=20261106-design-a">
+    <script src="script.js?v=20261106-design-a" defer></script>
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -87,33 +87,79 @@
     </script>
   </head>
   <body>
-    <header class="site-header is-scrolled" data-header>
-      <a class="brand" href="/" aria-label="На главную">
-        <span class="brand-mark">К</span>
-        <span><strong>КАМ Электро</strong><small>электромонтаж под ключ</small></span>
+    <script>document.documentElement.classList.add("js")</script>
+    <header class="site-header" data-header>
+      <a class="skip-link" href="#top">К содержанию</a>
+      <a class="brand" href="/" aria-label="КАМ Электро, на главную">
+        <span class="brand-text">
+          <strong>КАМ Электро</strong>
+          <small>Екатеринбург и область</small>
+        </span>
       </a>
-      <nav class="nav" aria-label="Основная навигация">
-        <a href="/">Главная</a>
-        <a href="/elektromontazh.html">Электромонтаж</a>
-        <a href="/sborka-elektroshchitov.html">Щиты</a>
+      <div class="header-side">
+        <span class="crew-badge">Бригада</span>
+        <a class="header-phone" href="tel:+79120507100" data-goal="click_phone_header">8 912 050-71-00</a>
+      </div>
+      <nav class="nav desktop-nav" aria-label="Основная навигация">
+        <a href="/" data-tab="home">Главная</a>
+        <a href="/uslugi-elektrika-elektromontazhnye-raboty.html" data-tab="services" aria-current="page">Услуги</a>
+        <a href="/#works" data-tab="works">Работы</a>
+        <a href="/#contact" data-tab="contact" data-goal="click_mobile_request">Связь</a>
         <a href="/stati.html">Статьи</a>
-        <a href="/#contact">Заявка</a>
       </nav>
-      <a class="header-phone" href="tel:+79120507100" data-goal="click_phone_header">8 912 050-71-00</a>
     </header>
 
-    <main class="landing-main">
+    <main id="top" class="landing-main">
       <section class="landing-hero">
         <div class="landing-hero-content">
+          <p class="back-row"><a href="/">На главную</a></p>
           <p class="eyebrow">Екатеринбург / электромонтажные работы</p>
           <h1>Услуги электрика и электромонтажные работы под ключ</h1>
           <p>Выполняем электромонтаж квартир, частных домов, коттеджей, коммерческих и производственных помещений. Берем не мелкие разовые задачи, а понятный объем работ, который можно нормально спланировать, собрать и довести до результата.</p>
+          <figure class="service-hero-photo"><img src="assets/work-photos/electrical-installation-rough-in.webp" width="1000" height="450" fetchpriority="high" alt="Черновой электромонтаж кабельных линий"></figure>
           <div class="hero-actions">
             <a class="button primary" href="/#contact" data-goal="click_services_electrician_request">Оставить заявку</a>
             <a class="button ghost" href="tel:+79120507100" data-goal="click_phone_services_electrician">Позвонить</a>
           </div>
         </div>
       </section>
+
+      <section class="search-page" data-search data-search-mode="page">
+        <p class="search-title">Поиск услуг</p>
+        <form class="search-form" role="search" method="get" action="/uslugi-elektrika-elektromontazhnye-raboty.html">
+  <label class="visually-hidden" for="service-search-page">Какие работы вам нужны?</label>
+  <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="6.5"/><path d="M16 16.5 20 20.5"/></svg>
+  <input id="service-search-page" data-search-input type="search" name="q" placeholder="Какие работы вам нужны?" autocomplete="off" enterkeyhint="search" aria-autocomplete="list" aria-controls="service-search-page-results" aria-expanded="false">
+</form>
+<div class="suggest-panel">
+  <p class="search-hint">Выберите строку — откроется карточка услуги</p>
+  <ul id="service-search-page-results" class="suggest-list" data-search-list aria-label="Подходящие услуги">
+    <li data-keywords="щит щиток щиты электрощит электрощита сборка щитовая квартирный этажный учет учёта щиток учета"><a href="sborka-elektroshchitov.html"><span class="dot" aria-hidden="true"></span><span class="suggest-copy"><strong>Сборка электрощита</strong><small>Квартирный, этажный и щит учёта</small></span><span class="chevron" aria-hidden="true">›</span></a></li>
+<li data-keywords="вру вводно-распределительное вводно распределительное устройство ввод щит"><a href="vru-avr-shu.html"><span class="dot" aria-hidden="true"></span><span class="suggest-copy"><strong>ВРУ</strong><small>Вводно-распределительное устройство</small></span><span class="chevron" aria-hidden="true">›</span></a></li>
+<li data-keywords="авр автоматический ввод резерва резервное питание генератор щит"><a href="vru-avr-shu.html"><span class="dot" aria-hidden="true"></span><span class="suggest-copy"><strong>АВР</strong><small>Автоматический ввод резерва</small></span><span class="chevron" aria-hidden="true">›</span></a></li>
+<li data-keywords="щу щит управления автоматика автоматики насос вентиляция"><a href="vru-avr-shu.html"><span class="dot" aria-hidden="true"></span><span class="suggest-copy"><strong>ЩУ</strong><small>Щит управления и автоматики</small></span><span class="chevron" aria-hidden="true">›</span></a></li>
+<li data-keywords="распределительный щит щр силовая часть схема объекта"><a href="sborka-elektroshchitov.html"><span class="dot" aria-hidden="true"></span><span class="suggest-copy"><strong>Распределительный щит</strong><small>Под схему объекта</small></span><span class="chevron" aria-hidden="true">›</span></a></li>
+<li data-keywords="квартира квартирный электромонтаж розетки освещение новостройка под ключ"><a href="elektromontazh-kvartiry-pod-klyuch.html"><span class="dot" aria-hidden="true"></span><span class="suggest-copy"><strong>Электромонтаж квартиры</strong><small>Черновая, щит, розетки и свет</small></span><span class="chevron" aria-hidden="true">›</span></a></li>
+<li data-keywords="дом коттедж частный котельная загородный"><a href="elektromontazh-kottedzhey.html"><span class="dot" aria-hidden="true"></span><span class="suggest-copy"><strong>Электромонтаж дома</strong><small>Коттедж и частный дом</small></span><span class="chevron" aria-hidden="true">›</span></a></li>
+<li data-keywords="бизнес офис магазин коммерция производство цех склад промышленный"><a href="elektromontazh-promyshlennykh-pomeshcheniy.html"><span class="dot" aria-hidden="true"></span><span class="suggest-copy"><strong>Электромонтаж для бизнеса</strong><small>Коммерция и производство</small></span><span class="chevron" aria-hidden="true">›</span></a></li>
+<li data-keywords="электромонтаж под ключ монтаж объект"><a href="elektromontazh.html"><span class="dot" aria-hidden="true"></span><span class="suggest-copy"><strong>Электромонтаж под ключ</strong><small>Квартиры, дома и объекты</small></span><span class="chevron" aria-hidden="true">›</span></a></li>
+<li data-keywords="услуги электрик электрика электромонтажные работы"><a href="uslugi-elektrika-elektromontazhnye-raboty.html"><span class="dot" aria-hidden="true"></span><span class="suggest-copy"><strong>Услуги электрика</strong><small>Электромонтажные работы</small></span><span class="chevron" aria-hidden="true">›</span></a></li>
+<li class="suggest-empty" data-search-empty hidden>По этому слову отдельной страницы нет. Откройте раздел услуг или выберите тип объекта.</li>
+  </ul>
+  <p class="search-hint">Или по типу объекта</p>
+<div class="chip-row" aria-label="Тип объекта">
+  <a class="chip" href="elektromontazh-kvartiry-pod-klyuch.html">Квартира</a>
+  <a class="chip" href="elektromontazh-kottedzhey.html">Дом</a>
+  <a class="chip" href="elektromontazh-promyshlennykh-pomeshcheniy.html">Бизнес</a>
+  <a class="chip" href="sborka-elektroshchitov.html">Щиты</a>
+</div>
+</div>
+        <div class="quick-actions">
+          <a class="button ghost" href="tel:+79120507100">Позвонить</a>
+          <a class="button primary" href="https://t.me/kam_ekb" target="_blank" rel="noopener">Написать в Telegram</a>
+        </div>
+      </section>
+
 
       <section class="landing-section">
         <div class="section-copy">
@@ -152,11 +198,11 @@
         </div>
         <div class="landing-work-grid">
           <figure class="work-photo">
-            <img loading="lazy" decoding="async" src="assets/work-photos/electrical-installation-rough-in.webp" alt="Черновой электромонтаж кабельных линий">
+            <img loading="lazy" decoding="async" src="assets/work-photos/electrical-installation-rough-in.webp" alt="Черновой электромонтаж кабельных линий" width="1000" height="450">
             <figcaption>Прокладка и подготовка линий до чистового этапа</figcaption>
           </figure>
           <figure class="work-photo">
-            <img loading="lazy" decoding="async" src="assets/work-photos/main-distribution-panel.webp" alt="Распределительный щит после сборки">
+            <img loading="lazy" decoding="async" src="assets/work-photos/main-distribution-panel.webp" alt="Распределительный щит после сборки" width="768" height="1024">
             <figcaption>Щит с понятной структурой и маркировкой линий</figcaption>
           </figure>
         </div>
@@ -196,10 +242,31 @@
       </section>
     </main>
 
+    <details class="legacy-links"><summary>Прежние разделы страницы</summary><p class="legacy-brand">К КАМ Электро электромонтаж под ключ</p><nav class="nav" aria-label="Прежняя навигация">
+        <a href="/">Главная</a>
+        <a href="/elektromontazh.html">Электромонтаж</a>
+        <a href="/sborka-elektroshchitov.html">Щиты</a>
+        <a href="/stati.html">Статьи</a>
+        <a href="/#contact">Заявка</a>
+      </nav></details>
     <footer class="footer">
       <span>КАМ Электро</span>
       <span>Услуги электрика и электромонтажные работы</span>
       <a href="/">На главную</a>
+    
+      <p class="footer-contacts">
+        <a href="tel:+79120507100" data-goal="click_mobile_phone">Позвонить</a>
+        <a href="https://wa.me/79120507100" target="_blank" rel="noopener" data-goal="click_mobile_whatsapp">WhatsApp</a>
+        <a href="https://t.me/kam_ekb" target="_blank" rel="noopener">Telegram</a>
+        <a href="mailto:kammsk87@gmail.com">kammsk87@gmail.com</a>
+      </p>
     </footer>
+  
+    <nav class="tabbar" aria-label="Нижняя навигация">
+      <a href="/" data-tab="home"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z"/></svg><span>Главная</span></a>
+      <a href="/uslugi-elektrika-elektromontazhnye-raboty.html" data-tab="services" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="6.5" height="6.5" rx="1.2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.2"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.2"/></svg><span>Услуги</span></a>
+      <a href="/#works" data-tab="works"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.4"/><path d="m7 16 3.2-3.2a1 1 0 0 1 1.4 0L16 17"/></svg><span>Работы</span></a>
+      <a href="/#contact" data-tab="contact" data-goal="click_mobile_request"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 16.5 4 20l4.2-1.6A8 8 0 1 0 6 16.5z"/></svg><span>Связь</span></a>
+    </nav>
   </body>
 </html>
