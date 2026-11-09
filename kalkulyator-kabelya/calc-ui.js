@@ -16,6 +16,7 @@
     appliances: Object.assign({}, config.presets.two.appliances)
   };
   var resultSeen = false;
+  var STORAGE_KEY = "kam-cable-calc-v1";
 
   var steps = [
     { id: "preset", title: "Квартира" },
@@ -63,21 +64,47 @@
     }
   }
 
-  function resultText(result) {
-    var lines = [
-      "Оценка кабеля и автоматов для квартиры, Екатеринбург. Это не проект.",
-      "Площадь " + result.input.area + " м², потолок " + result.input.ceiling + " м, " + (result.input.housing === "secondary" ? "вторичка" : "новостройка") + ".",
-      "Итого с запасом около " + formatM(result.totals.withReserve) + " м, в бухтах " + result.totals.coil + " м. Модулей щита ориентировочно " + result.totals.modules + "."
-    ];
-    result.cables.forEach(function (item) {
-      lines.push("ВВГнг-LS 3×" + formatSection(item.section) + ": " + formatM(item.raw) + "–" + formatM(item.withReserve) + " м, бухта " + item.coil + " м");
-    });
-    result.lines.forEach(function (item) {
-      var protection = item.device + " " + item.curve + item.in;
-      if (item.rcdMa) protection += ", " + item.rcdMa + " мА";
-      lines.push(item.name + ": 3×" + formatSection(item.section) + ", " + protection);
-    });
-    return lines.join("\n");
+  function saveState() {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (error) {}
+  }
+
+  function loadState() {
+    try {
+      var raw = window.localStorage.getItem(STORAGE_KEY);
+      if (!raw) return false;
+      var saved = JSON.parse(raw);
+      if (!saved || typeof saved !== "object") return false;
+      state.step = Math.min(steps.length - 1, Math.max(0, Number(saved.step) || 0));
+      state.preset = saved.preset || state.preset;
+      state.housing = saved.housing === "secondary" ? "secondary" : "newBuild";
+      ["area", "rooms", "ceiling", "sockets", "switches", "lights", "kitchenSockets", "bathSockets"].forEach(function (key) {
+        if (saved[key] != null) state[key] = Number(saved[key]);
+      });
+      if (saved.appliances) state.appliances = Object.assign({}, config.presets.two.appliances, saved.appliances);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function shopText(items) {
+    return items.map(function (item) {
+      return item.title + " — " + item.qty + (item.detail ? " (" + item.detail + ")" : "");
+    }).join("\n");
+  }
+
+  function resultText(result, items) {
+    var housing = result.input.housing === "secondary" ? "вторичка" : "новостройка";
+    return [
+      "Оценка для мастера КАМ Электро, Екатеринбург. Это не проект и не список, по которому стоит закупаться без проверки.",
+      "Площадь " + result.input.area + " м², потолок " + result.input.ceiling + " м, " + housing + ".",
+      "Кабель с запасом " + formatM(result.totals.withReserve) + " м, в бухтах " + result.totals.coil + " м. Щит около " + result.totals.modules + " модулей.",
+      "",
+      "Список для закупки:",
+      shopText(items)
+    ].join("\n");
   }
 
   function formatM(value) {
@@ -95,7 +122,12 @@
       return "<li class=\"" + cls + "\"><span>" + (index + 1) + "</span>" + step.title + "</li>";
     }).join("");
     root.innerHTML = "<ol class=\"calc-progress\">" + progress + "</ol>" + stepBody() + navButtons();
+    saveState();
     bind();
+    if (state.step === steps.length - 1) {
+      var top = document.querySelector(".calc-result-top");
+      if (top) top.scrollIntoView({ block: "start" });
+    }
   }
 
   function stepBody() {
@@ -134,7 +166,7 @@
       numberField("bathSockets", "Из них санузел", state.bathSockets, "1", "0", "12") +
       numberField("switches", "Выключатели", state.switches, "1", "0", "40") +
       numberField("lights", "Светильники", state.lights, "1", "1", "40") +
-      "</div><p class=\"search-hint\">Кухня и санузел считаются отдельными линиями с дифавтоматом 30 мА.</p></fieldset>";
+      "</div><p class=\"search-hint\">Кухня и санузел пойдут отдельными линиями.</p></fieldset>";
   }
 
   function loadsStep() {
@@ -145,30 +177,62 @@
     return "<fieldset class=\"calc-card\"><legend>Мощные приборы</legend><div class=\"appliance-list\">" + boxes + "</div><p class=\"search-hint\">Каждый включённый прибор получает отдельную линию. Мощность и сечение заданы в calc.js.</p></fieldset>";
   }
 
+  function deviceCount(result) {
+    return result.lines.length + 1;
+  }
+
   function resultStep() {
     readNumbers();
     var result = api.calculate(state);
+    var items = api.shoppingList(result);
     if (!resultSeen) {
       resultSeen = true;
       reach("calc_result");
     }
-    var cables = result.cables.map(function (item) {
-      return "<li><strong>ВВГнг-LS 3×" + formatSection(item.section) + "</strong><span>" + formatM(item.raw) + "–" + formatM(item.withReserve) + " м, бухта " + item.coil + " м</span></li>";
+    var shop = items.map(function (item) {
+      var detail = item.detail ? "<span>" + item.detail + "</span>" : "";
+      return "<li><strong>" + item.title + "</strong><span>" + item.qty + "</span>" + detail + "</li>";
     }).join("");
-    var lines = result.lines.map(function (item) {
-      var extra = item.rcdMa ? ", УЗО " + item.rcdMa + " мА" : "";
-      return "<li><strong>" + item.name + "</strong><span>3×" + formatSection(item.section) + " · " + item.device + " " + item.curve + item.in + extra + " · " + formatM(item.lengthM) + " м</span></li>";
+    var plainLines = result.lines.map(function (item) {
+      return "<li>" + item.name + " — кабель " + formatSection(item.section) + " мм²</li>";
     }).join("");
     var notes = result.notes.map(function (note) { return "<li>" + note + "</li>"; }).join("");
-    window.__kamCalcText = resultText(result);
-    return "<div class=\"calc-card calc-result\"><p class=\"calc-disclaimer\">Оценка объёма, не проект. Типовая рекомендация, мастер проверит на объекте.</p><p class=\"calc-total\">С запасом <strong>" + formatM(result.totals.withReserve) + " м</strong>, в бухтах <strong>" + result.totals.coil + " м</strong>. Ориентир щита: <strong>" + result.totals.modules + " модулей</strong>.</p><h2>Кабель по сечениям</h2><ul class=\"calc-list\">" + cables + "</ul><h2>Линии</h2><ul class=\"calc-list\">" + lines + "</ul><h2>Как считали</h2><ul class=\"calc-notes\">" + notes + "</ul></div>";
+    var text = resultText(result, items);
+    window.__kamCalcText = text;
+    window.__kamShopText = "Список для закупки\n" + shopText(items);
+    return "<div class=\"calc-card calc-result\">" +
+      "<div class=\"calc-result-top\">" +
+      "<p class=\"calc-total\">Кабель с запасом <strong>" + formatM(result.totals.withReserve) + " м</strong>. Аппаратов защиты <strong>" + deviceCount(result) + "</strong>, щит на <strong>" + result.totals.modules + " модулей</strong>.</p>" +
+      "<p class=\"calc-disclaimer\">Это оценка, точный проект сделает мастер.</p>" +
+      "<p class=\"calc-hint\">Скопируем расчёт — вставьте его в чат.</p>" +
+      "<div class=\"calc-actions\">" +
+      "<button type=\"button\" class=\"button primary\" id=\"calc-telegram\" data-goal=\"calc_telegram\">Скопировать расчёт и открыть Telegram</button>" +
+      "<a class=\"button ghost\" href=\"tel:+79120507100\">Позвонить</a>" +
+      "</div>" +
+      "<label class=\"calc-text-label\" for=\"calc-text\">Текст для чата</label>" +
+      "<textarea id=\"calc-text\" class=\"calc-text\" readonly rows=\"6\">" + escapeText(text) + "</textarea>" +
+      "<p id=\"calc-copy-note\" class=\"search-hint\" role=\"status\"></p>" +
+      "</div>" +
+      "<h2>Список для закупки</h2>" +
+      "<ul class=\"calc-list\">" + shop + "</ul>" +
+      "<button type=\"button\" class=\"button ghost\" id=\"calc-copy-list\" data-goal=\"calc_copy_list\">Скопировать список</button>" +
+      "<h2>Линии простыми словами</h2>" +
+      "<ul class=\"calc-list calc-plain\">" + plainLines + "</ul>" +
+      "<details class=\"calc-how\"><summary>Как считали</summary><ul class=\"calc-notes\">" + notes + "</ul></details>" +
+      "</div>";
+  }
+
+  function escapeText(value) {
+    return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;");
   }
 
   function navButtons() {
-    var back = state.step > 0 ? "<button type=\"button\" class=\"button ghost\" data-calc-back>Назад</button>" : "<span></span>";
-    var next = state.step < steps.length - 1 ? "<button type=\"button\" class=\"button primary\" data-calc-next>Дальше</button>" : "";
-    var actions = state.step === steps.length - 1 ? "<div class=\"calc-actions\"><button type=\"button\" class=\"button primary\" id=\"calc-telegram\" data-goal=\"calc_telegram\">Скопировать расчёт и открыть Telegram</button><button type=\"button\" class=\"button ghost\" id=\"calc-copy\">Скопировать</button><a class=\"button ghost\" href=\"tel:+79120507100\">Позвонить</a><p id=\"calc-copy-note\" class=\"search-hint\" role=\"status\"></p></div>" : "";
-    return "<div class=\"calc-nav\">" + back + next + "</div>" + actions;
+    if (state.step === steps.length - 1) {
+      return "<div class=\"calc-nav\"><button type=\"button\" class=\"button ghost\" data-calc-back>Назад к приборам</button></div>";
+    }
+    var back = state.step > 0 ? "<button type=\"button\" class=\"button ghost\" data-calc-back>Назад</button>" : "";
+    var next = "<button type=\"button\" class=\"button primary\" data-calc-next>Дальше</button>";
+    return "<div class=\"calc-nav" + (back ? "" : " is-single") + "\">" + back + next + "</div>";
   }
 
   function bind() {
@@ -182,35 +246,34 @@
     if (next) next.addEventListener("click", function () { readNumbers(); state.step += 1; render(); });
     var back = $("[data-calc-back]");
     if (back) back.addEventListener("click", function () { readNumbers(); state.step -= 1; render(); });
-    var copy = $("#calc-copy");
-    if (copy) copy.addEventListener("click", function () { copyText(false); });
+    var listCopy = $("#calc-copy-list");
+    if (listCopy) listCopy.addEventListener("click", function () { copyText(window.__kamShopText, false, "Список скопирован."); });
     var telegram = $("#calc-telegram");
     if (telegram) telegram.addEventListener("click", function (event) {
       event.preventDefault();
-      copyText(true);
+      copyText(window.__kamCalcText, true, "Расчёт скопирован. Вставьте его в чат: сообщение само не уходит.");
     });
   }
 
-  function copyText(openTelegram) {
-    var text = window.__kamCalcText || "";
+  function copyText(text, openTelegram, success) {
     var note = $("#calc-copy-note");
     function done(message) {
       if (note) note.textContent = message;
       if (openTelegram) window.open("https://t.me/kam_ekb", "_blank", "noopener");
     }
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(function () {
-        done(openTelegram ? "Расчёт скопирован. Вставьте его в Telegram сами: чат не заполняется заранее." : "Расчёт скопирован.");
+      navigator.clipboard.writeText(text || "").then(function () {
+        done(success);
       }).catch(function () {
-        done("Не удалось скопировать автоматически. Выделите текст результата вручную.");
+        done("Не удалось скопировать автоматически. Выделите текст в поле выше.");
       });
     } else {
-      done("Автокопирование недоступно. Выделите текст результата вручную.");
+      done("Автокопирование недоступно. Выделите текст в поле выше.");
     }
   }
 
   function start() {
-    applyPreset("two");
+    if (!loadState()) applyPreset("two");
     render();
   }
 

@@ -2,7 +2,7 @@ import { createRequire } from "module";
 import assert from "assert";
 
 const require = createRequire(import.meta.url);
-const { CONFIG, calculate } = require("../kalkulyator-kabelya/calc.js");
+const { CONFIG, calculate, shoppingList } = require("../kalkulyator-kabelya/calc.js");
 
 function inputFromPreset(id, housing) {
   const preset = CONFIG.presets[id];
@@ -49,6 +49,16 @@ for (const id of Object.keys(CONFIG.presets)) {
   const text = JSON.stringify(result);
   assert.ok(!/(^|[^а-яё])руб([^а-яё]|$)|цена|стоимость|прайс/i.test(text));
 }
+
+const shop = shoppingList(two);
+const rcbo16 = shop.find((item) => item.title === "Дифавтомат C16");
+const rcbo32 = shop.find((item) => item.title === "Дифавтомат C32");
+const mcb10 = shop.find((item) => item.title === "Автомат C10");
+assert.ok(rcbo16 && rcbo16.qty === "6 шт.", JSON.stringify(shop));
+assert.ok(rcbo32 && rcbo32.qty === "1 шт.");
+assert.ok(mcb10 && mcb10.qty === "1 шт.");
+assert.ok(shop.some((item) => item.title === "Вводной автомат 2P" && item.qty === "1 шт."));
+assert.ok(shop.some((item) => item.title.indexOf("Щит на ") === 0));
 
 console.log(JSON.stringify({
   twoArea: two.input.area,

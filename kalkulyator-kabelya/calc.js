@@ -286,5 +286,36 @@
     };
   }
 
-  return { CONFIG: CONFIG, calculate: calculate, round1: round1 };
+  function shoppingList(result) {
+    var cables = result.cables.map(function (item) {
+      return {
+        kind: "cable",
+        title: "Кабель ВВГнг-LS 3×" + String(item.section).replace(".", ","),
+        qty: item.coil + " м",
+        detail: formatRange(item)
+      };
+    });
+    var mcb = {};
+    var rcbo = {};
+    result.lines.forEach(function (item) {
+      var bucket = item.rcdMa ? rcbo : mcb;
+      var key = String(item.in);
+      bucket[key] = (bucket[key] || 0) + 1;
+    });
+    function rows(bucket, title) {
+      return Object.keys(bucket).sort(function (a, b) { return Number(a) - Number(b); }).map(function (rating) {
+        return { kind: "device", title: title + " " + CONFIG.curve + rating, qty: bucket[rating] + " шт." };
+      });
+    }
+    return cables.concat(rows(mcb, "Автомат")).concat(rows(rcbo, "Дифавтомат")).concat([
+      { kind: "input", title: "Вводной автомат 2P", qty: "1 шт.", detail: "Номинал задаёт сетевая организация" },
+      { kind: "panel", title: "Щит на " + result.totals.modules + " модулей", qty: "1 шт." }
+    ]);
+  }
+
+  function formatRange(item) {
+    return String(item.raw).replace(".", ",") + "–" + String(item.withReserve).replace(".", ",") + " м расчёт, бухта " + item.coil + " м";
+  }
+
+  return { CONFIG: CONFIG, calculate: calculate, shoppingList: shoppingList, round1: round1 };
 });

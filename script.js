@@ -196,7 +196,7 @@ function syncTabState() {
   });
 
   let tab = null;
-  if (hash === "#contact") {
+  if (hash === "#contact" || hash === "#calc-contact") {
     tab = "contact";
   } else if (hash === "#works") {
     tab = "works";

@@ -1154,8 +1154,35 @@ figure {
   background: #fff;
 }
 
-.calc-nav {
-  grid-template-columns: 1fr 1fr;
+.calc-nav,
+.calc-nav.is-single {
+  grid-template-columns: 1fr;
+}
+
+.calc-result-top {
+  scroll-margin-top: var(--header-offset);
+}
+
+.calc-text {
+  width: 100%;
+  min-height: 140px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #f6f7f9;
+  resize: vertical;
+}
+
+.calc-text-label,
+.calc-hint {
+  display: block;
+  margin: 8px 0 0;
+  font-weight: 700;
+}
+
+.calc-contact {
+  margin-top: 16px;
 }
 
 .calc-disclaimer {
