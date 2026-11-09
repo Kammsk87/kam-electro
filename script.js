@@ -188,6 +188,10 @@ function openDetailsForHash() {
   }
 }
 
+function isCableCalculator() {
+  return window.location.pathname.indexOf("/kalkulyator-kabelya") !== -1;
+}
+
 function syncTabState() {
   const hash = window.location.hash;
   const file = pageFile();
@@ -196,7 +200,9 @@ function syncTabState() {
   });
 
   let tab = null;
-  if (hash === "#contact") {
+  if (isCableCalculator()) {
+    tab = "services";
+  } else if (hash === "#contact" || hash === "#calc-contact") {
     tab = "contact";
   } else if (hash === "#works") {
     tab = "works";
