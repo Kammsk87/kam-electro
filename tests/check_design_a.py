@@ -12,6 +12,10 @@ from seo_snapshot import infra, snapshot  # noqa: E402
 BEFORE = json.loads((ROOT / "tests/fixtures/seo-before.json").read_text(encoding="utf-8"))
 ALLOWED_REMOVED = [
     "После отправки мы увидим заявку и свяжемся с вами в ближайшее время.",
+    # Approved visible H2 replacements on the homepage. Not used in title,
+    # description, canonical or JSON-LD.
+    "Сайт должен сразу отсекать мелкие заявки и приводить подходящие объекты",
+    "Разбираем электромонтаж через вопросы, которые ведут к заявке",
 ]
 ASSET_SUFFIXES = ("styles.css", "script.js", "favicon.svg")
 
