@@ -2,6 +2,7 @@
 """Compare the working tree with the pre-design SEO snapshot."""
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -27,11 +28,36 @@ def norm_href(href):
     return href
 
 
+ALLOWED_SITEMAP_ADDITIONS = {"https://kamtok.ru/kalkulyator-kabelya/"}
+
+
+def sitemap_locs(text):
+    return re.findall(r"<loc>(.*?)</loc>", text)
+
+
+def check_infra(after_infra):
+    problems = []
+    before = before_infra()
+    for name in ("robots.txt", "CNAME", "yandex_58997e3dcee658b5.html"):
+        if before[name] != after_infra[name]:
+            problems.append(f"{name} changed")
+    if before["sitemap.xml"] == after_infra["sitemap.xml"]:
+        return problems
+    old_text = (ROOT / "tests/fixtures/sitemap-main.xml").read_text(encoding="utf-8")
+    new_text = (ROOT / "sitemap.xml").read_text(encoding="utf-8")
+    old_locs = sitemap_locs(old_text)
+    new_locs = sitemap_locs(new_text)
+    missing = [loc for loc in old_locs if loc not in new_locs]
+    added = [loc for loc in new_locs if loc not in old_locs]
+    if missing or set(added) - ALLOWED_SITEMAP_ADDITIONS:
+        problems.append(f"sitemap.xml changed beyond the calculator URL: missing={missing} added={added}")
+    return problems
+
+
 def main():
     after = snapshot()
     problems = []
-    if before_infra() != after["infra"]:
-        problems.append("robots.txt, sitemap.xml, CNAME or Yandex verification file changed")
+    problems.extend(check_infra(after["infra"]))
 
     for page, old in BEFORE["pages"].items():
         new = after["pages"].get(page)
