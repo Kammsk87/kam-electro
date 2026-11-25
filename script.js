@@ -220,77 +220,234 @@ function syncTabState() {
   });
 }
 
+const GENERIC_CTA = new Set([
+  "связь",
+  "заявка",
+  "оставить заявку",
+  "перейти к заявке",
+  "получить предварительный расчет",
+  "написать"
+]);
+
+const OBJECT_BY_FILE = {
+  "elektromontazh-kvartiry-pod-klyuch.html": "Квартира",
+  "elektromontazh-kottedzhey.html": "Дом",
+  "elektromontazh-promyshlennykh-pomeshcheniy.html": "Коммерция",
+  "sborka-elektroshchitov.html": "Щит",
+  "vru-avr-shu.html": "Щит",
+  "elektromontazh.html": "",
+  "uslugi-elektrika-elektromontazhnye-raboty.html": "",
+  "voprosy-po-elektromontazhu.html": "",
+  "stati.html": ""
+};
+
+const TELEGRAM_CHAT = "https://t.me/kam_ekb";
+const WHATSAPP_CHAT = "https://wa.me/79120507100";
+
 function rememberTaskFromService(anchor) {
   const href = anchor.getAttribute("href") || "";
   const toContact = href === "/#contact" || href === "#contact" || href.endsWith("/#contact");
-  if (!toContact || !SERVICE_PAGES.has(pageFile())) {
+  const file = pageFile();
+  if (!toContact || file === "index.html" || file === "") {
     return;
   }
   const heading = document.querySelector("h1");
-  const text = heading ? heading.textContent.trim() : "";
-  if (text) {
-    window.sessionStorage.setItem(TASK_KEY, text);
+  const page = heading ? heading.textContent.replace(/\s+/g, " ").trim() : "";
+  if (!page) {
+    return;
+  }
+  const cta = (anchor.textContent || "").replace(/\s+/g, " ").trim().slice(0, 80);
+  try {
+    window.sessionStorage.setItem(TASK_KEY, JSON.stringify({
+      page: page.slice(0, 180),
+      cta,
+      file
+    }));
+  } catch (error) {
+    // Storage can be blocked. The chat still opens without the page name.
   }
 }
 
-function initSelectedTask() {
-  const box = document.querySelector("[data-selected-task]");
-  const output = document.querySelector("[data-selected-task-text]");
-  const copyButton = document.querySelector("[data-copy-task]");
-  const clearButton = document.querySelector("[data-clear-task]");
-  const note = document.querySelector("[data-copy-note]");
-  if (!box || !output) {
-    return;
+function readStoredTask() {
+  let raw = "";
+  try {
+    raw = window.sessionStorage.getItem(TASK_KEY) || "";
+  } catch (error) {
+    return null;
   }
-
-  const saved = window.sessionStorage.getItem(TASK_KEY) || "";
-  if (saved) {
-    output.textContent = saved;
-    box.hidden = false;
+  if (!raw) {
+    return null;
   }
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && typeof parsed.page === "string") {
+      return {
+        page: parsed.page.trim(),
+        cta: typeof parsed.cta === "string" ? parsed.cta.trim() : "",
+        file: typeof parsed.file === "string" ? parsed.file : ""
+      };
+    }
+  } catch (error) {
+    // Older visits stored only the heading.
+  }
+  return { page: raw.trim(), cta: "", file: "" };
+}
 
-  copyButton?.addEventListener("click", async () => {
-    const text = output.textContent.trim();
-    if (!text) {
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(text);
-      if (note) {
-        note.textContent = "Текст задачи скопирован. Вставьте его в Telegram сами: чат не заполняется автоматически.";
-      }
-    } catch (error) {
-      if (note) {
-        note.textContent = "Автокопирование недоступно. Выделите текст задачи выше и скопируйте его вручную.";
-      }
-    }
-  });
+function objectFromPage(file, title) {
+  if (Object.prototype.hasOwnProperty.call(OBJECT_BY_FILE, file)) {
+    return OBJECT_BY_FILE[file];
+  }
+  const text = normalizeSearch(title || "");
+  if (/щит|вру|авр|щу/.test(text)) {
+    return "Щит";
+  }
+  if (/квартир/.test(text)) {
+    return "Квартира";
+  }
+  if (/дом|коттедж|бан|котельн|гараж|мастерск/.test(text)) {
+    return "Дом";
+  }
+  if (/коммерч|офис|склад|торгов|производ|цех|промышлен/.test(text)) {
+    return "Коммерция";
+  }
+  return "";
+}
 
-  clearButton?.addEventListener("click", () => {
-    window.sessionStorage.removeItem(TASK_KEY);
-    output.textContent = "";
-    box.hidden = true;
-    if (note) {
-      note.textContent = "";
-    }
-  });
+function clipField(value, limit) {
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, limit);
+}
+
+function specificCta(cta) {
+  const clean = cta ? cta.replace(/\s+/g, " ").trim() : "";
+  if (!clean || GENERIC_CTA.has(normalizeSearch(clean))) {
+    return "";
+  }
+  return clean;
+}
+
+function leadMessage(source) {
+  const form = document.querySelector("#lead-form");
+  const data = new FormData(form);
+  const lines = ["Здравствуйте! Заявка с сайта КАМ Электро."];
+  if (source && source.page) {
+    lines.push(`Страница: ${source.page}`);
+  }
+  const cta = source ? specificCta(source.cta) : "";
+  if (cta) {
+    lines.push(`Запрос: ${cta}`);
+  }
+  const object = clipField(data.get("object"), 40);
+  const need = clipField(data.get("need"), 240);
+  const place = clipField(data.get("place"), 240);
+  const name = clipField(data.get("name"), 80);
+  if (object) {
+    lines.push(`Объект: ${object}`);
+  }
+  if (need) {
+    lines.push(`Нужно: ${need}`);
+  }
+  if (place) {
+    lines.push(`Где: ${place}`);
+  }
+  if (name) {
+    lines.push(`Имя: ${name}`);
+  }
+  lines.push("Фото, план или проект приложу в чате.");
+  return lines.join("\n");
+}
+
+function copyText(text) {
+  const copiedNow = legacyCopy(text);
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+    return navigator.clipboard.writeText(text).then(() => true, () => copiedNow || legacyCopy(text));
+  }
+  return Promise.resolve(copiedNow);
+}
+
+function legacyCopy(text) {
+  const helper = document.createElement("textarea");
+  helper.value = text;
+  helper.setAttribute("readonly", "");
+  helper.setAttribute("aria-hidden", "true");
+  helper.style.position = "fixed";
+  helper.style.top = "0";
+  helper.style.left = "0";
+  helper.style.width = "1px";
+  helper.style.height = "1px";
+  helper.style.opacity = "0";
+  document.body.appendChild(helper);
+  helper.focus();
+  helper.select();
+  let ok = false;
+  try {
+    ok = document.execCommand("copy");
+  } catch (error) {
+    ok = false;
+  }
+  helper.remove();
+  return ok;
 }
 
 function initLeadForm() {
   const form = document.querySelector("#lead-form");
-  const note = document.querySelector("[data-form-note]");
-  if (!form) {
+  const preview = document.querySelector("#lead-preview");
+  const telegram = document.querySelector("#lead-telegram");
+  const whatsapp = document.querySelector("#lead-whatsapp");
+  const hint = document.querySelector("#lead-hint");
+  const sourceBox = document.querySelector("[data-lead-source]");
+  if (!form || !telegram || !whatsapp) {
     return;
+  }
+
+  const source = readStoredTask();
+  if (source && source.page && sourceBox) {
+    const cta = specificCta(source.cta);
+    sourceBox.hidden = false;
+    sourceBox.textContent = cta
+      ? `Заявка со страницы «${source.page}» — кнопка «${cta}».`
+      : `Заявка со страницы «${source.page}».`;
+    const object = objectFromPage(source.file, source.page);
+    const selected = form.querySelector('input[name="object"]:checked');
+    if (object && !selected) {
+      form.querySelectorAll('input[name="object"]').forEach((input) => {
+        input.checked = input.value === object;
+      });
+    }
+  }
+
+  // core.telegram.org/api/links documents t.me/<username>?text= as a draft.
+  // Web and older apps often ignore it, so the same text is copied for paste.
+  function refresh() {
+    const text = leadMessage(source);
+    if (preview) {
+      preview.value = text;
+    }
+    const encoded = encodeURIComponent(text);
+    whatsapp.href = `${WHATSAPP_CHAT}?text=${encoded}`;
+    telegram.href = `${TELEGRAM_CHAT}?text=${encoded}`;
   }
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    if (note) {
-      note.classList.remove("success");
-      note.classList.add("error");
-      note.textContent = "Заявка не отправлена. У сайта нет приёмника формы, поэтому сообщение никуда не ушло. Напишите в Telegram или позвоните.";
-    }
   });
+  form.addEventListener("input", refresh);
+  form.addEventListener("change", refresh);
+  whatsapp.addEventListener("click", refresh);
+  telegram.addEventListener("click", () => {
+    const text = leadMessage(source);
+    telegram.href = `${TELEGRAM_CHAT}?text=${encodeURIComponent(text)}`;
+    copyText(text).then((ok) => {
+      if (!hint) {
+        return;
+      }
+      hint.classList.toggle("success", ok);
+      hint.classList.toggle("error", !ok);
+      hint.textContent = ok
+        ? "Текст скопирован, вставьте в чат."
+        : "Не удалось скопировать само. Выделите текст в поле выше и вставьте его в чат.";
+    });
+  });
+  refresh();
 }
 
 document.querySelectorAll("[data-goal]").forEach((element) => {
@@ -307,7 +464,6 @@ document.addEventListener("click", (event) => {
 });
 
 document.querySelectorAll("[data-search]").forEach(initSearch);
-initSelectedTask();
 initLeadForm();
 openDetailsForHash();
 syncTabState();
