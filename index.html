@@ -48,8 +48,8 @@
       </div>
     </noscript>
     <!-- /Yandex.Metrika counter -->
-    <link rel="stylesheet" href="styles.css?v=20261107-laptop1">
-    <script src="script.js?v=20261106-design-a" defer></script>
+    <link rel="stylesheet" href="styles.css?v=20261125-lead">
+    <script src="script.js?v=20261125-lead" defer></script>
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -875,90 +875,59 @@
       </details>
 <section class="section contact" id="contact">
         <div class="contact-card">
-          <p class="contact-kicker">Обсудить расчёт</p>
-          <p class="eyebrow">Напишите нам</p>
-          <h2>Написать в Telegram</h2>
-          <p>Откройте наш Telegram и расскажите, какой щит или объект нужен. Можно приложить фото или проект. Чат не заполняется заранее: сообщение пишете вы.</p>
-          <p>Без регистрации и без корзины.</p>
-          <div class="contact-actions">
-            <a class="button primary" href="https://t.me/kam_ekb" target="_blank" rel="noopener" data-goal="click_telegram_contact">Открыть Telegram</a>
-            <a class="button ghost" href="tel:+79120507100" data-goal="click_phone_contact">Позвонить</a>
-          </div>
-          <p class="form-status" role="status"><strong>Форма на сайте не принимает заявки.</strong> Напишите в Telegram или позвоните.</p>
-          <div class="selected-task" data-selected-task hidden>
-            <span>Выбрано</span>
-            <strong data-selected-task-text></strong>
-            <button class="link-button" type="button" data-copy-task>Скопировать текст задачи</button>
-            <button class="link-button" type="button" data-clear-task>Сбросить</button>
-            <p data-copy-note></p>
-          </div>
-        </div>
-        <form class="lead-form" id="lead-form" name="lead" method="post" action="" hidden onsubmit="return false" aria-disabled="true" data-metrika-goal-when-delivered="lead_form_submit">
-            <p class="form-note" data-form-note>Заявка с этой формы не доставляется и не считается отправленной. Хостинг GitHub Pages не принимает сообщения, отдельный приёмник не подключён. Кнопка выключена специально, чтобы не показывать ложный успех.</p>
-            <fieldset disabled>
-              <input type="hidden" name="form-name" value="lead">
-              <input type="hidden" name="page_url" value="">
-              <input type="hidden" name="page_title" value="">
-              <p class="visually-hidden">
-                <label>
-                  Не заполняйте это поле
-                  <input name="bot-field">
-                </label>
-              </p>
-              <label>
-                Имя
-                <input name="name" autocomplete="name" placeholder="Как к вам обращаться">
-              </label>
-              <label>
-                Телефон
-                <input name="phone" inputmode="tel" autocomplete="tel" placeholder="+7 ___ ___-__-__">
-              </label>
-              <label>
-                Что нужно сделать
-                <select name="service">
-                  <option>Электромонтаж на объекте</option>
-                  <option>Электромонтаж коттеджа или дома</option>
-                  <option>Электромонтаж квартиры под ключ</option>
-                  <option>Электромонтаж производственного помещения</option>
-                  <option>Собрать щит</option>
-                  <option>Сборка щита + монтаж</option>
-                  <option>Нужна консультация</option>
-                </select>
-              </label>
-              <label>
-                Коротко о задаче
-                <textarea name="message" rows="5" placeholder="Например: коттедж 180 м2, нужен электромонтаж под ключ, есть план и фото объекта..."></textarea>
-              </label>
-              <div class="form-help">
-                <strong>Можно отправить даже без проекта.</strong>
-                <span>Если данных не хватит, мы уточним, что нужно прислать для нормальной оценки.</span>
+          <p class="contact-kicker">Заявка</p>
+          <h2>Напишите, что нужно посчитать</h2>
+          <p>Поля остаются в браузере: сайт их никуда не отправляет. Кнопка откроет Telegram или WhatsApp с текстом заявки. Фото, план или проект приложите в чате — предварительная оценка за 1–3 дня.</p>
+          <p class="form-status" data-lead-source hidden></p>
+          <form class="lead-form" id="lead-form" novalidate onsubmit="return false">
+            <fieldset class="lead-types">
+              <legend>Тип объекта</legend>
+              <div class="type-options">
+                <label class="lead-option"><input type="radio" name="object" value="Квартира"> Квартира</label>
+                <label class="lead-option"><input type="radio" name="object" value="Дом"> Дом</label>
+                <label class="lead-option"><input type="radio" name="object" value="Коммерция"> Коммерция</label>
+                <label class="lead-option"><input type="radio" name="object" value="Щит"> Щит</label>
               </div>
-              <button class="button primary" type="submit" disabled>Отправить заявку</button>
             </fieldset>
+            <label class="lead-field">
+              Площадь или что нужно
+              <input name="need" maxlength="240" autocomplete="off" placeholder="Например: 65 м², под ключ">
+            </label>
+            <label class="lead-field">
+              Район или город
+              <input name="place" maxlength="240" autocomplete="off" placeholder="Например: Академический, Екатеринбург">
+            </label>
+            <label class="lead-field">
+              Имя
+              <input name="name" maxlength="80" autocomplete="name" placeholder="Как к вам обращаться">
+            </label>
+            <label class="lead-field" for="lead-preview">
+              Текст для чата
+              <textarea id="lead-preview" readonly rows="6"></textarea>
+            </label>
+            <p class="form-note" id="lead-hint" role="status"></p>
+            <div class="contact-actions lead-actions">
+              <a class="button primary" id="lead-telegram" href="https://t.me/kam_ekb" target="_blank" rel="noopener" data-goal="click_telegram_contact" aria-describedby="lead-messenger-note">Написать в Telegram</a>
+              <a class="button primary" id="lead-whatsapp" href="https://wa.me/79120507100?text=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5!%20%D0%97%D0%B0%D1%8F%D0%B2%D0%BA%D0%B0%20%D1%81%20%D1%81%D0%B0%D0%B9%D1%82%D0%B0%20%D0%9A%D0%90%D0%9C%20%D0%AD%D0%BB%D0%B5%D0%BA%D1%82%D1%80%D0%BE.%0A%D0%A4%D0%BE%D1%82%D0%BE%2C%20%D0%BF%D0%BB%D0%B0%D0%BD%20%D0%B8%D0%BB%D0%B8%20%D0%BF%D1%80%D0%BE%D0%B5%D0%BA%D1%82%20%D0%BF%D1%80%D0%B8%D0%BB%D0%BE%D0%B6%D1%83%20%D0%B2%20%D1%87%D0%B0%D1%82%D0%B5." target="_blank" rel="noopener" data-goal="click_whatsapp_contact" aria-describedby="lead-messenger-note">Написать в WhatsApp</a>
+            </div>
+            <p class="search-hint" id="lead-messenger-note">В WhatsApp текст уже будет в сообщении. В Telegram он копируется: вставьте его в чат, если поле пустое.</p>
           </form>
+        </div>
         <div class="contact-copy">
-          <p class="eyebrow">Заявка</p>
-          <p class="contact-path">Это не форма. Такие сведения можно написать в Telegram или сказать по телефону.</p>
-          <h2>Пришлите вводные, и мы оценим электромонтаж объекта</h2>
-          <p>
-            Лучше всего приложить план, проект, фото объекта, список нагрузок или фото текущего щита.
-            Если документов нет, начнем с короткого звонка. Работаем по Екатеринбургу и
-            Свердловской области, щиты можем собирать отдельно и отправлять транспортной компанией.
-          </p>
-          <div class="contact-links" aria-label="Способы связи">
-            <a href="tel:+79120507100" data-goal="click_phone_contact">8 912 050-71-00</a>
-            <a href="https://wa.me/79120507100" target="_blank" rel="noopener" data-goal="click_whatsapp_contact">WhatsApp</a>
-            <a href="https://t.me/kam_ekb" target="_blank" rel="noopener" data-goal="click_telegram_contact">Telegram</a>
-            <a href="https://max.ru/u/f9LHodD0cOLynfdRttKoIF_j0KKoL1yJP9YbU3gEaWBa7ZW_3o2vPkf8S3E" target="_blank" rel="noopener" data-goal="click_max_contact">MAX</a>
-            <a href="mailto:kammsk87@gmail.com" data-goal="click_email_contact">kammsk87@gmail.com</a>
+          <p class="eyebrow">Другие способы</p>
+          <h2>Телефон и MAX</h2>
+          <p>Если удобнее без мессенджера — позвоните. Фото, план или проект можно отправить и в MAX.</p>
+          <div class="contact-actions">
+            <a class="button ghost" href="tel:+79120507100" data-goal="click_phone_contact">8 912 050-71-00</a>
+            <a class="button ghost" href="https://max.ru/u/f9LHodD0cOLynfdRttKoIF_j0KKoL1yJP9YbU3gEaWBa7ZW_3o2vPkf8S3E" target="_blank" rel="noopener" data-goal="click_max_contact">Написать в MAX</a>
           </div>
-          <div class="lead-checklist" aria-label="Что желательно указать в заявке">
-            <strong>Чтобы быстрее получить расчет, напишите:</strong>
+          <p><a class="text-link" href="mailto:kammsk87@gmail.com" data-goal="click_email_contact">kammsk87@gmail.com</a></p>
+          <div class="lead-checklist">
+            <strong>В тексте заявки достаточно:</strong>
             <ul>
-              <li>тип объекта: квартира, дом, коммерция или производство;</li>
-              <li>адрес или район в Екатеринбурге / Свердловской области;</li>
-              <li>есть ли проект, план, фото объекта или список нагрузок;</li>
-              <li>когда нужно начать работы и какой объем нужен под ключ.</li>
+              <li>типа объекта: квартира, дом, коммерция или щит;</li>
+              <li>района или города;</li>
+              <li>площади или что именно нужно сделать.</li>
             </ul>
           </div>
         </div>
